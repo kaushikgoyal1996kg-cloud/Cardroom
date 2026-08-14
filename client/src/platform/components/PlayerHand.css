@@ -1,0 +1,70 @@
+/* ==========================================================================
+   Local player's hand
+   ========================================================================== */
+
+.hand {
+  width: 100%;
+  padding: var(--space-3) var(--space-2) calc(var(--safe-bottom) + var(--space-3));
+  /* The hand itself never scrolls the page. */
+  touch-action: manipulation;
+  overscroll-behavior: contain;
+}
+
+.hand__fan {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  /* Room for the lift on a selected card, so it is never clipped. */
+  padding-top: 18px;
+  min-height: 5.5rem;
+}
+
+.hand__slot {
+  flex: 0 0 auto;
+  transform: translateY(var(--slot-lift, 0));
+  transition: transform var(--dur-base) var(--ease-settle);
+}
+
+/* Overlap every card after the first. */
+.hand__slot + .hand__slot {
+  margin-left: calc(var(--hand-overlap, 0%) * -1);
+}
+
+/* A selected or hovered card is raised above its neighbours so its full face
+   is readable, not half-covered by the next card along. */
+.hand__slot:hover,
+.hand__slot:focus-within {
+  z-index: 2;
+}
+
+.hand__slot:has(.is-selected) {
+  z-index: 3;
+}
+
+/* ---- Dealing ----------------------------------------------------------
+   Cards arrive one at a time from the deck at the centre of the table.   */
+
+@keyframes hand-deal-in {
+  from {
+    transform: translate(0, -40vh) scale(0.8) rotate(-8deg);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(var(--slot-lift, 0)) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.hand__slot--dealing {
+  animation: hand-deal-in var(--dur-deal) var(--ease-deal) backwards;
+  animation-delay: calc(var(--slot-index, 0) * 55ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hand__slot--dealing { animation: none; }
+}
+
+@media (max-width: 23.75rem) {
+  .hand { padding-left: var(--space-1); padding-right: var(--space-1); }
+  .hand__fan { min-height: 4.75rem; }
+}

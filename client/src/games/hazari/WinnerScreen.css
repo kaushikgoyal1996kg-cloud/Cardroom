@@ -1,0 +1,176 @@
+/* ==========================================================================
+   Match winner
+
+   Celebration by lighting and typography, not by flashing. One warm pool of
+   light, an elegant name, and the final scores. Reuses .score-list from
+   RoundSummary.css so the two screens read as one pair.
+   ========================================================================== */
+
+.winner {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  height: 100dvh;
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 10%, var(--room-700), transparent 70%),
+    var(--room-950);
+  color: var(--ink-200);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+
+.winner__lamp {
+  position: absolute;
+  top: -26vh;
+  left: 50%;
+  width: min(130vw, 760px);
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    circle,
+    rgba(200, 164, 92, 0.16) 0%,
+    rgba(200, 164, 92, 0.05) 40%,
+    transparent 66%
+  );
+  pointer-events: none;
+}
+
+.winner__scroll {
+  position: relative;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + var(--space-6))
+    calc(env(safe-area-inset-right, 0px) + var(--space-4))
+    var(--space-4)
+    calc(env(safe-area-inset-left, 0px) + var(--space-4));
+}
+
+.winner__scroll > * {
+  width: 100%;
+  max-width: 30rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ---- Headline ----------------------------------------------------------- */
+
+.winner__head {
+  text-align: center;
+  margin-bottom: var(--space-6);
+}
+
+.winner__eyebrow {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--brass-500);
+}
+
+.winner__avatar {
+  display: grid;
+  place-items: center;
+  margin-bottom: var(--space-3);
+}
+
+.winner__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 500;
+  line-height: 1.05;
+  color: var(--ink-100);
+}
+
+.winner__score {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+}
+
+.winner__score-value {
+  font-size: var(--text-xl);
+  color: var(--brass-300);
+}
+
+.winner__score-label {
+  font-size: var(--text-sm);
+  color: var(--ink-400);
+}
+
+.winner__you {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-wide);
+  color: var(--brass-300);
+}
+
+/* ---- Standings ---------------------------------------------------------- */
+
+.winner__standings-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+/* Winner row marked by a brass frame AND the word "winner". */
+.score-list__row.is-winner {
+  border: 1px solid var(--brass-600);
+  background: rgba(200, 164, 92, 0.08);
+}
+
+.winner__tag {
+  font-size: var(--text-xs);
+  color: var(--brass-300);
+}
+
+/* ---- Actions ------------------------------------------------------------ */
+
+.winner__actions {
+  position: relative;
+  display: grid;
+  gap: var(--space-2);
+  padding:
+    var(--space-3)
+    calc(env(safe-area-inset-right, 0px) + var(--space-4))
+    calc(env(safe-area-inset-bottom, 0px) + var(--space-3))
+    calc(env(safe-area-inset-left, 0px) + var(--space-4));
+  border-top: 1px solid var(--room-800);
+  background: linear-gradient(180deg, transparent, rgba(10, 9, 8, 0.7));
+}
+
+.winner__actions > * {
+  width: 100%;
+  max-width: 30rem;
+  margin: 0 auto;
+}
+
+.winner__actions .btn {
+  min-height: var(--touch-min);
+}
+
+.winner__waiting {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-400);
+  text-align: center;
+}
+
+/* ---- Landscape ---------------------------------------------------------- */
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .winner__scroll { padding-top: calc(env(safe-area-inset-top, 0px) + var(--space-3)); }
+  .winner__head { margin-bottom: var(--space-4); }
+  .winner__name { font-size: var(--text-2xl); }
+  .winner__lamp { display: none; }
+  .winner__actions {
+    grid-template-columns: 1fr 1fr;
+  }
+  .winner__actions .winner__waiting { grid-column: 1 / -1; }
+}

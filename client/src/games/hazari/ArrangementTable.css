@@ -1,0 +1,669 @@
+/* ==========================================================================
+   Hazari - arranging your hand
+
+   Same room as HazariTable: felt, wood, brass, warm ink. The four sets are
+   marked trays cut into the felt rather than dashboard panels, and the
+   player's remaining cards sit below as a hand, not a list.
+
+   Layout is a three-row grid on the dynamic viewport - header, felt, action
+   rail - so the Confirm button is always reachable without the page ever
+   scrolling sideways.
+   ========================================================================== */
+
+.arr {
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  height: 100dvh;
+  background:
+    radial-gradient(ellipse 90% 45% at 50% 0%, var(--room-800), transparent 70%),
+    var(--room-950);
+  color: var(--ink-200);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+
+/* ---- Header: one thin strip, no hero ----------------------------------- */
+
+.arr__bar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'title remaining'
+    'hint  hint';
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  padding:
+    calc(var(--safe-top) + var(--space-2))
+    calc(var(--safe-right) + var(--space-3))
+    var(--space-2)
+    calc(var(--safe-left) + var(--space-3));
+  border-bottom: 1px solid var(--room-800);
+}
+
+.arr__title {
+  grid-area: title;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--ink-100);
+}
+
+.arr__remaining {
+  grid-area: remaining;
+  font-family: var(--font-numeric);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-wide);
+  color: var(--brass-300);
+  white-space: nowrap;
+}
+
+.arr__hint {
+  grid-area: hint;
+  margin: 2px 0 0;
+  font-size: var(--text-xs);
+  color: var(--ink-500);
+}
+
+/* ---- Felt ---------------------------------------------------------------
+   A single continuous surface. The trays are marked ON it, so the screen
+   reads as one table rather than four floating cards.                      */
+
+.arr__felt {
+  position: relative;
+  min-height: 0;            /* lets this row actually shrink */
+  overflow-y: auto;
+  overflow-x: hidden;       /* never allow sideways page movement */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  margin: var(--space-2) calc(var(--safe-left) + var(--space-2)) 0
+          calc(var(--safe-right) + var(--space-2));
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--wood-700);
+  background:
+    radial-gradient(ellipse 80% 70% at 50% 30%,
+      var(--felt-500) 0%, var(--felt-600) 45%, var(--felt-800) 100%);
+  box-shadow:
+    inset 0 0 0 2px var(--brass-600),
+    inset 0 0 28px rgba(0, 0, 0, 0.5);
+}
+
+.arr__felt-texture {
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(-45deg, rgba(0,0,0,0.02) 0 1px, transparent 1px 3px);
+  pointer-events: none;
+}
+
+.arr__trays {
+  position: relative;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-2);
+}
+
+/* ---- Tray ---------------------------------------------------------------
+   Each set is an inlaid area: a darker recess in the felt with a brass
+   nameplate. Not a panel with a border and a heading.                      */
+
+.tray {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'plate  slots'
+    'status slots';
+  align-items: center;
+  gap: 2px var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.18);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+/* Brass nameplate. Small and engraved rather than a heading. */
+.tray__plate {
+  grid-area: plate;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 3.6rem;
+}
+
+.tray__name {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  line-height: 1;
+  color: var(--brass-300);
+  letter-spacing: 0.02em;
+}
+
+.tray__rank-hint {
+  font-size: 0.5625rem;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+.tray__count {
+  font-family: var(--font-numeric);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-400);
+}
+
+.tray__slots {
+  grid-area: slots;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.tray__card,
+.tray__empty {
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: var(--radius-card);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+
+.tray__card:focus-visible,
+.tray__empty:focus-visible {
+  outline: 3px solid var(--brass-300);
+  outline-offset: 3px;
+}
+
+/* An empty place in a set: a scored outline on the felt. */
+.tray__empty {
+  width: 2.375rem;             /* matches PlayingCard --pcard--sm */
+  height: 3.37rem;
+  border: 1px dashed rgba(200, 164, 92, 0.35);
+  background: rgba(0, 0, 0, 0.12);
+  transition:
+    border-color var(--dur-fast) var(--ease-smooth),
+    background-color var(--dur-fast) var(--ease-smooth);
+}
+
+.tray__empty:disabled {
+  cursor: default;
+}
+
+/* When a card is in hand, valid destinations brighten - so it's obvious
+   where the selected card can go. */
+.tray.can-accept .tray__empty:not(:disabled) {
+  border-color: var(--brass-400);
+  border-style: solid;
+  background: rgba(200, 164, 92, 0.12);
+}
+
+.tray__status {
+  grid-area: status;
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  color: var(--ink-400);
+  min-height: 1em;
+}
+
+/* Invalid ordering: brass turns to a warning edge AND the text carries a
+   mark, so it never depends on colour alone. */
+.tray.is-invalid {
+  box-shadow:
+    inset 0 0 0 1px var(--status-lost),
+    inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.tray__status.is-invalid {
+  color: var(--status-lost);
+  font-weight: 500;
+}
+
+/* ---- The player's remaining cards --------------------------------------- */
+
+.arr__hand {
+  padding: var(--space-2) calc(var(--safe-right) + var(--space-2)) 0
+           calc(var(--safe-left) + var(--space-2));
+}
+
+/* When everything is placed, take no space at all. */
+.arr__hand.is-empty {
+  padding: 0;
+}
+
+.arr__hand-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.arr__hand-label {
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+/* Compact sort control: "Sort  Rank | Suit | Dealt" */
+.sortbar {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid var(--wood-700);
+  border-radius: var(--radius-pill);
+  background: var(--room-900);
+}
+
+.sortbar__label {
+  padding: 0 var(--space-2) 0 var(--space-1);
+  font-size: 0.5625rem;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+.sortbar__btn {
+  min-height: 30px;
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink-300);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color var(--dur-fast) var(--ease-smooth);
+}
+
+.sortbar__btn.is-active {
+  background: var(--brass-500);
+  color: var(--room-950);
+  font-weight: 600;
+}
+
+.sortbar__btn:focus-visible {
+  outline: 3px solid var(--brass-300);
+  outline-offset: 2px;
+}
+
+/* The fan. Scrolls horizontally WITHIN itself so 13 cards never force the
+   page to move sideways, and cards stay a readable size. */
+.arr__fan {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  padding: 18px 0 var(--space-2);   /* headroom for the lift on selection */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+}
+
+.arr__fan::-webkit-scrollbar {
+  display: none;
+}
+
+.arr__fan-card {
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-fast) var(--ease-settle);
+}
+
+/* Controlled overlap. Cards keep their full size; only the spacing tightens. */
+.arr__fan-card + .arr__fan-card {
+  margin-left: -0.9rem;
+}
+
+.arr__fan-card:focus-visible {
+  outline: 3px solid var(--brass-300);
+  outline-offset: 3px;
+  border-radius: var(--radius-card);
+  z-index: 3;
+}
+
+/* A picked-up card sits above its neighbours so its face is fully readable. */
+.arr__fan-card:has(.is-selected) {
+  z-index: 4;
+}
+
+.arr__fan-card:hover {
+  z-index: 2;
+}
+
+/* Deal-in, matched to the table's dealing language. */
+@keyframes arr-deal-in {
+  from { transform: translate(0, -30vh) scale(0.85) rotate(-6deg); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+.arr__fan-card.is-dealing {
+  animation: arr-deal-in var(--dur-deal) var(--ease-deal) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arr__fan-card.is-dealing { animation: none; }
+}
+
+/* ---- Action rail -------------------------------------------------------- */
+
+.arr__actions {
+  padding:
+    var(--space-2)
+    calc(var(--safe-right) + var(--space-3))
+    calc(var(--safe-bottom) + var(--space-2))
+    calc(var(--safe-left) + var(--space-3));
+  border-top: 1px solid var(--room-800);
+  background: linear-gradient(180deg, transparent, rgba(10, 9, 8, 0.65));
+}
+
+/* One consolidated line, not a wall of warnings. */
+.arr__status {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  text-align: center;
+  color: var(--ink-400);
+  min-height: 1.2em;
+}
+
+.arr__status.is-ready {
+  color: var(--brass-300);
+}
+
+.arr__status.is-error {
+  color: var(--status-lost);
+}
+
+.arr__buttons {
+  display: flex;
+  gap: var(--space-2);
+  align-items: stretch;
+}
+
+.arr__btn-reset {
+  flex: 0 0 auto;
+}
+
+.arr__buttons .btn {
+  min-height: var(--touch-min);
+}
+
+/* Confirm takes the remaining width, so it is always the biggest target. */
+.arr__btn-confirm {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* ---- Dismissal ----------------------------------------------------------
+   Folded away behind a single line. Important, but exceptional - it must not
+   compete with Confirm.                                                     */
+
+.dismiss {
+  margin-top: var(--space-2);
+}
+
+.dismiss__summary {
+  list-style: none;
+  cursor: pointer;
+  padding: var(--space-1) 0;
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  color: var(--status-away);
+  text-align: center;
+}
+
+.dismiss__summary::-webkit-details-marker {
+  display: none;
+}
+
+.dismiss__summary::after {
+  content: ' ▾';
+}
+
+.dismiss[open] .dismiss__summary::after {
+  content: ' ▴';
+}
+
+.dismiss__summary:focus-visible {
+  outline: 3px solid var(--brass-300);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.dismiss__body {
+  padding: var(--space-2);
+  margin-top: var(--space-1);
+  border: 1px solid var(--wood-700);
+  border-radius: var(--radius-md);
+  background: var(--room-900);
+}
+
+.dismiss__reason,
+.dismiss__consequence {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--ink-300);
+}
+
+.dismiss__action {
+  width: 100%;
+  border-color: var(--status-lost);
+  color: var(--status-lost);
+}
+
+/* ---- Suggestions --------------------------------------------------------
+   Only ever rendered when assistance is permitted.                          */
+
+.suggest {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  align-items: end;
+  padding: var(--space-3);
+  padding-bottom: calc(var(--safe-bottom) + var(--space-3));
+  background: rgba(10, 9, 8, 0.74);
+}
+
+.suggest__sheet {
+  width: 100%;
+  max-width: 32rem;
+  margin: 0 auto;
+  max-height: 78dvh;
+  overflow-y: auto;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--wood-600);
+  background: linear-gradient(165deg, var(--wood-800), var(--room-900));
+  box-shadow: var(--shadow-lg);
+  animation: suggest-rise var(--dur-slow) var(--ease-settle);
+}
+
+@keyframes suggest-rise {
+  from { transform: translateY(18px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .suggest__sheet { animation: none; }
+}
+
+.suggest__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.suggest__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 500;
+  color: var(--ink-100);
+}
+
+.suggest__close {
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  border: none;
+  background: none;
+  color: var(--ink-400);
+  font-size: var(--text-lg);
+  cursor: pointer;
+}
+
+.suggest__close:focus-visible {
+  outline: 3px solid var(--brass-300);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.suggest__note {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--brass-300);
+}
+
+.suggest__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.suggest__option {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: var(--space-3);
+  border: 1px solid var(--wood-700);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-smooth);
+}
+
+.suggest__option:hover {
+  border-color: var(--brass-500);
+}
+
+.suggest__option:focus-visible {
+  outline: 3px solid var(--brass-300);
+  outline-offset: 2px;
+}
+
+.suggest__option-label {
+  font-size: var(--text-base);
+  color: var(--ink-100);
+}
+
+.suggest__option-desc {
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  color: var(--ink-400);
+}
+
+.suggest__option-sets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+
+.suggest__tag {
+  padding: 1px var(--space-2);
+  border: 1px solid var(--wood-600);
+  border-radius: var(--radius-sm);
+  font-size: 0.625rem;
+  color: var(--brass-300);
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+/* Very narrow phones (320px). Tighten the nameplate column and overlap the
+   fan harder - card SIZE is never reduced. */
+@media (max-width: 22.5rem) {
+  .tray {
+    grid-template-columns: auto 1fr;
+    gap: 2px var(--space-1);
+    padding: var(--space-1) var(--space-2);
+  }
+  .tray__plate { min-width: 3.1rem; }
+  .tray__name { font-size: var(--text-xs); }
+  .tray__rank-hint { display: none; }
+  .arr__fan-card + .arr__fan-card { margin-left: -1.1rem; }
+  .sortbar__btn { padding: 0 var(--space-2); }
+  .sortbar__label { display: none; }
+}
+
+/* Roomier phones: the 3-card sets pair up two per row, so the felt shows
+   more at once without shrinking anything. */
+@media (min-width: 26rem) {
+  .arr__trays {
+    grid-template-columns: 1fr 1fr;
+  }
+  /* Set 4 holds four cards, so it keeps the full width. */
+  .tray--4 {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Landscape phones: felt and hand sit side by side so the action rail and
+   the cards are both visible without scrolling. */
+@media (orientation: landscape) and (max-height: 30rem) {
+  .arr { grid-template-rows: auto 1fr auto; }
+  .arr__bar { padding-top: var(--space-1); padding-bottom: var(--space-1); }
+  .arr__hint { display: none; }
+  .arr__fan { padding-top: 14px; padding-bottom: var(--space-1); }
+  .arr__trays { grid-template-columns: 1fr 1fr; }
+}
+
+/* Tablet and desktop: the whole surface centres at a natural width instead
+   of stretching across the window. */
+@media (min-width: 48rem) {
+  .arr__felt,
+  .arr__hand,
+  .arr__actions {
+    width: 100%;
+    max-width: 46rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .arr__trays {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+  .arr__fan-card + .arr__fan-card { margin-left: -0.5rem; }
+  .arr__fan { justify-content: center; }
+}

@@ -1,0 +1,37 @@
+/* ==========================================================================
+   Dealer button
+   ========================================================================== */
+
+.dealer-token {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 1.75rem;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, var(--brass-300), var(--brass-500) 62%, var(--brass-600));
+  border: 1px solid var(--brass-600);
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+  z-index: 3;
+  /* Slides across the felt when the deal passes on. */
+  transition:
+    left var(--dur-slow) var(--ease-settle),
+    top var(--dur-slow) var(--ease-settle);
+}
+
+.dealer-token__face {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--wood-900);
+}
+
+@media (max-width: 23.75rem) {
+  .dealer-token { width: 1.5rem; height: 1.5rem; }
+  .dealer-token__face { font-size: var(--text-sm); }
+}

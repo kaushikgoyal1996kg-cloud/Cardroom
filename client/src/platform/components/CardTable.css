@@ -1,0 +1,237 @@
+/* ==========================================================================
+   The card table
+
+   Sized from the viewport so the felt always dominates the game screen.
+   Uses dvh, not vh, so the mobile browser's collapsing address bar does not
+   push the bottom seat or the hand off-screen.
+   ========================================================================== */
+
+.table {
+  position: relative;
+  width: 100%;
+  max-width: 60rem;
+  margin: 0 auto;
+  aspect-ratio: 4 / 5;
+  max-height: 72dvh;
+  padding: 1.4%;
+  border-radius: 46% / 34%;
+  isolation: isolate;
+}
+
+/* ---- Wooden surround --------------------------------------------------- */
+
+.table__wood {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(148deg, var(--wood-highlight) 0%, var(--wood-700) 22%,
+      var(--wood-900) 55%, var(--wood-700) 88%, var(--wood-600) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(200, 164, 92, 0.16),
+    var(--shadow-lg);
+}
+
+/* Fine grain. A repeating gradient rather than an image keeps this free. */
+.table__wood::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: repeating-linear-gradient(
+    96deg,
+    transparent 0 2px,
+    rgba(0, 0, 0, 0.05) 2px 3px,
+    transparent 3px 7px
+  );
+  opacity: 0.6;
+}
+
+/* ---- Felt -------------------------------------------------------------- */
+
+.table__felt {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 45% / 33%;
+  background:
+    radial-gradient(ellipse 62% 58% at 50% 42%,
+      var(--felt-500) 0%, var(--felt-600) 42%, var(--felt-800) 100%);
+  box-shadow:
+    inset 0 0 0 2px var(--brass-600),
+    inset 0 0 34px rgba(0, 0, 0, 0.55),
+    inset 0 6px 20px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+/* Felt nap - a very fine speckle, kept subtle enough to read as texture
+   rather than noise. */
+.table__felt-texture {
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(-45deg, rgba(0,0,0,0.02) 0 1px, transparent 1px 3px);
+  pointer-events: none;
+}
+
+/* The lamp above the table. */
+.table__light {
+  position: absolute;
+  top: -18%;
+  left: 50%;
+  width: 78%;
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  background: radial-gradient(circle,
+    rgba(255, 240, 205, 0.10) 0%,
+    rgba(255, 240, 205, 0.03) 45%,
+    transparent 68%);
+  pointer-events: none;
+}
+
+/* ---- Centre ------------------------------------------------------------ */
+
+.table__centre {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.table__centre-label {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  letter-spacing: var(--tracking-wide);
+  color: rgba(246, 241, 228, 0.42);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ---- Deck -------------------------------------------------------------- */
+
+.table__deck {
+  position: relative;
+  width: 3rem;
+  height: 4.26rem;
+}
+
+.table__deck-card {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-card);
+  background: var(--card-back);
+  border: 1px solid var(--brass-600);
+  box-shadow: var(--shadow-sm);
+}
+
+.table__deck-card:nth-child(1) { transform: translate(-2px, -2px) rotate(-2deg); }
+.table__deck-card:nth-child(2) { transform: translate(1px, -1px) rotate(1.5deg); }
+.table__deck-card:nth-child(3) { transform: translate(0, 0) rotate(0deg); }
+
+/* ---- Played sets ------------------------------------------------------- */
+
+.table__played {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  gap: 2px;
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  transition:
+    left var(--dur-slow) var(--ease-deal),
+    top var(--dur-slow) var(--ease-deal);
+}
+
+.table__played.is-winning {
+  background: rgba(200, 164, 92, 0.10);
+  box-shadow: 0 0 0 1px var(--brass-600);
+}
+
+/* ---- Small screens -----------------------------------------------------
+   Below 380px the table gets slightly taller relative to its width so the
+   side seats keep room to breathe.                                        */
+
+@media (max-width: 23.75rem) {
+  .table {
+    aspect-ratio: 3 / 4;
+    padding: 1.2%;
+  }
+}
+
+/* Landscape phones: the table goes wide and short, and we cap by height so
+   the local player's hand always stays on screen below it. */
+@media (orientation: landscape) and (max-height: 30rem) {
+  .table {
+    aspect-ratio: 16 / 9;
+    max-height: 62dvh;
+  }
+}
+
+/* ---- Dealing -------------------------------------------------------------
+   Face-down cards travel from the deck at the centre out to each seat. The
+   whole animation runs on transform/opacity so it stays on the compositor.
+   Cards here carry no data - see CardTable.tsx.                            */
+
+.table__dealt {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: table-deal-out var(--dur-deal) var(--ease-deal) backwards;
+  animation-delay: var(--deal-delay, 0ms);
+}
+
+@keyframes table-deal-out {
+  from {
+    transform: translate(-50%, -50%)
+      translate(var(--deal-from-x, 0), var(--deal-from-y, 0))
+      scale(0.9) rotate(0deg);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1) rotate(var(--deal-tilt, 0deg));
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .table__dealt {
+    animation: none;
+  }
+}
+
+/* ---- Card play travel ----------------------------------------------------
+   A set moves from its owner's seat onto the felt. Restrained: a short
+   glide with a slight settle, no arcs or flourishes. Only sets marked
+   `arriving` animate, so reconnect never replays old plays.                */
+
+@keyframes table-play-travel {
+  from {
+    transform: translate(-50%, -50%)
+      translate(var(--play-from-x, 0), var(--play-from-y, 0))
+      scale(0.92);
+    opacity: 0.4;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+
+.table__played.is-arriving {
+  animation: table-play-travel var(--dur-slow) var(--ease-deal) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .table__played.is-arriving {
+    animation: none;
+  }
+}

@@ -1,0 +1,51 @@
+/* ==========================================================================
+   The deal
+
+   Same room as HazariTable: the felt fills the screen and a single quiet
+   caption sits beneath it. Deliberately sparse - this screen lasts about a
+   second and a half and then hands over to the arrangement screen.
+   ========================================================================== */
+
+.dealing {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  height: 100dvh;
+  background:
+    radial-gradient(ellipse 90% 50% at 50% 0%, var(--room-800), transparent 70%),
+    var(--room-950);
+  color: var(--ink-200);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+
+.dealing__table-area {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding:
+    calc(var(--safe-top) + var(--space-3))
+    calc(var(--safe-right) + var(--space-2))
+    0
+    calc(var(--safe-left) + var(--space-2));
+}
+
+.dealing__caption {
+  margin: 0;
+  padding:
+    var(--space-3)
+    var(--space-3)
+    calc(var(--safe-bottom) + var(--space-4));
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  letter-spacing: var(--tracking-wide);
+  color: var(--brass-300);
+}
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .dealing__caption {
+    padding-top: var(--space-1);
+    padding-bottom: calc(var(--safe-bottom) + var(--space-2));
+    font-size: var(--text-base);
+  }
+}

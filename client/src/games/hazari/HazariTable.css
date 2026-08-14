@@ -1,0 +1,310 @@
+/* ==========================================================================
+   Hazari at the table
+
+   Layout is a three-row grid pinned to the dynamic viewport: a thin status
+   strip, the felt (which takes all remaining space), and the player's own
+   sets. Using dvh rather than vh means the mobile address bar collapsing
+   never pushes the Play button off-screen.
+   ========================================================================== */
+
+.hazari {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100dvh;
+  background:
+    radial-gradient(ellipse 90% 50% at 50% 0%, var(--room-800), transparent 70%),
+    var(--room-950);
+  color: var(--ink-200);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+
+/* ---- Status strip ------------------------------------------------------
+   One line, three facts. Deliberately not a dashboard: scores live on the
+   seats where they belong, next to the player they describe.              */
+
+.hazari__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding:
+    calc(var(--safe-top) + var(--space-2))
+    calc(var(--safe-right) + var(--space-3))
+    var(--space-2)
+    calc(var(--safe-left) + var(--space-3));
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  color: var(--ink-400);
+  border-bottom: 1px solid var(--room-800);
+}
+
+.hazari__room {
+  font-family: var(--font-numeric);
+  color: var(--brass-300);
+  font-variant-numeric: tabular-nums;
+}
+
+.hazari__round {
+  text-align: center;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hazari__points {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Felt --------------------------------------------------------------- */
+
+.hazari__table-area {
+  display: grid;
+  place-items: center;
+  min-height: 0; /* lets the grid row actually shrink on short screens */
+  padding: var(--space-2) var(--space-2) 0;
+}
+
+/* ---- The player's own sets ---------------------------------------------- */
+
+.hazari__hand {
+  padding:
+    var(--space-2)
+    calc(var(--safe-right) + var(--space-2))
+    calc(var(--safe-bottom) + var(--space-2))
+    calc(var(--safe-left) + var(--space-2));
+  border-top: 1px solid var(--room-800);
+  background: linear-gradient(180deg, transparent, rgba(10, 9, 8, 0.6));
+}
+
+.hazari__sets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.hazari__set {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-1) 2px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  min-width: 0;
+}
+
+/* The set about to be played is marked by a brass frame AND a brighter
+   label - never by colour alone. */
+.hazari__set.is-active {
+  border-color: var(--brass-500);
+  background: rgba(200, 164, 92, 0.07);
+}
+
+.hazari__set.is-done {
+  opacity: 0.4;
+}
+
+.hazari__set-label {
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--ink-500);
+  white-space: nowrap;
+}
+
+.hazari__set.is-active .hazari__set-label {
+  color: var(--brass-300);
+}
+
+.hazari__set-cards {
+  display: flex;
+  justify-content: center;
+}
+
+/* Cards inside a set overlap so all four sets fit across a 320px screen. */
+.hazari__set-cards > * + * {
+  margin-left: -1.05rem;
+}
+
+/* ---- Action ------------------------------------------------------------- */
+
+.hazari__action {
+  min-height: var(--touch-min);
+  display: grid;
+  place-items: center;
+}
+
+.hazari__play {
+  width: 100%;
+  max-width: 22rem;
+}
+
+.hazari__waiting {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-400);
+}
+
+/* ---- Toast -------------------------------------------------------------- */
+
+.hazari__toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--safe-bottom) + var(--space-6));
+  transform: translateX(-50%);
+  max-width: min(90vw, 24rem);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--status-lost);
+  background: var(--room-800);
+  color: var(--ink-100);
+  font-size: var(--text-sm);
+  box-shadow: var(--shadow-lg);
+  cursor: pointer;
+  z-index: 40;
+}
+
+/* ---- Reveal -------------------------------------------------------------
+   A sheet rather than a spreadsheet modal: it rises from the bottom, shows
+   the four hands with the winner framed in brass, and leaves.              */
+
+.reveal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  align-items: end;
+  background: rgba(10, 9, 8, 0.72);
+  z-index: 50;
+  padding: var(--space-3);
+  padding-bottom: calc(var(--safe-bottom) + var(--space-3));
+}
+
+.reveal__sheet {
+  width: 100%;
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--wood-600);
+  background: linear-gradient(165deg, var(--wood-800), var(--room-900));
+  box-shadow: var(--shadow-lg);
+  animation: reveal-rise var(--dur-slow) var(--ease-settle);
+}
+
+@keyframes reveal-rise {
+  from { transform: translateY(18px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal__sheet { animation: none; }
+}
+
+.reveal__title {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 500;
+  color: var(--ink-100);
+  text-align: center;
+}
+
+.reveal__tie {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--status-away);
+  text-align: center;
+}
+
+.reveal__hands {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.reveal__hand {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'name  cards'
+    'label cards';
+  align-items: center;
+  gap: 0 var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+}
+
+.reveal__hand.is-winner {
+  border-color: var(--brass-500);
+  background: rgba(200, 164, 92, 0.08);
+}
+
+.reveal__hand-name {
+  grid-area: name;
+  font-size: var(--text-base);
+  color: var(--ink-100);
+}
+
+.reveal__won {
+  color: var(--brass-300);
+  font-size: var(--text-sm);
+}
+
+.reveal__hand-label {
+  grid-area: label;
+  font-size: var(--text-xs);
+  color: var(--ink-400);
+}
+
+.reveal__hand-cards {
+  grid-area: cards;
+  display: flex;
+  gap: 2px;
+}
+
+.reveal__points {
+  margin: 0 0 var(--space-3);
+  text-align: center;
+  font-size: var(--text-base);
+  color: var(--brass-300);
+}
+
+.reveal__sheet .btn {
+  width: 100%;
+}
+
+/* ---- Narrow phones (320px) ---------------------------------------------- */
+
+@media (max-width: 23.75rem) {
+  .hazari__set-cards > * + * { margin-left: -1.15rem; }
+  .hazari__set-label { font-size: 0.625rem; }
+}
+
+/* ---- Landscape ----------------------------------------------------------
+   Sets move beside the table so the felt keeps its height.                 */
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .hazari__sets { grid-template-columns: repeat(4, 1fr); }
+  .hazari__hand { padding-top: var(--space-1); }
+  .hazari__bar { padding-top: var(--space-1); padding-bottom: var(--space-1); }
+}
+
+/* ---- Desktop ------------------------------------------------------------
+   The table stays its natural size and centres; the sets strip is capped so
+   it does not stretch into a banner.                                       */
+
+@media (min-width: 48rem) {
+  .hazari__sets {
+    max-width: 40rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .hazari__set-cards > * + * { margin-left: -0.75rem; }
+}

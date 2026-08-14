@@ -1,0 +1,43 @@
+# ============================================================================
+# Root .gitignore — applies to the whole repo (client/ and server/).
+# Added during the pre-publish safety audit: previously only server/.gitignore
+# existed, and it did not exclude real .env files. Nothing in this project
+# currently contains secrets, but this file exists so a future `git add .`
+# run from a machine with real local secrets can't accidentally commit them.
+# ============================================================================
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment files — real secrets live here, never commit them.
+# Template/example files are explicitly re-included below.
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.staging
+!.env.example
+!.env.local.example
+!*.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Netlify local state
+.netlify/
+
+# Test/coverage output
+coverage/

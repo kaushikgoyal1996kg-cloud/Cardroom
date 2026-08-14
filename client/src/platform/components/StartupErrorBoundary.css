@@ -1,0 +1,79 @@
+/* ==========================================================================
+   Startup error
+
+   Deliberately plain and self-contained: it must render even if something in
+   the design system is what failed. Uses the platform tokens where available
+   but falls back to literal colours, so it can never itself be the reason a
+   player sees a blank page.
+   ========================================================================== */
+
+.startup-error {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 24px)
+    calc(env(safe-area-inset-right, 0px) + 20px)
+    calc(env(safe-area-inset-bottom, 0px) + 24px)
+    calc(env(safe-area-inset-left, 0px) + 20px);
+  background: var(--room-950, #0a0908);
+  color: var(--ink-200, #e6dcc6);
+  font-family: var(--font-body, -apple-system, BlinkMacSystemFont, sans-serif);
+  overflow-x: hidden;
+}
+
+.startup-error__sheet {
+  width: 100%;
+  max-width: 26rem;
+  text-align: center;
+}
+
+.startup-error__eyebrow {
+  margin: 0 0 4px;
+  font-size: 0.6875rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--brass-500, #a8843f);
+}
+
+.startup-error__title {
+  margin: 0 0 16px;
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 1.5rem;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--ink-100, #f6f1e4);
+}
+
+.startup-error__message {
+  margin: 0 0 12px;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--ink-300, #c4b699);
+}
+
+.startup-error__hint {
+  margin: 0 0 24px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--ink-500, #6e6252);
+}
+
+.startup-error__action {
+  min-height: 44px;
+  padding: 12px 28px;
+  border: 1px solid var(--brass-600, #8c6d34);
+  border-radius: 8px;
+  background: var(--brass-400, #c8a45c);
+  color: var(--room-950, #0a0908);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.startup-error__action:focus-visible {
+  outline: 3px solid var(--brass-300, #dcc086);
+  outline-offset: 2px;
+}
