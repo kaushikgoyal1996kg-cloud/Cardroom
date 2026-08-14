@@ -133,14 +133,28 @@
 }
 
 
-/* Landscape phones: height is the scarce dimension, so drop the stacking
-   offsets and let the panel scroll internally. */
+/* This block previously targeted `.voice-toggle` / `.voice-panel`, which do
+   not exist - the real classes are `.voice-call-toggle` / `.voice-call-panel`
+   (see VoiceCallPanel.tsx) - so it was a silent no-op in every browser.
+
+   Retargeting the selectors was tried, but the values it carried (a flat
+   `+ 58px` / `+ 10px`, no `var(--action-reserve)` term at all) are exactly
+   the thing tokens.css warns against: "The rails are only marginally
+   shorter [in landscape] ... dropping [the reserve] put the chat toggle
+   straight on top of 'Play' and 'Confirm hand'." Reactivating this rule
+   as-written would very likely put the voice FAB on top of the hand/cards
+   on the Hazari Table in landscape, without an actual device to check.
+
+   The base rule two blocks up already includes `var(--action-reserve)`,
+   which tokens.css itself already scales down slightly for landscape, so
+   the toggle's resting position is intentionally left alone here - adding
+   back a flat offset that drops the reserve is exactly the bug above.
+   What genuinely helps on a short landscape screen is capping the OPEN
+   panel's own height tighter so it scrolls internally instead of reaching
+   down toward the felt; that doesn't carry the same collision risk since
+   the panel only appears when the player opens it. */
 @media (orientation: landscape) and (max-height: 30rem) {
-  .voice-toggle {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 58px);
-  }
-  .voice-panel {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
-    max-height: 78dvh;
+  .voice-call-panel {
+    max-height: 62dvh;
   }
 }

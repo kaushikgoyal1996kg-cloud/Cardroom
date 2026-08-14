@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useGame } from '../../lib/GameStore';
 import { AvatarBadge } from './AvatarPicker';
-import './Lobby.css';
+import './RoomLobby.css';
 
 export function RoomLobby() {
   const { room, myPlayerId, setReady, startGame, addBot, leaveSession } = useGame();
@@ -37,7 +37,7 @@ export function RoomLobby() {
     <div className="room-lobby">
       <h1 className="wordmark room-lobby__title">Haazari Room</h1>
 
-      <div className="room-lobby__code panel">
+      <div className="room-lobby__code">
         <span className="text-muted">Room Code</span>
         <div className="room-lobby__code-value">{room.roomCode}</div>
         <span className="text-muted">Share this code with 3 friends</span>
@@ -47,7 +47,7 @@ export function RoomLobby() {
         {shareCopied && <span className="room-lobby__share-copied text-muted">Link copied!</span>}
       </div>
 
-      <div className="room-lobby__players panel">
+      <div className="room-lobby__players">
         {[0, 1, 2, 3].map((i) => {
           const p = room.players[i];
           return (

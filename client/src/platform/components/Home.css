@@ -400,6 +400,80 @@
   }
 }
 
+/* ---- Short mobile landscape ---------------------------------------------
+   Height is the scarce dimension here, not width. Confirmed on staging: the
+   hero ate too much vertical space, the primary action ("Play <game>",
+   functionally a quick match) was partly clipped, and the join row fell
+   below the viewport. Compress the header, drop the purely atmospheric
+   lamp, and let the three game cards sit side by side (the same pattern
+   already used at the desktop breakpoint below) instead of stacked, so
+   everything essential fits without shrinking any control below its touch
+   target or hiding it off-screen.                                          */
+@media (orientation: landscape) and (max-height: 30rem) {
+  .home {
+    padding-top: calc(var(--safe-top) + var(--space-2));
+    padding-bottom: calc(var(--safe-bottom) + var(--space-2));
+  }
+
+  .home__lamp {
+    display: none;
+  }
+
+  .home__header {
+    margin-bottom: var(--space-3);
+  }
+
+  .home__eyebrow {
+    display: none;
+  }
+
+  .home__brand {
+    font-size: var(--text-xl);
+  }
+
+  .home__identity {
+    margin-top: var(--space-2);
+    min-height: 36px;
+    padding: var(--space-1) var(--space-3);
+  }
+
+  .home__section-title {
+    margin-bottom: var(--space-2);
+  }
+
+  .home__games {
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+
+  .gamecard {
+    padding: var(--space-2);
+  }
+
+  .gamecard__mark {
+    margin-bottom: var(--space-1);
+  }
+
+  .gamecard__name {
+    font-size: var(--text-lg);
+  }
+
+  /* The blurb is the first thing to give up its space on a short screen -
+     name plus player/card count is enough to choose between three games. */
+  .gamecard__blurb {
+    display: none;
+  }
+
+  .home__actions {
+    margin-bottom: var(--space-3);
+  }
+
+  .home__join {
+    padding-top: var(--space-3);
+  }
+}
+
 /* A game with no server controller yet states why, in words. */
 .home__unavailable {
   margin: calc(var(--space-3) * -1) 0 var(--space-5);

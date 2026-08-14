@@ -543,6 +543,25 @@ function readSession(): StoredSession | null {
   }
 }
 
+/**
+ * Read-only check for the UI layer: does this browser already hold a stored
+ * session (a real reconnect token) for the given room code?
+ *
+ * Exists to close a duplicate-player gap: on connect, GameStore always
+ * attempts `room:reconnect` first using any stored session (see the
+ * `onConnect` handler above) - but that is an async round trip, and while it
+ * is in flight `App` still has `room === null`, so it still renders the
+ * invite-link flow. If that flow's "Join" button were tapped in that window,
+ * it would call `room:join` and create a brand-new player/token, even though
+ * a reconnect for the very same room was already on its way - leaving one
+ * stale, orphaned seat behind (see HomeScreen's use of this function).
+ * This performs no side effect and changes no reconnect/session/protocol
+ * behaviour; it only lets the UI avoid offering a redundant join.
+ */
+export function getStoredSessionRoomCode(): string | null {
+  return readSession()?.roomCode ?? null;
+}
+
 function storeSession(s: StoredSession): void {
   try {
     localStorage.setItem(SESSION_KEY, JSON.stringify(s));

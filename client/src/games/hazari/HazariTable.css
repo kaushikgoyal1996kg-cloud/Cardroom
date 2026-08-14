@@ -28,9 +28,12 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+  /* Right padding clears the fixed settings gear (top-right on every active
+     screen) - confirmed colliding with "0/360" on staging, in both
+     orientations since the gear does not move between them. */
   padding:
     calc(var(--safe-top) + var(--space-2))
-    calc(var(--safe-right) + var(--space-3))
+    calc(var(--safe-right) + var(--top-fab-reserve))
     var(--space-2)
     calc(var(--safe-left) + var(--space-3));
   font-size: var(--text-xs);

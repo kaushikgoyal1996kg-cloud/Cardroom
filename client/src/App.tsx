@@ -17,6 +17,7 @@ import { LoadingSpinner } from './components/LoadingSpinner';
 import { TutorialModal } from './components/TutorialModal';
 import { ChatPanel } from './components/ChatPanel';
 import { VoiceCallPanel } from './components/VoiceCallPanel';
+import { UpdateBanner } from './components/UpdateBanner';
 import { hasSeenTutorial } from './lib/tutorial';
 import './App.css';
 
@@ -207,6 +208,7 @@ export function App() {
     // space for whatever action rail the current screen puts at the bottom,
     // declaratively in CSS rather than by measuring the DOM.
     <div className="app-root" data-screen={screenKey}>
+      <UpdateBanner />
       {showConnBanner && connectionStatus !== 'connected' && (
         <div className="conn-banner">
           {hasConnectedOnce

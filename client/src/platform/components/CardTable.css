@@ -113,6 +113,16 @@
   white-space: nowrap;
 }
 
+/* The local player's own turn is a call to action, not ambient status - it
+   gets the brass treatment (plus a soft glow, so it also reads at a glance
+   against the top-centre seat behind it) rather than the same quiet
+   low-opacity label used for "Waiting for X". */
+.table__centre-label.is-emphasis {
+  color: var(--brass-300);
+  text-shadow: 0 0 16px var(--brass-glow), 0 1px 3px rgba(0, 0, 0, 0.6);
+  font-weight: 600;
+}
+
 /* ---- Deck -------------------------------------------------------------- */
 
 .table__deck {

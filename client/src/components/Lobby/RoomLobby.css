@@ -1,0 +1,295 @@
+/* ==========================================================================
+   Room Lobby - a waiting room inside The Card Room
+
+   Same shell language as Home: dark room, one overhead lamp, brass accents,
+   Cinzel for the title, wood-panelled cards for content. This used to be
+   its own legacy green-and-gold screen (see SESSION_CHANGELOG.md); it now
+   reads as another room inside the same premium building, not a separate
+   app. The physical Hazari table itself is untouched - only the waiting
+   room around it changed.
+   ========================================================================== */
+
+.room-lobby {
+  position: relative;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -5%, var(--room-700), transparent 70%),
+    var(--room-950);
+  color: var(--ink-200);
+  font-family: var(--font-body);
+  text-align: center;
+  overflow-x: hidden;
+  /* Top padding clears BOTH the notch and the fixed settings gear
+     (top-right on every active screen) - confirmed colliding with the
+     title in portrait before this. */
+  padding:
+    calc(var(--safe-top) + var(--top-fab-reserve) + var(--space-2))
+    calc(var(--safe-right) + var(--space-4))
+    calc(var(--safe-bottom) + var(--space-5))
+    calc(var(--safe-left) + var(--space-4));
+}
+
+.room-lobby__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--ink-100);
+}
+
+/* ---- Room code: a small brass-bordered plaque, the Home gamecard's
+   language reused for a single panel instead of a grid of them. ---------- */
+
+.room-lobby__code {
+  width: 100%;
+  max-width: 26rem;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--wood-700);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(160deg, var(--wood-800), var(--wood-900));
+  box-shadow: var(--shadow-md);
+}
+
+.room-lobby__code .text-muted {
+  color: var(--ink-400);
+  opacity: 1;
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+}
+
+.room-lobby__code-value {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  letter-spacing: 0.14em;
+  color: var(--brass-300);
+}
+
+.room-lobby__share-btn {
+  margin-top: var(--space-2);
+  width: 100%;
+  min-height: var(--touch-min);
+  border: 1px solid var(--brass-600);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, var(--brass-400), var(--brass-500));
+  color: var(--room-950);
+  font-weight: 600;
+  touch-action: manipulation;
+}
+
+.room-lobby__share-copied {
+  font-size: var(--text-xs);
+  color: var(--brass-300);
+  animation: room-lobby-fade-in 200ms ease-out;
+}
+
+@keyframes room-lobby-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ---- Players: an inlaid list, echoing the arrangement trays rather than
+   a dashboard table. ------------------------------------------------------- */
+
+.room-lobby__players {
+  width: 100%;
+  max-width: 26rem;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--wood-700);
+  border-radius: var(--radius-lg);
+  background: rgba(0, 0, 0, 0.18);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.room-lobby__player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--room-800);
+  text-align: left;
+  min-height: var(--touch-min);
+}
+
+.room-lobby__player:last-child {
+  border-bottom: none;
+}
+
+.room-lobby__player .text-muted {
+  color: var(--ink-400);
+  opacity: 1;
+  font-size: var(--text-sm);
+}
+
+.room-lobby__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-100);
+}
+
+.room-lobby__host-tag {
+  font-size: var(--text-xs);
+  color: var(--brass-300);
+  border: 1px solid var(--brass-600);
+  border-radius: var(--radius-pill);
+  padding: 1px var(--space-2);
+  margin-left: var(--space-1);
+  white-space: nowrap;
+}
+
+.room-lobby__host-tag--bot {
+  color: var(--ink-100);
+  border-color: var(--status-bot);
+  background: rgba(125, 142, 168, 0.22);
+}
+
+.room-lobby__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ink-500);
+  flex-shrink: 0;
+}
+
+.room-lobby__dot--ready {
+  background: var(--status-connected);
+}
+
+/* ---- Actions -------------------------------------------------------------
+   Full-width, stacked buttons - matching Home's action language. A long
+   label (e.g. "Add Computer Player (2 open seats)") wraps cleanly onto a
+   full-width button instead of squeezing an auto-sized one into an
+   awkward narrow shape, which is what was actually happening before. */
+
+.room-lobby__actions {
+  width: 100%;
+  max-width: 26rem;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.room-lobby__actions .btn {
+  width: 100%;
+  min-height: var(--touch-min);
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.room-lobby__actions .btn-primary {
+  background: linear-gradient(180deg, var(--brass-400), var(--brass-500));
+  border-color: var(--brass-600);
+  color: var(--room-950);
+  font-weight: 600;
+}
+
+.room-lobby__actions .btn-ghost {
+  background: transparent;
+  border: 1px solid var(--wood-600);
+  color: var(--ink-200);
+}
+
+.room-lobby__hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-400);
+}
+
+/* ==========================================================================
+   Landscape phones: title/code/players/actions rearrange into a compact
+   two-column layout so everything stays reachable without the player list,
+   Ready control, Add Computer Player and Start Game falling below the
+   viewport, which is what was confirmed happening before this.
+   ========================================================================== */
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .room-lobby {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      'title   title'
+      'code    players'
+      'actions actions'
+      'hint    hint';
+    align-content: start;
+    gap: var(--space-2) var(--space-3);
+    padding:
+      calc(var(--safe-top) + var(--top-fab-reserve) + var(--space-1))
+      calc(var(--safe-right) + var(--space-3))
+      calc(var(--safe-bottom) + var(--space-2))
+      calc(var(--safe-left) + var(--space-3));
+    /* Falls back to page scroll on the shortest phones rather than clipping -
+       "reachable", per the brief, does not require zero scrolling. */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* grid-area only means anything once the parent is display:grid, which is
+     true in this block only - the portrait rule above stays a plain flex
+     column in DOM order, so these are scoped here rather than declared
+     (and silently ignored) on the base rules. */
+  .room-lobby__title {
+    grid-area: title;
+    font-size: var(--text-lg);
+  }
+
+  .room-lobby__code {
+    grid-area: code;
+  }
+
+  .room-lobby__players {
+    grid-area: players;
+  }
+
+  .room-lobby__actions {
+    grid-area: actions;
+  }
+
+  .room-lobby__hint {
+    grid-area: hint;
+  }
+
+  .room-lobby__code,
+  .room-lobby__players {
+    max-width: none;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .room-lobby__code-value {
+    font-size: var(--text-xl);
+  }
+
+  .room-lobby__actions {
+    max-width: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+  }
+
+  .room-lobby__actions .btn {
+    min-height: 38px;
+    font-size: var(--text-sm);
+  }
+}
+
+/* ---- Tablet / desktop ---------------------------------------------------- */
+
+@media (min-width: 48rem) {
+  .room-lobby__code,
+  .room-lobby__players,
+  .room-lobby__actions {
+    max-width: 30rem;
+  }
+}

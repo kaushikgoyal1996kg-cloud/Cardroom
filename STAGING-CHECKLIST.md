@@ -1,11 +1,19 @@
 # Staging checklist
 
-**Nothing in this file has been verified on a real device.** Every box is
-unticked. It is a script for you to run, not a report of work already done.
+Almost nothing in this file has been verified on a real device yet — it is
+still mostly a script to run, not a report of work already done.
 
-Automated tests cover the game logic underneath these flows (215 server tests,
-22 client tests, all passing). What they cannot cover is real phones, real
-networks, and real fingers.
+**First-pass QA update:** the owner opened the deployed staging build
+(`https://cardroom-staging.netlify.app`) on one real Android phone, in
+portrait and landscape, and reviewed Home, Lobby, Arrangement and the Hazari
+Table screens for layout/visual issues. That is reflected below by ticking
+the one item it directly confirms. It was **not** a run through this whole
+checklist — no iPhone, no reconnection drills, no full match, no double-tap
+testing, no chat/voice, no console check. Everything else below is still
+open. See `SESSION_CHANGELOG.md` for the dated entry.
+
+Automated tests cover the game logic underneath these flows. What they cannot
+cover is real phones, real networks, and real fingers.
 
 ---
 
@@ -19,7 +27,7 @@ networks, and real fingers.
 
 ## 1. Basics
 
-- [ ] Home screen opens on the staging address
+- [x] Home screen opens on the staging address — confirmed, first-pass Android QA
 - [ ] The three games are readable without zooming
 - [ ] Name entry works, and the name is still there after closing and reopening
 - [ ] Changing the name afterwards works
@@ -86,6 +94,11 @@ Nothing should happen twice.
 
 ## 6. Phones specifically
 
+First-pass Android QA found confirmed layout issues on Home, Lobby,
+Arrangement and Table (portrait and landscape) — see `SESSION_CHANGELOG.md`.
+That is why the items below stay unticked rather than ticked-with-caveats:
+the screens were reachable, but not yet reliably usable at every size.
+
 - [ ] Works on the narrowest phone you have (ideally 320px)
 - [ ] Works on a large phone
 - [ ] Portrait and landscape both usable
@@ -116,6 +129,31 @@ Nothing should happen twice.
 - [ ] Two separate rooms can run simultaneously without interfering
 - [ ] Restarting the backend while a game is running behaves sensibly
 - [ ] Open the browser console and confirm there are no red errors
+
+## 10. Install / PWA
+
+Added 2026-08-14, entirely unverified on a real device yet — see
+`SESSION_CHANGELOG.md`.
+
+- [ ] Android Chrome: the install banner appears and "Install App" actually
+      installs it (icon on the home screen, opens standalone, no browser chrome)
+- [ ] iOS Safari: Share → "Add to Home Screen" shows the Cardroom icon and
+      name, and opens standalone
+- [ ] The installed icon looks right at home-screen size (no cropping — this
+      is what "maskable" is supposed to guarantee, worth actually checking)
+- [ ] Rotating the phone while the installed app is open is NOT locked to
+      portrait
+- [ ] Turn on aeroplane mode after the app has loaded once: a branded
+      "offline" page appears on reload, not a browser error page or a blank
+      screen
+- [ ] Deploy a trivial change to staging, then reopen the already-installed
+      app: the update banner appears, and does NOT appear mid-hand /
+      mid-arrangement uninvited
+- [ ] Tapping "Refresh" on the update banner mid-lobby (not mid-hand) works
+      and does not lose the player's seat
+- [ ] The service worker never visibly interferes with reconnection — do a
+      normal reconnect drill (section 4) with the app installed and confirm
+      it behaves identically to the browser tab version
 
 ---
 

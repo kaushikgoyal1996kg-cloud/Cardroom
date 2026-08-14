@@ -1,9 +1,16 @@
 import { useState } from 'react';
-import { useGame } from '../../lib/GameStore';
+import { useGame, getStoredSessionRoomCode } from '../../lib/GameStore';
 import { Home } from './Home';
 import { Landing } from '../../components/Lobby/Landing';
+import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { getSavedIdentity } from '../../lib/identity';
 import type { GameId } from '../../game/types';
+
+function inviteCodeFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  const raw = new URLSearchParams(window.location.search).get('join');
+  return raw ? raw.toUpperCase() : null;
+}
 
 /**
  * Entry point to the app.
@@ -22,11 +29,30 @@ export function HomeScreen() {
   const [editingName, setEditingName] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const arrivedViaInvite =
-    typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('join');
+  const inviteCode = inviteCodeFromUrl();
+  const arrivedViaInvite = inviteCode !== null;
 
-  // No saved identity, mid-edit, or following an invite link: the existing
-  // Landing flow already covers all three properly.
+  // A person can already hold a valid reconnect token for the exact room an
+  // invite link points at - most commonly by opening their own share link,
+  // or reopening a link they'd already used, while GameStore's own
+  // reconnect-on-connect is still in flight (this component is only
+  // rendered at all while `room` is still null - see App.tsx). If the Join
+  // flow below ran anyway, it would create a brand-new player rather than
+  // resuming the existing one, leaving a stale duplicate seat behind once
+  // the real reconnect also lands. Detect that case and wait for the
+  // already-in-flight reconnect instead of offering a redundant Join.
+  const alreadyHoldsInvitedRoom = arrivedViaInvite && getStoredSessionRoomCode() === inviteCode;
+
+  if (alreadyHoldsInvitedRoom) {
+    return (
+      <div className="waiting-screen">
+        <LoadingSpinner message="Rejoining your table…" />
+      </div>
+    );
+  }
+
+  // No saved identity, mid-edit, or following a genuinely new invite link:
+  // the existing Landing flow already covers all three properly.
   if (!identity || editingName || arrivedViaInvite) {
     return (
       <Landing

@@ -53,9 +53,16 @@ const RINGS: Record<number, Omit<SeatPosition, 'isSelf' | 'scale'>[]> = {
   ],
   4: [
     { x: 50, y: 88, anchor: 'bottom' },
-    { x: 10, y: 50, anchor: 'left' },
+    // Left/right seats pulled in from the 10/90 they used to sit at. The
+    // felt clips overflow (`.table__felt { overflow: hidden }`), and at
+    // x:90 a seat's own half-width (up to 44px at full scale) is wider
+    // than the margin left to the felt edge on nearly every phone table
+    // width - confirmed on staging as the right-side player being partly
+    // clipped. 12/88 leaves enough margin to clear that at realistic table
+    // widths without moving the seats far enough to read as a redesign.
+    { x: 12, y: 50, anchor: 'left' },
     { x: 50, y: 12, anchor: 'top' },
-    { x: 90, y: 50, anchor: 'right' },
+    { x: 88, y: 50, anchor: 'right' },
   ],
   5: [
     { x: 50, y: 90, anchor: 'bottom' },

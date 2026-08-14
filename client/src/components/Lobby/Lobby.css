@@ -24,6 +24,27 @@
   }
 }
 
+/* Short mobile landscape: compress the hero so the first action ("Quick
+   Match") isn't sitting partly under the fold before the page has even
+   given a reason to scroll. */
+@media (orientation: landscape) and (max-height: 30rem) {
+  .landing {
+    gap: 4px;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  }
+
+  .landing__title {
+    font-size: clamp(1.6rem, 6vw, 2.2rem);
+    margin-top: 0;
+  }
+
+  .landing__tagline {
+    margin-bottom: 8px;
+    font-size: 0.8rem;
+  }
+}
+
 .landing__title {
   font-size: clamp(2.4rem, 10vw, 3.6rem);
   margin-top: 8px;
@@ -199,96 +220,6 @@
   min-height: 34px;
 }
 
-.room-lobby {
-  max-width: 480px;
-  margin: 0 auto;
-  padding: 24px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  align-items: center;
-  text-align: center;
-}
-
-.room-lobby__title {
-  font-size: 1.8rem;
-}
-
-.room-lobby__code {
-  width: 100%;
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.room-lobby__code-value {
-  font-family: var(--font-display);
-  font-size: 2.2rem;
-  letter-spacing: 0.12em;
-  color: var(--gold-300);
-}
-
-.room-lobby__players {
-  width: 100%;
-  padding: 8px 16px;
-}
-
-.room-lobby__player {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid rgba(230, 221, 192, 0.12);
-  text-align: left;
-}
-
-.room-lobby__player:last-child {
-  border-bottom: none;
-}
-
-.room-lobby__name {
-  flex: 1;
-}
-
-.room-lobby__host-tag {
-  font-size: 0.7rem;
-  color: var(--gold-300);
-  border: 1px solid var(--gold-500);
-  border-radius: var(--radius-pill);
-  padding: 1px 6px;
-  margin-left: 6px;
-}
-
-.room-lobby__host-tag--bot {
-  color: var(--ivory-100);
-  border-color: var(--sapphire-500);
-  background: rgba(43, 76, 111, 0.4);
-}
-
-.room-lobby__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: rgba(230, 221, 192, 0.3);
-  flex-shrink: 0;
-}
-
-.room-lobby__dot--ready {
-  background: var(--success-500);
-}
-
-.room-lobby__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: center;
-}
-
-.room-lobby__hint {
-  font-size: 0.85rem;
-}
-
 .landing__invite-note {
   background: rgba(201, 162, 39, 0.15);
   border: 1px solid var(--gold-500);
@@ -298,17 +229,4 @@
   margin: 0 0 4px;
 }
 
-.room-lobby__share-btn {
-  margin-top: 8px;
-  width: 100%;
-}
 
-.room-lobby__share-copied {
-  font-size: 0.75rem;
-  animation: room-lobby-fade-in 200ms ease-out;
-}
-
-@keyframes room-lobby-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}

@@ -24,6 +24,7 @@ Legend: ✅ built and tested · 🟡 partial · ⛔ not built
 | Mobile / safe areas | ✅ | Additive `env(inset, 0px)` throughout, `dvh` for layout, per-screen FAB reserve, VisualViewport keyboard handling. |
 | Startup / config errors | ✅ | `StartupErrorBoundary` wraps `GameProvider`; a missing or localhost `VITE_SERVER_URL` in a production build shows a real screen, never a blank page. |
 | CORS | ✅ | Explicit allow-list; production refuses to start without `ALLOWED_ORIGINS`. |
+| PWA / installability | 🟡 | Manifest (`Cardroom` branding, unlocked orientation, maskable dark/brass icons), hand-written `sw.js` (app-shell caching, explicit cross-origin/`/socket.io/` bypass, player-confirmed updates only), `offline.html`, install + update banners. Added 2026-08-14 — see `SESSION_CHANGELOG.md`. Not yet verified on a real device (same standing limitation as the rest of this table). |
 
 ---
 
@@ -35,7 +36,7 @@ Fully playable end to end, subject to the visual caveat below.
 |---|---|---|---|---|
 | Home / game selection | ✅ | ✅ | ✅ | Kitti and Teen Patti shown but disabled with reasons. |
 | Landing / identity | ✅ | 🟡 legacy | 🟡 | Name, avatar, invite links, table browser. Reached for first-time players and invite links. |
-| RoomLobby | ✅ | ⛔ legacy | 🟡 | Fully functional; mobile-safe; **not** visually migrated. Known debt. |
+| RoomLobby | ✅ | ✅ | 🟡 | Card-room visual language as of 2026-08-14 (`RoomLobby.css`). No dedicated component test yet — see `SESSION_CHANGELOG.md`. |
 | Arrangement screen | ✅ | ✅ | ✅ | Felt trays, tap-first, consolidated status line, dismissal folded away. |
 | Dealing ceremony | ✅ | ✅ | ✅ | Face-down cards from deck to seats, dealer-first clockwise, reduced-motion aware. |
 | Game table | ✅ | ✅ | ✅ | Seat ring 2–9, brass dealer token, turn ring, bot/away/voice indicators. |
@@ -48,9 +49,12 @@ Fully playable end to end, subject to the visual caveat below.
 | Arrangement fairness | ✅ | ✅ | ✅ | Server-authoritative; blocked against any human opponent; real socket test. |
 | Play money | ⛔ | — | — | **Not implemented.** Confirmed as planned (consensual board, winner takes the virtual pot) — see `RULES_HAZARI.md`. Not a current rule. |
 
-**Still uncertain:** every visual claim above. Nothing has been rendered in a
-browser. Highest-risk unknowns are dealing/travel timing and the two migrated
-result screens.
+**Still uncertain:** most visual claims above are still unverified by
+rendering. A first-pass Android QA round (real staging, one phone, portrait
+and landscape) has now happened and found confirmed layout issues on Home,
+Lobby, Arrangement and Table — see `SESSION_CHANGELOG.md` for the dated entry.
+That pass did not cover iPhone/Safari, dealing/travel timing, reconnection, or
+a full match, so those remain the highest-risk unknowns.
 
 ---
 
@@ -131,12 +135,12 @@ play-travel wiring, dealing order and reconnect suppression.
 | Item | State |
 |---|---|
 | Production | **Blocked.** Never deployed. |
-| Staging | Never deployed. |
+| Staging | **Deployed**, after this file was first written. Netlify client: `https://cardroom-staging.netlify.app`. Render server: `https://cardroom-staging-server.onrender.com`. Confirmed connected (`ALLOWED_ORIGINS` set, `/health` responds). |
 | `netlify.toml` | Present and configured (base `client`, publish `dist`, SPA redirects) |
 | `.env.example` | Present for both client and server |
 | `DEPLOYMENT.md` | Written for a non-developer |
-| `STAGING-CHECKLIST.md` | Written, **entirely unticked** |
+| `STAGING-CHECKLIST.md` | Mostly still unticked. One item confirmed by a first-pass Android QA round — see that file and `SESSION_CHANGELOG.md`. |
 | `MIGRATION.md` | Written; old app must not be deleted |
 
-The previous live application is untouched and remains the working version for
-the family.
+The previous live application is untouched, separate from staging, and
+remains the working version for the family. Nothing about staging affects it.

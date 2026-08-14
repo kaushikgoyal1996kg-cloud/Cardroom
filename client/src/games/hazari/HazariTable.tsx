@@ -202,6 +202,7 @@ export function HazariTable() {
           activePlayerId={nextToPlay}
           playedSets={playedSets}
           centreLabel={centreLabel}
+          centreLabelEmphasis={isMyTurn}
         />
       </div>
 

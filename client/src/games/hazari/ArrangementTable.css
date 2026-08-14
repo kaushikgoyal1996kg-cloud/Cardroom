@@ -34,7 +34,7 @@
   gap: 0 var(--space-2);
   padding:
     calc(var(--safe-top) + var(--space-2))
-    calc(var(--safe-right) + var(--space-3))
+    calc(var(--safe-right) + var(--top-fab-reserve))
     var(--space-2)
     calc(var(--safe-left) + var(--space-3));
   border-bottom: 1px solid var(--room-800);
@@ -610,6 +610,20 @@
    Responsive
    ========================================================================== */
 
+/* Typical phones (roughly 384px and up - iPhone/most Android widths, short
+   of the narrowest 320-360px tier). Confirmed on staging: the fan used the
+   same tight overlap tuned for a 320px screen all the way up to the tablet
+   breakpoint, so most phones showed cards more overlapped than their actual
+   width warranted, hurting both readability and tap accuracy. Cards stay
+   full size either way - only the spacing relaxes. Threshold matches the
+   375px tier in the project's own documented target-width list, so it
+   picks up 375/390/412/430 while 320/360 keep the tighter overlap below. */
+@media (min-width: 23.4375rem) {
+  .arr__fan-card + .arr__fan-card {
+    margin-left: -0.65rem;
+  }
+}
+
 /* Very narrow phones (320px). Tighten the nameplate column and overlap the
    fan harder - card SIZE is never reduced. */
 @media (max-width: 22.5rem) {
@@ -639,12 +653,43 @@
 }
 
 /* Landscape phones: felt and hand sit side by side so the action rail and
-   the cards are both visible without scrolling. */
+   the cards are both visible without scrolling.
+
+   Confirmed on staging: with felt, hand and actions still stacked as three
+   rows, felt only got a sliver of a short viewport once the (already
+   compact) header, the horizontal hand and the action rail each took their
+   own row - "only a thin strip of the set areas is visible". Felt needs
+   its own column, not a fraction of the remaining vertical space, so the
+   four sets stay reviewable while the fan and Reset/Suggest/Confirm - both
+   already fine in landscape - keep their spot in a narrower side column. */
 @media (orientation: landscape) and (max-height: 30rem) {
-  .arr { grid-template-rows: auto 1fr auto; }
-  .arr__bar { padding-top: var(--space-1); padding-bottom: var(--space-1); }
+  .arr {
+    grid-template-columns: minmax(0, 1fr) minmax(210px, 38%);
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas:
+      'bar     bar'
+      'felt    hand'
+      'felt    actions';
+  }
+  .arr__bar {
+    grid-area: bar;
+    padding-top: var(--space-1);
+    padding-bottom: var(--space-1);
+  }
   .arr__hint { display: none; }
+  .arr__felt {
+    grid-area: felt;
+    margin-bottom: var(--space-2);
+  }
+  .arr__hand {
+    grid-area: hand;
+    overflow-y: auto;
+    padding-top: 0;
+  }
+  .arr__actions { grid-area: actions; }
   .arr__fan { padding-top: 14px; padding-bottom: var(--space-1); }
+  /* Two columns of trays within the now-taller felt column, so all four
+     sets fit without shrinking any card. */
   .arr__trays { grid-template-columns: 1fr 1fr; }
 }
 

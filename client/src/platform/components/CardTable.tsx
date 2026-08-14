@@ -43,6 +43,16 @@ export interface CardTableProps {
   dealCardsEach?: number;
   /** Shown in the middle of the table when nothing is played yet. */
   centreLabel?: string;
+  /**
+   * True when centreLabel specifically announces the local player's own
+   * turn (as opposed to a passive "Waiting for X" notice). Confirmed on
+   * staging: the label's usual quiet, low-opacity treatment made "Your
+   * turn" easy to miss and made it compete visually with the top-centre
+   * seat rather than reading as its own signal. Game-specific copy
+   * ("Your turn" vs "Waiting for…") stays owned by the caller; this platform
+   * component only needs to know which visual treatment to use.
+   */
+  centreLabelEmphasis?: boolean;
   children?: React.ReactNode;
 }
 
@@ -63,6 +73,7 @@ export const CardTable = memo(function CardTable({
   dealing = false,
   dealCardsEach = 0,
   centreLabel,
+  centreLabelEmphasis = false,
   children,
 }: CardTableProps) {
   const layout = useMemo(
@@ -98,7 +109,11 @@ export const CardTable = memo(function CardTable({
             </div>
           )}
           {!dealing && playedSets.length === 0 && centreLabel && (
-            <p className="table__centre-label">{centreLabel}</p>
+            <p
+              className={`table__centre-label${centreLabelEmphasis ? ' is-emphasis' : ''}`}
+            >
+              {centreLabel}
+            </p>
           )}
         </div>
 

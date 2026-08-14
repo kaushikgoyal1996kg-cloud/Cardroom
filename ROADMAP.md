@@ -33,22 +33,29 @@ RoundSummary and WinnerScreen migrations, reliability tests.
 
 ## Current checkpoint
 
-Hazari is feature-complete enough for staging.
+Hazari is feature-complete enough for staging. **Staging is now deployed**
+(Netlify + Render, see `PROJECT_STATE.md`), and a **first-pass Android QA
+round** has happened and found confirmed layout issues — see
+`SESSION_CHANGELOG.md` for the dated entry.
 
-**No real browser or device QA has ever happened.** That is the gate.
+**Full real browser/device QA has not happened.** That remains the gate to
+production. The first-pass round covered one Android phone, portrait and
+landscape, on Home/Lobby/Arrangement/Table only — no iPhone, no reconnection
+drills, no full match.
 
 ---
 
 ## Next
 
-### 1. Staging-only deployment — *requires explicit owner approval*
-Deploy backend then frontend per `DEPLOYMENT.md`. Production stays blocked and
-the old live app stays untouched.
+### 1. ~~Staging-only deployment~~ — done
+Backend and frontend are both deployed to staging per `DEPLOYMENT.md`.
+Production stays blocked and the old live app stays untouched.
 
-### 2. Real-device QA
-Work through `STAGING-CHECKLIST.md` on real phones. Look hardest at: dealing
-timing, play-travel visibility, the two migrated result screens, chat with the
-keyboard open, and reconnect behaviour.
+### 2. Fix the confirmed first-pass findings, then continue real-device QA
+Fix the layout issues the first-pass round found, then keep working through
+`STAGING-CHECKLIST.md` on real phones. Look hardest at: dealing timing,
+play-travel visibility, the two migrated result screens, chat with the
+keyboard open, and reconnect behaviour — none of that has been exercised yet.
 
 ### 3. Fix findings
 Expect timing and spacing adjustments. Most live in one place —

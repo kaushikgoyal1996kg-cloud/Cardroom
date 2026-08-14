@@ -1,0 +1,47 @@
+.update-banner {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  /* Sits above whichever action rail the current screen has reserved space
+     for - the same token the chat/voice toggles use - so it never lands on
+     top of Play/Confirm/Start Game on any screen. */
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-3) + var(--action-reserve, 0px));
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: calc(100vw - 32px);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--brass-600);
+  background: linear-gradient(160deg, var(--wood-800), var(--wood-900));
+  box-shadow: var(--shadow-lg);
+  color: var(--ink-100);
+  font-size: var(--text-sm);
+}
+
+.update-banner__refresh {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--brass-600);
+  background: linear-gradient(180deg, var(--brass-400), var(--brass-500));
+  color: var(--room-950);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  touch-action: manipulation;
+}
+
+.update-banner__dismiss {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  min-height: unset;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink-400);
+  font-size: var(--text-sm);
+  touch-action: manipulation;
+}
