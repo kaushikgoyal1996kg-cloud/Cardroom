@@ -15,27 +15,42 @@ open. See `SESSION_CHANGELOG.md` for the dated entry.
 Automated tests cover the game logic underneath these flows. What they cannot
 cover is real phones, real networks, and real fingers.
 
-**Second-pass QA needed — 2026-08-15.** Five defects the owner confirmed on
-real Android PWA staging (Arrangement's voice/call FAB overlapping "Dealt";
-Hazari Table player names/Bot badges clipped or crowded; the end-of-hand
-RoundSummary not scrolling in landscape; plus an integration review of the
-existing background/reconnect and Leave-without-blank-screen fixes) have all
-been re-derived from the frozen source and fixed or confirmed correct in
-this environment — see `SESSION_CHANGELOG.md`'s "Frozen-checkpoint
-verification: Bugs 1-5" entry for the full reasoning on each. **None of the
-five are real-device verified.** All are arithmetic/test-level only in an
-environment with no browser access. Redeploy to staging and specifically
-re-check, on the same Android phone/orientations as the original report:
+**Second-pass QA update — 2026-08-15.** The five items below were retested
+by the owner on real Android PWA staging. Bugs 1, 2, 4 and 5 were each
+CONFIRMED STILL FAILING despite the previous session's fixes and full test
+suite passing — the previous session's conclusions on those four were each
+wrong or incomplete in specific ways, now corrected; see
+`SESSION_CHANGELOG.md`'s "Second real-device retest" entry for the full
+root-cause reasoning on each. Bug 3 was re-verified only (no change).
+**None of the five are real-device verified AGAIN after this round either.**
+Given the track record above, treat every item below as genuinely open
+until an owner actually sees it on a phone — a clean test suite has now
+twice not been sufficient evidence on its own. Redeploy to staging and
+specifically re-check, on the same Android phone/orientations as the
+original reports:
 
+- **Backgrounding an active game** (switch away to another app briefly,
+  switch back): the table must reconnect silently — no
+  "You're not in a game right now"
+- **Leave Table** from an active hand: must land on a real screen
+  immediately, never an indefinite "Loading…"
 - Hazari Arrangement, portrait and landscape: Rank/Suit/Dealt fully visible
   and tappable with the voice/call toggle both collapsed and its panel open
-- The Hazari Table, portrait and landscape: every seat's name and Bot badge
-  (where present), and specifically the **top seat's dealer button** — its
-  on-screen offset changed (smaller, fixed-size nudge instead of the old
-  oversized one) and has not been seen on a real screen yet
-- The screen shown right after a hand/set ends (RoundSummary), in a short
-  landscape viewport specifically — confirm all score rows are reachable by
-  scrolling and Next Hand/Continue stays visible throughout
+- The Hazari Table, portrait and landscape: ordinary short names (e.g.
+  "Raja", "Nawab") must display IN FULL, not "R…"/"Na…" — this is the
+  specific thing that was still broken last round despite looking fixed on
+  paper; and the **top seat's dealer button** — its on-screen offset has
+  changed again (seat positions were re-derived, not just the token) and
+  has not been seen on a real screen yet
+- The screen shown right after a hand/set ends (RoundSummary) AND the
+  final match-winner screen (WinnerScreen), in a short landscape viewport
+  specifically — confirm all score rows are reachable by scrolling and
+  Next Hand/Continue/Play Again stays visible and legible (readable
+  against any content now scrolling behind it) throughout. This one was
+  redesigned from a different approach entirely this round (page scroll +
+  a sticky action bar, not an internal scroll region) after the previous
+  approach failed real-device testing twice — worth a specifically
+  careful look.
 
 ---
 

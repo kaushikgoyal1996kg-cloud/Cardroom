@@ -116,6 +116,10 @@ function makeSocket() {
       return emitted.filter((e) => e.event === 'room:join' || e.event === 'room:create' || e.event === 'room:quickMatch')
         .length;
     },
+    /** Generic count of any emitted event, for the gameplay-gating tests. */
+    emittedCount(event: string) {
+      return emitted.filter((e) => e.event === event).length;
+    },
   };
 }
 
@@ -281,5 +285,128 @@ describe('Bug 1 - backgrounding must not lose an active game', () => {
     expect(result.current.roomError).toMatch(/timed out|no longer|start or join/i);
     // The stored session token must be gone too - it's genuinely dead.
     expect(localStorage.getItem(SESSION_KEY)).toBeNull();
+  });
+});
+
+describe('Bug 1 retest (2026-08-15) - a queued/stale action or error around a reconnect must never surface a false "not in game"', () => {
+  it('a stale "Not currently in a room" game:error arriving WHILE restoration is in flight is not shown, and does not clear the table', async () => {
+    const { GameProvider, useGame } = await loadStore();
+    const { result } = renderHook(() => useGame(), { wrapper: GameProvider });
+
+    act(() => socket.fire('connect'));
+    act(() => socket.completeReconnect(true));
+    await waitFor(() => expect(result.current.room).not.toBeNull());
+
+    // Background/foreground cycle: socket drops and reconnects, restoration
+    // starts (the ack has not resolved yet)...
+    act(() => socket.fire('disconnect'));
+    act(() => socket.fire('connect'));
+
+    // ...and, before that ack lands, a queued/replayed action from the OLD
+    // socket cycle (or a genuinely racing one) comes back with exactly the
+    // raw server error a not-yet-rebound socket produces. This must not
+    // reach the player as "You're not in a game right now" - the table is
+    // still right there and the reconnect that will settle this is already
+    // in flight.
+    act(() => socket.fire('game:error', { message: 'Not currently in a room.' }));
+
+    expect(result.current.gameError).toBeNull();
+    expect(result.current.room?.roomCode).toBe('HZR482');
+
+    // The in-flight reconnect then succeeds normally, as it would have
+    // regardless.
+    act(() => socket.completeReconnect(true));
+    await waitFor(() => expect(result.current.room?.roomCode).toBe('HZR482'));
+    expect(result.current.gameError).toBeNull();
+  });
+
+  it('the same stale error arriving just AFTER restoration completes, while the table is still held, is also not shown', async () => {
+    const { GameProvider, useGame } = await loadStore();
+    const { result } = renderHook(() => useGame(), { wrapper: GameProvider });
+
+    act(() => socket.fire('connect'));
+    act(() => socket.completeReconnect(true));
+    await waitFor(() => expect(result.current.room).not.toBeNull());
+    // restoration.active releases on the NEXT TICK after the ack (see
+    // GameStore.tsx's onConnect: "Release on the next tick, after the
+    // restoration burst of events") - wait for it explicitly rather than
+    // assuming it's already settled the instant `room` updates.
+    await waitFor(() => expect(result.current.isRestoring).toBe(false));
+
+    // A late-arriving error from a superseded cycle, well after restoration
+    // has already finished - the client still holds a valid room, so this
+    // is stale by definition, not authoritative.
+    act(() => socket.fire('game:error', { message: 'Not currently in a room.' }));
+
+    expect(result.current.gameError).toBeNull();
+    expect(result.current.room?.roomCode).toBe('HZR482');
+  });
+
+  it('a GENUINE in-game error (not this one specific race message) still surfaces normally during restoration', async () => {
+    const { GameProvider, useGame } = await loadStore();
+    const { result } = renderHook(() => useGame(), { wrapper: GameProvider });
+
+    act(() => socket.fire('connect'));
+    act(() => socket.completeReconnect(true));
+    await waitFor(() => expect(result.current.room).not.toBeNull());
+
+    act(() => socket.fire('disconnect'));
+    act(() => socket.fire('connect'));
+    // A real gameplay error, unrelated to the reconnect race, must not be
+    // silently swallowed just because a reconnect happens to be in flight.
+    act(() => socket.fire('game:error', { message: 'Game has not started yet.' }));
+
+    expect(result.current.gameError).toBe('The game has not started yet.');
+  });
+
+  it('gameplay actions are gated (not sent) while restoration is in flight, and work again once it completes', async () => {
+    const { GameProvider, useGame } = await loadStore();
+    const { result } = renderHook(() => useGame(), { wrapper: GameProvider });
+
+    act(() => socket.fire('connect'));
+    act(() => socket.completeReconnect(true));
+    await waitFor(() => expect(result.current.room).not.toBeNull());
+
+    act(() => socket.fire('disconnect'));
+    act(() => socket.fire('connect')); // restoration starts; ack not yet resolved
+    expect(result.current.isRestoring).toBe(true);
+
+    act(() => result.current.playSet());
+    act(() => result.current.startNextRound());
+    act(() => result.current.requestDismissal('NO_SEQUENCE'));
+    expect(socket.emittedCount('hazari:playSet')).toBe(0);
+    expect(socket.emittedCount('hazari:startNextRound')).toBe(0);
+    expect(socket.emittedCount('hazari:requestDismissal')).toBe(0);
+
+    let suggestAck: { ok: boolean; error?: string } | undefined;
+    await act(async () => {
+      suggestAck = await result.current.requestSuggestionOptions();
+    });
+    expect(suggestAck?.ok).toBe(false);
+    expect(socket.emittedCount('hazari:requestSuggestionOptions')).toBe(0);
+
+    // Restoration completes - the same actions now go through normally.
+    act(() => socket.completeReconnect(true));
+    await waitFor(() => expect(result.current.isRestoring).toBe(false));
+
+    act(() => result.current.playSet());
+    expect(socket.emittedCount('hazari:playSet')).toBe(1);
+  });
+
+  it('confirmArrangement is also gated during restoration - no optimistic local update either', async () => {
+    const { GameProvider, useGame } = await loadStore();
+    const { result } = renderHook(() => useGame(), { wrapper: GameProvider });
+
+    act(() => socket.fire('connect'));
+    act(() => socket.completeReconnect(true));
+    await waitFor(() => expect(result.current.room).not.toBeNull());
+
+    act(() => socket.fire('disconnect'));
+    act(() => socket.fire('connect'));
+    expect(result.current.isRestoring).toBe(true);
+
+    act(() => result.current.confirmArrangement([[], [], [], []]));
+    expect(socket.emittedCount('hazari:confirmArrangement')).toBe(0);
+    expect(result.current.myArrangedSets).toBeNull();
   });
 });

@@ -40,6 +40,23 @@ export const MAX_SEATS = 9;
  * Tuning these by hand rather than generating them from an ellipse formula
  * is deliberate: a formula spaces seats evenly in angle, which bunches them
  * awkwardly at the narrow ends of an oval and pushes them off the felt.
+ *
+ * X positions re-derived 2026-08-15 (Bug 4 retest): the PREVIOUS margin
+ * check (platform/table/layout.test.ts) compared a seat's footprint against
+ * `.table`'s own box, but `.table` has its own 1.4%/1.2% padding around
+ * `.table__felt` (CardTable.css) - the actual clipping boundary
+ * (`overflow: hidden` lives on `.table__felt`, not `.table`) - and the test
+ * never subtracted it. Redone against the felt's real width, several seats
+ * came out with essentially NO margin, and several were measurably
+ * NEGATIVE (as much as -9.75px) at realistic phone widths - confirmed on
+ * real Android PWA staging as the right-side seat's identity clipped by
+ * the felt's own edge, not just crowded internally. Every anchor below at
+ * >18% (opponent scale 1), >17.2% (scale 0.9, 5-6 players) or >16% (scale
+ * 0.8, 7-9 players) from the nearest felt edge already had a real margin
+ * and is untouched; only anchors that were actually inside that threshold
+ * were pulled in, and only just enough to clear it with a small buffer -
+ * this is a margin fix, not a re-layout, so it changes as little of the
+ * existing hand-tuned shape as the arithmetic allows.
  */
 const RINGS: Record<number, Omit<SeatPosition, 'isSelf' | 'scale'>[]> = {
   2: [
@@ -48,65 +65,64 @@ const RINGS: Record<number, Omit<SeatPosition, 'isSelf' | 'scale'>[]> = {
   ],
   3: [
     { x: 50, y: 88, anchor: 'bottom' },
-    { x: 12, y: 30, anchor: 'left' },
-    { x: 88, y: 30, anchor: 'right' },
+    { x: 18.4, y: 30, anchor: 'left' },
+    { x: 81.6, y: 30, anchor: 'right' },
   ],
   4: [
     { x: 50, y: 88, anchor: 'bottom' },
-    // Left/right seats pulled in from the 10/90 they used to sit at. The
-    // felt clips overflow (`.table__felt { overflow: hidden }`), and at
-    // x:90 a seat's own half-width (up to 44px at full scale) is wider
-    // than the margin left to the felt edge on nearly every phone table
-    // width - confirmed on staging as the right-side player being partly
-    // clipped. 12/88 leaves enough margin to clear that at realistic table
-    // widths without moving the seats far enough to read as a redesign.
-    { x: 12, y: 50, anchor: 'left' },
+    // Left/right seats previously sat at 12/88 (pulled in from an even
+    // earlier 10/90 - see git history / SESSION_CHANGELOG.md). Still not
+    // enough: `.table__felt` (the actual clipping boundary) is narrower
+    // than `.table` by its own padding, which the check that produced
+    // 12/88 did not subtract - see the ring-level comment above. 18.4/81.6
+    // is the first value actually re-derived against the felt itself.
+    { x: 18.4, y: 50, anchor: 'left' },
     { x: 50, y: 12, anchor: 'top' },
-    { x: 88, y: 50, anchor: 'right' },
+    { x: 81.6, y: 50, anchor: 'right' },
   ],
   5: [
     { x: 50, y: 90, anchor: 'bottom' },
-    { x: 9, y: 62, anchor: 'left' },
+    { x: 17.2, y: 62, anchor: 'left' },
     { x: 24, y: 16, anchor: 'top-left' },
     { x: 76, y: 16, anchor: 'top-right' },
-    { x: 91, y: 62, anchor: 'right' },
+    { x: 82.8, y: 62, anchor: 'right' },
   ],
   6: [
     { x: 50, y: 90, anchor: 'bottom' },
-    { x: 9, y: 68, anchor: 'left' },
-    { x: 9, y: 26, anchor: 'top-left' },
+    { x: 17.2, y: 68, anchor: 'left' },
+    { x: 17.2, y: 26, anchor: 'top-left' },
     { x: 50, y: 10, anchor: 'top' },
-    { x: 91, y: 26, anchor: 'top-right' },
-    { x: 91, y: 68, anchor: 'right' },
+    { x: 82.8, y: 26, anchor: 'top-right' },
+    { x: 82.8, y: 68, anchor: 'right' },
   ],
   7: [
     { x: 50, y: 91, anchor: 'bottom' },
     { x: 16, y: 80, anchor: 'bottom-left' },
-    { x: 7, y: 46, anchor: 'left' },
+    { x: 16, y: 46, anchor: 'left' },
     { x: 28, y: 12, anchor: 'top-left' },
     { x: 72, y: 12, anchor: 'top-right' },
-    { x: 93, y: 46, anchor: 'right' },
+    { x: 84, y: 46, anchor: 'right' },
     { x: 84, y: 80, anchor: 'bottom-right' },
   ],
   8: [
     { x: 50, y: 91, anchor: 'bottom' },
     { x: 17, y: 82, anchor: 'bottom-left' },
-    { x: 7, y: 55, anchor: 'left' },
-    { x: 14, y: 22, anchor: 'top-left' },
+    { x: 16, y: 55, anchor: 'left' },
+    { x: 16, y: 22, anchor: 'top-left' },
     { x: 50, y: 9, anchor: 'top' },
-    { x: 86, y: 22, anchor: 'top-right' },
-    { x: 93, y: 55, anchor: 'right' },
+    { x: 84, y: 22, anchor: 'top-right' },
+    { x: 84, y: 55, anchor: 'right' },
     { x: 83, y: 82, anchor: 'bottom-right' },
   ],
   9: [
-    { x: 50, y: 92, anchor: 'bottom' },
+    { x: 50, y: 91.5, anchor: 'bottom' },
     { x: 19, y: 85, anchor: 'bottom-left' },
-    { x: 7, y: 62, anchor: 'left' },
-    { x: 9, y: 30, anchor: 'top-left' },
+    { x: 16, y: 62, anchor: 'left' },
+    { x: 16, y: 30, anchor: 'top-left' },
     { x: 32, y: 9, anchor: 'top-left' },
     { x: 68, y: 9, anchor: 'top-right' },
-    { x: 91, y: 30, anchor: 'top-right' },
-    { x: 93, y: 62, anchor: 'right' },
+    { x: 84, y: 30, anchor: 'top-right' },
+    { x: 84, y: 62, anchor: 'right' },
     { x: 81, y: 85, anchor: 'bottom-right' },
   ],
 };

@@ -25,6 +25,195 @@ why, without any conversation context.
 
 ---
 
+## 2026-08-15 (evening) — Second real-device retest: Bugs 1, 2, 4 & 5 genuinely fixed; Bug 3 re-verified
+
+- **Model:** Sonnet
+- **Context:** A real-device Android PWA retest of the staging build deployed
+  after the previous session's checkpoint found MULTIPLE bugs still
+  failing, despite that session's fixes and full test suite passing.
+  Treated as authoritative: the earlier session's conclusions on Bugs 1, 2
+  and 5 were each wrong or incomplete in specific, identifiable ways -
+  documented below so the actual root causes are on record, not just the
+  fixes.
+- **Bug 1 (Android backgrounding → "You're not in a game right now") -
+  genuinely re-broken, now fixed:** Root cause: a `game:error` carrying the
+  raw server message `"Not currently in a room."` could arrive during the
+  reconnect window - or from a stale pre-background socket cycle - and get
+  shown to the player even while the table was still legitimately valid
+  and restoring normally. `onGameError` in `GameStore.tsx` now treats that
+  one specific message as transient/stale (not shown) whenever restoration
+  is active or the client still holds a room in state at all - the
+  AUTHORITATIVE "you're really out" signal is `room:reconnect`'s own
+  `ok:false` branch, which already handles this correctly with a clear,
+  different message. Additionally gated every gameplay-emitting action
+  (`playSet`, `confirmArrangement`, `requestDismissal`, `startNextRound`,
+  `requestSuggestionOptions`) so none can fire while disconnected/
+  restoring - closes the complementary race where a queued/buffered emit
+  (socket.io-client's own default behaviour while offline) could reach the
+  server before `room:reconnect` rebinds the socket. 5 new tests in
+  `backgroundReconnect.test.tsx`.
+- **Bug 2 (Leave Table → stuck on branded "Loading…" indefinitely) - a
+  genuine SERVER bug, found and fixed:** `room:leaveTable` converted the
+  leaving player to a bot and broadcast the room update, but never
+  unsubscribed that player's OWN socket from the room's Socket.IO
+  channels or cleared `socket.data` - so the leaving player's client kept
+  receiving `room:update`/`hazari:state` for the rest of the game (bots
+  keep playing), which could race against and silently overwrite the
+  `room: null` the client had just set locally, leaving `room` real but
+  `myPlayerId`/`myHand`/`lastRoundResult`/`winnerInfo` all correctly
+  null - matching no screen's requirements, permanently landing on
+  App.tsx's catch-all "Loading…". Added `leaveSocketFromRoom()`
+  (`socketHandlers.ts`, the inverse of `joinSocketToRoom`), called before
+  the post-leave broadcast. New real-socket integration test
+  (`leaveTable.integration.test.ts`, 3 tests) - proven meaningful by
+  reverting the fix and confirming it fails, then restoring it.
+- **Bug 3 (Arrangement FAB vs "Dealt") - re-verified, unchanged:**
+  Re-derived the geometry from scratch again per the retest brief's
+  instruction not to trust a passing test suite alone. 236px portrait /
+  228px landscape (set the previous session) are still correct: required
+  clearance is 230.76px / 222.76px, both comfortably covered. Additionally
+  checked the OPEN voice panel (not just the collapsed toggle, which is
+  all the previous session verified) - its own `bottom` offset
+  (`134px + reserve`) is strictly larger than the toggle's (`76px +
+  reserve`), so if the toggle clears the sort control, the panel clears it
+  with even more room; no change needed.
+- **Bug 4 (ordinary short names still ellipsizing, e.g. "Raja" → "R…") -
+  TWO independent real bugs found and fixed:**
+  1. `.seat`'s `align-items: center` gave `.seat__info` (and everything
+     inside it, down to the name text) a width COMPUTED from its own
+     content via flexbox shrink-to-fit, not a width GUARANTEED by the
+     seat's declared 5.5rem/4.5rem. On paper an ordinary short name was
+     entitled to the full width whenever it needed less - but the actual
+     number handed to it was the outcome of an intrinsic-sizing
+     computation threaded through three nested boxes, not a fixed value,
+     and real device rendering did not hand it what the arithmetic
+     implied it should. Changed to `align-items: stretch`, with
+     `.seat__avatar-wrap` given `align-self: center` specifically to opt
+     back out (otherwise `.seat__ring`/`.seat__dealer-dot`, positioned
+     relative to that wrapper's own box, would have spread to the full
+     seat width instead of hugging the avatar).
+  2. Independently, re-derived the seat-to-felt geometry properly this
+     time - the existing margin check (`platform/table/layout.test.ts`)
+     compared a seat's footprint against `.table`'s own box, but `.table`
+     has its own 1.4%/1.2% padding around `.table__felt` (CardTable.css) -
+     the box that actually clips (`overflow: hidden`) - which the check
+     never subtracted, and additionally allowed 16px of "slack" on the
+     theory that a seat could safely hang over into a non-existent
+     forgiving margin. Redone against the felt's real width: several
+     seats were measurably OUTSIDE the true clipping boundary at common
+     phone widths - as much as **-9.75px** (7-9 player rings) and
+     **-0.38px** (the LIVE 4-player ring, at 390px - a very common phone
+     width) - meaning the felt's own `overflow: hidden` was genuinely
+     clipping part of the seat, name included, on real devices. Re-derived
+     safe x/y positions for every ring size (2-9 players) in
+     `seatLayout.ts`, moving only the anchors that actually needed it;
+     rewrote `layout.test.ts` to check against the felt (not `.table`),
+     drop the false "slack", and additionally require a real minimum
+     margin (not just non-negative) at every target width. Both fixes
+     proven independently by reverting each and confirming the
+     corresponding tests fail, then restoring them. 12 new arithmetic
+     tests in `Seat.test.tsx` for the width-allocation fix specifically
+     (explicitly not just asserting `text-overflow: ellipsis` exists, per
+     the retest brief).
+- **Bug 5 (end-of-hand RoundSummary/WinnerScreen not scrollable in short
+  landscape) - the previous session's fix was WRONG; redesigned from
+  scratch:** The previous session concluded the CSS was already correct
+  and the failing test was a false positive (a comment containing the
+  literal string it was matching against) - fixed the test, reworded the
+  comment, changed nothing about actual runtime behaviour. This retest's
+  real-device evidence (still FAIL) proves that conclusion was wrong, or
+  at least incomplete: since NO functional CSS had changed, the screen's
+  real behaviour was never actually altered between the two retests.
+  Rather than continue tuning the same approach a real device had now
+  rejected twice, replaced the whole pattern: `.rsum`/`.winner` no longer
+  pin themselves to exactly one viewport height with `overflow: hidden`
+  and a nested `overflow-y: auto` scroll region - that depends on `dvh`
+  computing the actual usable height correctly in Android PWA standalone
+  mode (a documented rough edge that can survive as a *recognised but
+  wrong* value, which no vh-then-dvh fallback cascade catches, since that
+  only helps when a later declaration is dropped outright) and on a
+  nested scroll region reliably keeping touch-scroll capture rather than
+  the outer page (a known category of WebView inconsistency) - NEITHER of
+  which this environment could ever verify, and real-device testing twice
+  suggested at least one does not hold. Redesigned: `.rsum`/`.winner` now
+  use `min-height` (a floor, not a ceiling) and normal flex-column flow;
+  content taller than one screen simply makes the PAGE taller, and the
+  browser's own universally-reliable page scroll takes over - confirmed
+  nothing between here and `<body>` clips or hard-caps its own height
+  (`.app-root` is `min-height`; `.screen-fade` sets none;
+  `html`/`body`/`#root`'s `height: 100%` does not clip an overflowing
+  child by default). `.rsum__actions`/`.winner__actions` switched from a
+  fixed grid row to `position: sticky; bottom: 0`, which has been
+  reliably supported in every target browser for years - "Next round"/
+  "Play again" stay visually pinned to the bottom of the screen as the
+  page scrolls, without depending on precise viewport-unit accuracy or a
+  nested scroll region at all. Backgrounds on the action bars changed
+  from a translucent gradient to solid at the lower edge, since content
+  now legitimately scrolls behind them once they start sticking.
+  Rewrote `mobileSafety.test.ts`'s RoundSummary/WinnerScreen tests to
+  check the new invariants (min-height floor + vh-then-dvh cosmetic
+  fallback, no shell-level `overflow: hidden`, sticky action bars) -
+  including one MORE comment/regex collision of the exact kind the
+  previous session found and fixed (this session's own explanatory
+  comment for `.rsum` happened to contain the literal text
+  `overflow: hidden` as prose) - stripped comments before matching, same
+  established pattern. All four rewritten/new assertions proven
+  meaningful by reverting the corresponding CSS and confirming failure,
+  then restoring it.
+- **Also fixed:** a flaky race in one of this session's own new Bug 1
+  tests (`backgroundReconnect.test.tsx`) - asserted `isRestoring === false`
+  immediately after `room` updated, but restoration releases on the NEXT
+  TICK after the reconnect ack (`GameStore.tsx`'s own documented
+  behaviour) - occasionally observed `true` depending on scheduling.
+  Fixed to `await waitFor(...)` on `isRestoring` explicitly, and verified
+  stable across repeated runs.
+- **Files changed:** `client/src/lib/GameStore.tsx` (Bug 1),
+  `client/src/lib/backgroundReconnect.test.tsx` (Bug 1 tests + flaky-test
+  fix), `server/src/platform/net/socketHandlers.ts` (Bug 2),
+  `server/tests/leaveTable.integration.test.ts` (new, Bug 2),
+  `client/src/platform/components/Seat.css` +
+  `client/src/platform/components/Seat.test.tsx` (Bug 4, width
+  allocation), `client/src/platform/table/seatLayout.ts` +
+  `client/src/platform/table/layout.test.ts` (Bug 4, felt-margin
+  geometry), `client/src/games/hazari/RoundSummary.css` +
+  `client/src/games/hazari/WinnerScreen.css` (Bug 5, redesign),
+  `client/src/platform/styles/mobileSafety.test.ts` (Bug 5 tests
+  rewritten). Bug 3: nothing changed, re-verified only.
+- **Decisions:**
+  - Bug 5 in particular is recorded as a full redesign, not a tweak,
+    specifically so a future session does not attempt to "fix" this again
+    by adjusting vh/dvh values or overflow properties within the OLD
+    fixed-shell pattern - that pattern is not just imperfectly tuned here,
+    it depends on device/browser behaviour this environment cannot verify
+    and real testing has now contradicted twice.
+  - Every fix in this session that could be verified by reverting it and
+    confirming the corresponding test fails was verified that way, not
+    just by the new test passing on the first try - given how much of
+    this session was correcting a PREVIOUS session's confident-but-wrong
+    conclusions, passing-on-first-try was no longer treated as sufficient
+    evidence on its own.
+  - Not deployed. Staging/production untouched, per standing instruction.
+- **Tests after:** server 310/310 (307 baseline + 3 new). Client 338/338
+  (326 baseline + 12 new `Seat.test.tsx` cases). All four remaining
+  commands (client typecheck, client build, server typecheck, server
+  build) clean. Forensic hash diff re-run against a fresh pre-session
+  baseline - only the files listed above changed.
+- **New debt:** none knowingly introduced. As before, **none of Bugs 1-5
+  are real-device verified** by this session - all fixes are
+  arithmetic/integration-test-level only, in an environment with no
+  browser access. Given this is the SECOND round of real-device fixes
+  where at least one prior "test-verified" conclusion turned out wrong on
+  an actual device, real-device redeployment and retest matters more than
+  usual here, specifically for: Bug 5's new sticky-action-bar behaviour
+  (never seen rendered), Bug 4's seat/name positions at the newly
+  re-derived x-values (a visible, if modest, shift from before), and
+  Bug 1/2's fixes (both are timing/race-dependent by nature, the hardest
+  category to fully trust from static analysis and mocked-socket tests
+  alone).
+- **Baseline status:** accepted.
+
+---
+
 ## 2026-08-15 — Frozen-checkpoint verification: Bugs 1-5 (Android PWA staging)
 
 - **Model:** Sonnet

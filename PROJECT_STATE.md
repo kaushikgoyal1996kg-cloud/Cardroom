@@ -113,8 +113,8 @@ code.
 
 | Suite | Count | Location |
 |---|---|---|
-| Server | 307 | `server/tests/` (19 files) |
-| Client | 315 | `client/src/**/*.test.*` (20 files) |
+| Server | 310 | `server/tests/` (20 files) |
+| Client | 338 | `client/src/**/*.test.*` (20 files) |
 
 Server covers: Hazari engine (the original 152, untouched), platform rooms,
 game registry, arrangement fairness, a **real Socket.IO** fairness integration

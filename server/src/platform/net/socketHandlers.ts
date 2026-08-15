@@ -180,6 +180,11 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
       withGame(socket, rooms, (game, playerId) => {
         const room = rooms.getRoomOrThrow(roomCodeOf(socket));
         rooms.convertToBot(room.roomCode, playerId);
+        // Detach THIS socket from the room's channels BEFORE broadcasting
+        // the update - see leaveSocketFromRoom for why (Bug 2, 2026-08-15
+        // retest). room.roomCode is captured above, so it remains usable
+        // below even though socket.data.roomCode is cleared by this call.
+        leaveSocketFromRoom(socket, room.roomCode, playerId);
         broadcastRoom(io, rooms, room.roomCode);
         scheduleBotActions(io, rooms, room.roomCode);
         io.to(room.roomCode).emit('voice:peerLeft', { playerId });
@@ -416,6 +421,45 @@ function joinSocketToRoom(socket: Sock, roomCode: string, playerId: PlayerId): v
   socket.data.playerId = playerId;
   socket.join(roomCode);
   socket.join(privateChannel(roomCode, playerId));
+}
+
+/**
+ * The inverse of joinSocketToRoom - detaches THIS socket from a room it is
+ * intentionally leaving (Bug 2, confirmed on real Android PWA staging,
+ * 2026-08-15 retest: Leave Table got stuck on an indefinite branded
+ * "Loading…" screen).
+ *
+ * Root cause: `room:leaveTable` converted the player to a bot server-side
+ * and broadcast the update, but never called this - the leaving socket
+ * stayed subscribed to the room's Socket.IO channels (joined once, at
+ * room:create/join/reconnect, and never left) and `socket.data` kept
+ * pointing at the room it had just asked to leave. The very
+ * `room:update` broadcast this handler sends out (now showing the player
+ * as a bot) therefore also reached the LEAVING player's own client - and
+ * every further update for the rest of that game, since a bot keeps
+ * playing - racing against the local `setRoom(null)`/`setGameState(null)`
+ * etc. that `leaveTable()` had just done client-side. Whichever arrived
+ * last won: if a stale broadcast landed after the local clear, it
+ * silently resurrected `room` (and, moments later, `gameState`) to a
+ * real, non-null value with none of the OTHER state any actual screen
+ * needs (myPlayerId, myHand, lastRoundResult, winnerInfo - all correctly
+ * still cleared) - matching no screen's requirements, so App.tsx's
+ * deliberate catch-all was all that was left to render, forever, since
+ * nothing further would ever clear `room` again.
+ *
+ * Detaching the socket here means the broadcast this handler sends next
+ * simply never reaches it - the race is prevented at its source rather
+ * than patched after the fact. `socket.data` is also cleared so any
+ * further action this socket sends (there should be none - the client
+ * doesn't keep using it for this room) is correctly refused as "not
+ * currently in a room" rather than stale-succeeding against a room this
+ * socket no longer has any real business in.
+ */
+function leaveSocketFromRoom(socket: Sock, roomCode: string, playerId: PlayerId): void {
+  socket.leave(roomCode);
+  socket.leave(privateChannel(roomCode, playerId));
+  socket.data.roomCode = undefined;
+  socket.data.playerId = undefined;
 }
 
 function roomCodeOf(socket: Sock): string {

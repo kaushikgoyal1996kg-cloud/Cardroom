@@ -8,30 +8,28 @@
 
 .winner {
   position: relative;
-  display: grid;
-  grid-template-rows: 1fr auto;
-  /* Fallback cascade, not min-height/no-clip - see RoundSummary.css's
-     .rsum for the full reasoning (a real dvh-support gap on some Android
-     WebView versions drops the WHOLE height declaration, not just
-     shrinks it, leaving nothing for either overflow:hidden or
-     .winner__scroll's own overflow-y:auto to trigger against).
-     This screen was not itself part of the confirmed end-of-hand
+  /* REDESIGNED 2026-08-15, matching RoundSummary.css's .rsum - see that
+     file's comment for the full reasoning (a second real-device retest
+     showed Bug 5 still failing after a fix that, in hindsight, only
+     touched a test file and a comment - no runtime behaviour had
+     actually changed, which is what prompted moving off a fixed-height/
+     nested-scroll shell entirely rather than continuing to tune it).
+     This screen was not itself part of the original confirmed end-of-hand
      scrolling bug (that was RoundSummary, shown on ROUND_COMPLETE /
-     DISMISSED_ROUND - this shows on GAME_COMPLETE, the full match end) -
-     but shares the identical layout primitive (verified: same
-     grid-template-rows, same .winner__scroll min-height:0 +
-     overflow-y:auto pairing, explicitly built to be RoundSummary's twin),
-     so the same latent risk applies here too. Precautionary hardening,
-     not a claim this screen was independently confirmed broken. See
-     SESSION_CHANGELOG.md. */
-  height: 100vh;
-  height: 100dvh;
+     DISMISSED_ROUND - this shows on GAME_COMPLETE, the full match end),
+     but shared the identical layout primitive, so gets the identical fix
+     for the same reason it got the identical precautionary hardening
+     before: not an independent confirmed defect, kept in step on
+     purpose. */
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
   background:
     radial-gradient(ellipse 80% 40% at 50% 10%, var(--room-700), transparent 70%),
     var(--room-950);
   color: var(--ink-200);
   font-family: var(--font-body);
-  overflow: hidden;
 }
 
 .winner__lamp {
@@ -52,10 +50,10 @@
 
 .winner__scroll {
   position: relative;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
+  /* No longer a scroll container itself (see .winner above) - normal-flow
+     content block; flex: 1 fills leftover space when content is shorter
+     than one screen. */
+  flex: 1;
   padding:
     calc(env(safe-area-inset-top, 0px) + var(--space-6))
     calc(env(safe-area-inset-right, 0px) + var(--space-4))
@@ -148,7 +146,10 @@
 /* ---- Actions ------------------------------------------------------------ */
 
 .winner__actions {
-  position: relative;
+  /* Sticky, not a fixed grid row inside a clipped shell - see .winner's
+     own comment above. */
+  position: sticky;
+  bottom: 0;
   display: grid;
   gap: var(--space-2);
   padding:
@@ -157,7 +158,11 @@
     calc(env(safe-area-inset-bottom, 0px) + var(--space-3))
     calc(env(safe-area-inset-left, 0px) + var(--space-4));
   border-top: 1px solid var(--room-800);
-  background: linear-gradient(180deg, transparent, rgba(10, 9, 8, 0.7));
+  /* Solid at the bottom, same reasoning as RoundSummary.css's
+     .rsum__actions: content now legitimately scrolls BEHIND this bar
+     once it starts sticking, so it needs full coverage at its own lower
+     edge to keep the buttons clearly legible. */
+  background: linear-gradient(180deg, transparent, var(--room-950) 65%, var(--room-950));
 }
 
 .winner__actions > * {

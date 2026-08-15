@@ -20,7 +20,29 @@
   transform: translate(-50%, -50%) scale(var(--seat-scale, 1));
   display: flex;
   flex-direction: column;
-  align-items: center;
+  /* NOT `center`: with the column's cross-axis alignment set to `center`,
+     .seat__info (a flex item with no explicit width) gets a
+     shrink-to-fit/hypothetical width computed from its own content, not a
+     guaranteed share of the seat's declared 5.5rem - so an ordinary short
+     name like "Raja" or "Nawab" was, in principle, entitled to the FULL
+     width whenever it needed less than that, but the actual width handed
+     to it was the outcome of an intrinsic-sizing computation threaded
+     through three nested boxes (.seat -> .seat__info -> .seat__name),
+     not a fixed number - confirmed on real Android PWA staging as short,
+     ordinary names still ellipsizing (Bug 4, 2026-08-15 retest: "Raja"
+     rendering as "R…", "Nawab" as "Na…"), which a browser engine
+     computing that chain even slightly differently than intended could
+     produce with NO change to the CSS values involved.
+     `stretch` (the flexbox default, restored explicitly here since it
+     matters) instead gives .seat__info a hard, unambiguous width equal to
+     the seat's own 5.5rem/4.5rem every time - not a value inferred from
+     content. .seat__avatar-wrap is unaffected visually (`display:grid;
+     place-items:center` already centres the avatar within whatever width
+     it's given, stretched or not), and .seat__name-text's own
+     overflow/ellipsis rule below still applies exactly as before for
+     names that genuinely don't fit - it now has a guaranteed amount of
+     room to not need it, rather than a merely probable one. */
+  align-items: stretch;
   gap: var(--space-1);
   width: 5.5rem;
   pointer-events: none;
@@ -33,6 +55,13 @@
   position: relative;
   display: grid;
   place-items: center;
+  /* Countermands .seat's new `align-items: stretch` (see above) - this one
+     specifically must stay sized to its own content (the avatar circle),
+     not stretched to the seat's full width, because .seat__ring and
+     .seat__dealer-dot below are positioned relative to ITS box
+     (`inset: -4px`, `right/bottom: -2px`) and need that box to hug the
+     avatar tightly, not span the whole seat. */
+  align-self: center;
 }
 
 .seat__avatar {

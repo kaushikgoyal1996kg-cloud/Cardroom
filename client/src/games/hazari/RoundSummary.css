@@ -2,47 +2,62 @@
    Round summary
 
    Same room as the table: dark warm ground, brass accents, cards shown as
-   cards. Scrolls internally with a fixed action rail, so "Next round" is
-   always reachable regardless of how many sets are listed.
+   cards. "Next round" stays reachable regardless of how many sets are
+   listed via a STICKY action bar over normal page scroll - see the note on
+   .rsum below for why this replaced an earlier fixed-height/nested-scroll
+   shell.
    ========================================================================== */
 
 .rsum {
-  display: grid;
-  grid-template-rows: 1fr auto;
-  /* Fallback cascade, not a switch to min-height/no-clip. `dvh` is the
-     correct unit (accounts for the mobile browser chrome that `vh` gets
-     wrong), but is a real, documented support gap on some Android WebView
-     versions - when a browser doesn't recognise a value it drops the WHOLE
-     declaration, not just that one line, so an unsupported dynamic-height
-     rule leaves .rsum with NO height constraint at all. Once that happens,
-     neither this overflow:hidden NOR .rsum__scroll's own overflow-y:auto
-     below ever has anything to actually trigger against - nothing is
-     capping the box for either of them to clip or scroll relative to. That
-     exactly matches the confirmed bug (content extends past a short
-     landscape viewport with no way to scroll to it), which is why this
-     stays a single, fixed-height, single-scroll-region shell - the safe,
-     already-correct pattern below - with a widely-supported fixed-viewport
-     value underneath as insurance, rather than loosening the constraint
-     itself (which would risk the page AND .rsum__scroll both becoming
-     independently scrollable - two nested scroll regions instead of one,
-     and no guarantee .rsum__actions stays reachable at the bottom either).
-     See SESSION_CHANGELOG.md. */
-  height: 100vh;
-  height: 100dvh;
+  /* REDESIGNED 2026-08-15 (Bug 5 SECOND real-device retest - still failing
+     after the previous fix, which only touched a test file and a comment;
+     no actual runtime behaviour had changed). That ruled out the
+     comment/test explanation and meant the fixed-height/nested-scroll
+     shell this replaced was never actually proven correct on a real
+     device - only argued for on paper.
+
+     The previous approach pinned .rsum to exactly one viewport
+     (`height: 100vh`/`100dvh`, `overflow: hidden`) and made
+     .rsum__scroll (not the page) the ONE scroll region inside it. That
+     depends on two things a real Android PWA does not reliably guarantee:
+     `dvh` computing the actual usable height in standalone display mode
+     (a documented rough edge, not just a support gap - the value can be
+     recognised but still wrong, which no `100vh`-then-`100dvh` fallback
+     cascade can catch, since that only helps when the *later* declaration
+     is dropped outright), and a NESTED overflow:auto region reliably
+     receiving/keeping touch-scroll capture rather than the outer page
+     (a known category of WebView inconsistency).
+
+     This version depends on neither. .rsum now sits in NORMAL page flow
+     (min-height, not height) - if its content is taller than the screen,
+     the PAGE grows and the browser's own, universally-reliable scroll
+     takes over, the same mechanism every ordinary long web page already
+     uses. `.rsum__actions` below uses `position: sticky` instead of being
+     a fixed grid row inside a clipped shell, so "Next round" still stays
+     visually pinned to the bottom of the screen as the page scrolls -
+     sticky has been reliably supported in every target browser for years,
+     unlike precise dvh accuracy in PWA standalone mode. Confirmed nothing
+     between here and <body> clips or fixes its own height in a way that
+     would block this (App.css: .app-root is min-height, not height;
+     .screen-fade sets no height at all; global.css: html/body/#root use
+     height: 100%, which does not clip an overflowing child by default). */
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
   background:
     radial-gradient(ellipse 90% 45% at 50% 0%, var(--room-800), transparent 70%),
     var(--room-950);
   color: var(--ink-200);
   font-family: var(--font-body);
-  overflow: hidden;
 }
 
 .rsum__scroll {
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
+  /* No longer a scroll container itself (see .rsum above) - just the
+     normal-flow content block. `flex: 1` still fills any leftover
+     vertical space when content is shorter than one screen, so
+     .rsum__actions reads as bottom-anchored either way. */
+  flex: 1;
   padding:
     calc(env(safe-area-inset-top, 0px) + var(--space-5))
     calc(env(safe-area-inset-right, 0px) + var(--space-4))
@@ -257,13 +272,26 @@
 /* ---- Action rail -------------------------------------------------------- */
 
 .rsum__actions {
+  /* Sticky, not a fixed grid row inside a clipped shell - see .rsum's own
+     comment above for why. Sticks to the bottom of the page as it
+     scrolls, so "Next round" reads as pinned exactly as before, without
+     depending on a hard-height parent to pin it within. */
+  position: sticky;
+  bottom: 0;
   padding:
     var(--space-3)
     calc(env(safe-area-inset-right, 0px) + var(--space-4))
     calc(env(safe-area-inset-bottom, 0px) + var(--space-3))
     calc(env(safe-area-inset-left, 0px) + var(--space-4));
   border-top: 1px solid var(--room-800);
-  background: linear-gradient(180deg, transparent, rgba(10, 9, 8, 0.65));
+  /* Solid at the bottom (not the 0.65 alpha this used when it was
+     guaranteed to sit flush against .rsum__scroll's own last pixel with
+     nothing beneath it) - content now legitimately keeps scrolling
+     BEHIND this bar once it starts sticking, so the lower edge needs to
+     fully cover it for the button to stay clearly legible, fading to
+     transparent only at the very top edge for a soft veil rather than a
+     hard line. */
+  background: linear-gradient(180deg, transparent, var(--room-950) 65%, var(--room-950));
 }
 
 .rsum__next {

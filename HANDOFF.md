@@ -126,6 +126,23 @@ Each of these was a deliberate choice, several after finding real bugs.
 
 ## Known technical debt
 
+- **A clean local test suite has now twice not been sufficient evidence
+  that a mobile fix actually works — 2026-08-15.** Two rounds in a row,
+  fixes that were fully arithmetic/test-verified in this environment (no
+  browser access) were confirmed still failing on the next real-device
+  retest, for reasons the tests could not have caught: a `dvh` value that
+  is *recognised but numerically wrong* in Android PWA standalone mode
+  (not merely unsupported — no vh-then-dvh fallback catches that), and a
+  nested `overflow: auto` region not reliably keeping touch-scroll capture
+  on some WebView versions (see `SESSION_CHANGELOG.md`'s "Second real-device
+  retest" entry, Bug 5, for the specific case this cost a full round on).
+  Treat "the arithmetic checks out and the suite is green" as necessary,
+  not sufficient, for anything involving viewport units, nested scroll
+  regions, or precise pixel geometry on a real phone — and prefer patterns
+  with a long, boring track record of just working everywhere (normal page
+  scroll, `position: sticky`) over ones that depend on a specific unit or
+  nested-scroll-capture behaving exactly as documented, even when the
+  documented behaviour is exactly what the arithmetic assumes.
 - **No automated/in-environment browser or device verification is possible.**
   Chromium download and apt are both blocked in this build environment, so no
   session working from this repo can render or screenshot anything itself.
@@ -138,6 +155,16 @@ Each of these was a deliberate choice, several after finding real bugs.
   unverified. This remains the single largest open risk.
 - Dealing and play-travel **timing** needs human judgement on a device.
   Constants live in `client/src/platform/table/seatLayout.ts`.
+- **RoundSummary/WinnerScreen no longer use a fixed-height/nested-scroll
+  shell — 2026-08-15, second rewrite.** If a future session is tempted to
+  "simplify" `.rsum`/`.winner` back to `height: 100dvh; overflow: hidden`
+  with an internal `overflow-y: auto` region: don't, without a real device
+  in hand to check it on. That exact pattern is what Bug 5 was, twice, and
+  the current `min-height` + normal-flow + `position: sticky` action bar
+  approach was specifically chosen because it does not depend on `dvh`
+  accuracy or nested-scroll-capture behaviour at all — see
+  `SESSION_CHANGELOG.md`'s "Second real-device retest" entry for the full
+  reasoning.
 - **`DealerToken`'s felt-relative positioning is a real architectural
   tension, not fully resolved — 2026-08-15.** The token (and every seat)
   is positioned as a percentage of the felt, but the felt's pixel size
@@ -149,12 +176,16 @@ Each of these was a deliberate choice, several after finding real bugs.
   The fix (`DealerToken.tsx`/`.css`) makes the token's *pull* a small fixed
   pixel amount instead of a felt percentage, which closes that specific
   collision arithmetically at every supported seat-scale/breakpoint
-  (`DealerToken.test.tsx`), but the same fixed-px-vs-percentage tension
-  still exists everywhere else seats are positioned (`seatLayout.ts`,
-  `Seat.css`) — it has simply never been large enough elsewhere to cause a
-  provable collision yet. If a future change enlarges any seat element,
-  re-run the same kind of arithmetic check before assuming percentage
-  positioning is safe.
+  (`DealerToken.test.tsx`). The SEAT positions themselves (`seatLayout.ts`)
+  got the same category of fix on 2026-08-15 (second retest) once the
+  margin check was corrected to measure against the felt rather than
+  `.table` — several seats were provably outside the felt's real clipping
+  boundary at common phone widths. The underlying fixed-px-vs-percentage
+  tension is not eliminated, only pushed back below the currently-provable
+  threshold again — if a future change enlarges any seat element or adds a
+  reachable 5-9 player game, re-run the same kind of arithmetic check
+  (`platform/table/layout.test.ts` now measures against the felt
+  correctly) before assuming percentage positioning is safe.
 - Reconnect animation suppression closes on the existing next-tick lifecycle.
   There is **no explicit server "restoration complete" event**; a sufficiently
   delayed restoration burst could still be read as new.

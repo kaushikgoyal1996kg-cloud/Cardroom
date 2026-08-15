@@ -157,6 +157,24 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   // connect/disconnect cycle on a flaky connection) applying its result
   // after a NEWER attempt has already resolved - see onConnect below.
   const reconnectAttemptRef = useRef(0);
+  // Mirrors `restoration.active` and `connectionStatus` for the socket
+  // listener effect below and for the gameplay-emitting callbacks further
+  // down, both of which need the LATEST value without re-subscribing/
+  // re-creating on every change - same reasoning as myPlayerIdRef etc.
+  // above. `actionsGatedRef` is true whenever a gameplay action must NOT be
+  // sent: mid-restoration, or while not connected at all (emitting while
+  // disconnected does not fail - socket.io-client silently buffers it and
+  // replays it the instant the transport reconnects, which can land the
+  // action on the server BEFORE `room:reconnect` has run and re-bound this
+  // socket to its room/player - the exact race behind Bug 1, 2026-08-15
+  // retest: a queued action or its resulting error surfacing after the
+  // table was already showing).
+  const restorationActiveRef = useRef(false);
+  const actionsGatedRef = useRef(false);
+  useEffect(() => {
+    restorationActiveRef.current = restoration.active;
+    actionsGatedRef.current = restoration.active || connectionStatus !== 'connected';
+  }, [restoration.active, connectionStatus]);
 
   useEffect(() => {
     const socket = socketRef.current;
@@ -250,6 +268,27 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const onYourArrangement = ({ sets }: { sets: FourSets }) => setMyArrangedSets(sets);
     const onGameState = (s: HaazariPublicStatePayload) => setGameState(s);
     const onGameError = ({ message }: { message: string }) => {
+      // "Not currently in a room." means THIS SOCKET currently has no
+      // room/player binding server-side (see `withGame`/`roomCodeOf` on the
+      // server) - which is the expected, transient state for the first
+      // stretch of every reconnect, before `room:reconnect`'s ack has come
+      // back and re-bound it (see onConnect above). It can also arrive from
+      // a stale pre-background socket cycle whose response races in behind
+      // a newer, already-successful reconnect. Either way, if restoration
+      // is currently in flight, or the client still holds a room in state
+      // at all, this is that transient/stale signal, not evidence the
+      // player is actually out - the AUTHORITATIVE "you're really not in
+      // this room any more" path is `room:reconnect`'s own `ok:false`
+      // branch above, which already clears state and shows a controlled,
+      // specific message ("Your table timed out..."). Surfacing this one
+      // too, on top of that, showed a confusing "You're not in a game
+      // right now" banner over a table that was actually fine - the exact
+      // bug reported on real Android PWA staging (Bug 1, 2026-08-15
+      // retest: "the existing Hazari table was still visibly present, then
+      // Cardroom showed 'You're not in a game right now'").
+      if (message === 'Not currently in a room.' && (restorationActiveRef.current || roomRef.current)) {
+        return;
+      }
       const players = roomRef.current?.players ?? [];
       setGameError(friendlyGameError(message, players, myPlayerIdRef.current));
       playErrorSound();
@@ -388,6 +427,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const requestSuggestionOptions = useCallback(() => {
     return new Promise<SuggestionOptionsAck>((resolve) => {
+      // See actionsGatedRef above: never send while reconnecting/
+      // disconnected - resolve with a same-shaped "not ok" ack instead of
+      // either silently hanging or letting socket.io buffer-and-replay this
+      // onto a socket that has not been rebound to its room yet.
+      if (actionsGatedRef.current) {
+        resolve({ ok: false, error: "Reconnecting - try again in a moment." });
+        return;
+      }
       socketRef.current.emit('hazari:requestSuggestionOptions', (res: SuggestionOptionsAck) => {
         resolve(res);
       });
@@ -457,6 +504,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const returnToGame = useCallback(() => setViewMode('active'), []);
 
   const confirmArrangement = useCallback((sets: FourSets) => {
+    // See actionsGatedRef above: a tap that lands in the reconnect/
+    // restoration window must not reach the server ahead of `room:reconnect`
+    // - silently ignored, not queued; the button re-enables the instant
+    // restoration completes and the tap can simply be repeated.
+    if (actionsGatedRef.current) return;
     const cardIdSets: [string[], string[], string[], string[]] = [
       sets[0].map((c) => c.id),
       sets[1].map((c) => c.id),
@@ -468,10 +520,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const playSet = useCallback(() => {
+    // See actionsGatedRef above.
+    if (actionsGatedRef.current) return;
     socketRef.current.emit('hazari:playSet');
   }, []);
 
   const requestDismissal = useCallback((reason: DismissalReason, proposedSets?: FourSets) => {
+    // See actionsGatedRef above.
+    if (actionsGatedRef.current) return;
     const proposedCardIdSets = proposedSets
       ? (proposedSets.map((s) => s.map((c) => c.id)) as [string[], string[], string[], string[]])
       : undefined;
@@ -479,6 +535,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const startNextRound = useCallback(() => {
+    // See actionsGatedRef above.
+    if (actionsGatedRef.current) return;
     setLastRoundResult(null);
     socketRef.current.emit('hazari:startNextRound');
   }, []);
