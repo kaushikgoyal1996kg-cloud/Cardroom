@@ -104,8 +104,13 @@ describe('HomeScreen invite-link handling', () => {
     const HomeScreen = await loadHomeScreen();
     render(<HomeScreen />);
 
-    // No saved identity in this environment, so Landing's name step shows -
-    // the ordinary first-time-visitor path, untouched by this fix.
-    expect(screen.queryByText(/choose an avatar/i)).toBeTruthy();
+    // A normal (non-invite) launch shows the premium Welcome screen first,
+    // not the Landing form directly - this is the intended product change
+    // this file shipped with (see PROJECT_STATE.md/DESIGN_SYSTEM.md), not a
+    // regression of the invite/reconnect behaviour above, which is what
+    // this describe block actually guards. Dedicated Welcome/Profile/
+    // CardRoom coverage lives in HomeScreen.entryFlow.test.tsx.
+    expect(screen.queryByText(/enter cardroom/i)).toBeTruthy();
+    expect(screen.queryByText(/choose an avatar/i)).toBeNull();
   });
 });

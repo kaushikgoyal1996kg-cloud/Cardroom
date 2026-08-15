@@ -3,6 +3,7 @@ import { useGame } from '../../lib/GameStore';
 import { CardTable } from '../../platform/components/CardTable';
 import type { SeatPlayer } from '../../platform/components/Seat';
 import { totalDealDuration } from '../../platform/table/seatLayout';
+import { LoadingSpinner } from '../../components/LoadingSpinner';
 import './DealingTable.css';
 
 /**
@@ -77,7 +78,15 @@ export function DealingTable() {
     }));
   }, [room, gameState]);
 
-  if (!room || seats.length === 0) return null;
+  // Defensive fallback, not the primary guard - see RoomLobby.tsx's comment
+  // on the same pattern.
+  if (!room || seats.length === 0) {
+    return (
+      <div className="waiting-screen">
+        <LoadingSpinner message="Returning to Cardroom…" />
+      </div>
+    );
+  }
 
   return (
     <div className="dealing">

@@ -97,11 +97,25 @@
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--ink-100);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   max-width: 5.5rem;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* The name text specifically, not the whole flex row - text-overflow does
+   NOT reliably truncate a bare text node sitting alongside a sibling flex
+   item (the Bot tag); it needs its own overflow/white-space/ellipsis, and
+   `min-width: 0` because flex items default to `min-width: auto`, which
+   otherwise blocks them from ever shrinking small enough to truncate at
+   all. Confirmed on real Android PWA staging as names clipping
+   unpredictably and the Bot tag crowding into them - see
+   SESSION_CHANGELOG.md. The Bot tag itself (`.seat__tag`, `flex: 0 0 auto`
+   below) keeps its natural size either way, so it's never the badge that
+   gets cut - only the name yields, gracefully, via ellipsis. */
+.seat__name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .seat__tag {

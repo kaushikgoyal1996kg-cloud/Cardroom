@@ -1,0 +1,167 @@
+.player-profile {
+  position: relative;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -5%, var(--room-700), transparent 70%),
+    var(--room-950);
+  color: var(--ink-200);
+  font-family: var(--font-body);
+  overflow-x: hidden;
+  padding:
+    calc(var(--safe-top) + var(--space-4))
+    calc(var(--safe-right) + var(--space-4))
+    calc(var(--safe-bottom) + var(--space-4))
+    calc(var(--safe-left) + var(--space-4));
+}
+
+.player-profile__sheet {
+  position: relative;
+  width: 100%;
+  max-width: 24rem;
+  padding: var(--space-6) var(--space-5) var(--space-5);
+  border: 1px solid var(--wood-700);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(160deg, var(--wood-800), var(--wood-900));
+  box-shadow: var(--shadow-lg);
+}
+
+.player-profile__back {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  width: 36px;
+  height: 36px;
+  min-height: unset;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--wood-600);
+  background: var(--room-900);
+  color: var(--ink-200);
+  font-size: var(--text-xl);
+  line-height: 1;
+  touch-action: manipulation;
+}
+
+.player-profile__title {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--ink-100);
+  text-align: center;
+}
+
+.player-profile__tagline {
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--ink-400);
+  text-align: center;
+}
+
+.player-profile__field {
+  display: block;
+  margin-bottom: var(--space-4);
+}
+
+.player-profile__label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+.player-profile__input {
+  width: 100%;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--wood-600);
+  border-radius: var(--radius-md);
+  background: var(--room-900);
+  color: var(--ink-100);
+  font-size: var(--text-base);
+  font-family: inherit;
+}
+
+.player-profile__input:focus {
+  outline: none;
+  border-color: var(--brass-500);
+}
+
+.player-profile__input[aria-invalid='true'] {
+  border-color: var(--status-away);
+}
+
+.player-profile__error {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--status-away);
+}
+
+.player-profile__continue {
+  width: 100%;
+  min-height: var(--touch-min);
+}
+
+/* ---- Scoped premium re-skin of the shared AvatarPicker ------------------
+   AvatarPicker/Lobby.css uses the legacy gold/dark-green palette (shared
+   with Landing's own avatar step, which this sheet deliberately does not
+   touch). Rather than change that shared component or its base styles,
+   override its visual language only inside this sheet, by nesting under a
+   scoping class - same technique already used for RoomLobby (see
+   SESSION_CHANGELOG.md). Structure and behaviour (the radiogroup, the
+   selection state) are fully reused; only colour/shape are repainted. */
+.player-profile__avatar-picker .avatar-picker__option {
+  background: var(--room-900);
+  border-color: var(--wood-600);
+}
+
+.player-profile__avatar-picker .avatar-picker__option--selected {
+  border-color: var(--brass-500);
+  background: rgba(200, 164, 92, 0.14);
+}
+
+/* ---- Short mobile landscape ---------------------------------------------
+   The sheet is short-form already, but the 22-option avatar grid plus name
+   field plus title/tagline can still exceed a short landscape viewport's
+   height. Compress vertical rhythm first; let the sheet scroll internally
+   as an intentional fallback (DESIGN_SYSTEM.md) rather than overflow the
+   page uncontrolled. */
+@media (orientation: landscape) and (max-height: 30rem) {
+  .player-profile {
+    align-items: stretch;
+    padding-top: calc(var(--safe-top) + var(--space-2));
+    padding-bottom: calc(var(--safe-bottom) + var(--space-2));
+  }
+
+  .player-profile__sheet {
+    max-height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: var(--space-4) var(--space-4) var(--space-3);
+  }
+
+  .player-profile__title {
+    margin-bottom: 2px;
+    font-size: var(--text-base);
+  }
+
+  .player-profile__tagline {
+    margin-bottom: var(--space-3);
+  }
+
+  .player-profile__field {
+    margin-bottom: var(--space-2);
+  }
+
+  .player-profile__avatar-picker .avatar-picker {
+    grid-template-columns: repeat(8, 1fr);
+  }
+}

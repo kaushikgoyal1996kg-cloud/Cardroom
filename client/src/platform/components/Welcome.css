@@ -1,0 +1,150 @@
+/* ==========================================================================
+   Welcome - the true root. First impression, not a form.
+
+   Same room language as Home.css: dark backdrop, one overhead lamp, brass
+   accents, Cinzel for the brand. Deliberately quieter than Home - there is
+   nothing to choose here yet, only somewhere to walk into.
+   ========================================================================== */
+
+.welcome {
+  position: relative;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -5%, var(--room-700), transparent 70%),
+    var(--room-950);
+  color: var(--ink-200);
+  font-family: var(--font-body);
+  text-align: center;
+  overflow-x: hidden;
+  padding:
+    calc(var(--safe-top) + var(--space-5))
+    calc(var(--safe-right) + var(--space-4))
+    calc(var(--safe-bottom) + var(--space-5))
+    calc(var(--safe-left) + var(--space-4));
+}
+
+/* The one atmospheric flourish - same treatment as Home's lamp, so the two
+   screens read as the same room. */
+.welcome__lamp {
+  position: absolute;
+  top: -30vh;
+  left: 50%;
+  width: min(140vw, 900px);
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    circle,
+    rgba(200, 164, 92, 0.14) 0%,
+    rgba(200, 164, 92, 0.05) 38%,
+    transparent 65%
+  );
+  pointer-events: none;
+}
+
+.welcome__content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 24rem;
+}
+
+.welcome__eyebrow {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--ink-300);
+}
+
+.welcome__brand {
+  margin: 0 0 var(--space-6);
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  color: var(--ink-100);
+}
+
+.welcome__brand-the {
+  display: block;
+  font-size: var(--text-lg);
+  font-weight: 400;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--brass-400);
+}
+
+.welcome__cta {
+  width: 100%;
+  max-width: 20rem;
+  min-height: 52px;
+  font-size: var(--text-base);
+}
+
+.welcome__returning {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.welcome__avatar-ring {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  margin-bottom: var(--space-2);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(200, 164, 92, 0.22), var(--room-900) 72%);
+  border: 1.5px solid var(--brass-500);
+  box-shadow:
+    0 3px 8px rgba(0, 0, 0, 0.45),
+    inset 0 1px 1px rgba(255, 255, 255, 0.08);
+}
+
+.welcome__returning-name {
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  color: var(--ink-100);
+}
+
+.welcome__change-profile {
+  margin-top: var(--space-3);
+  min-height: var(--touch-min);
+  padding: 0 var(--space-3);
+  background: none;
+  border: none;
+  color: var(--ink-400);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  touch-action: manipulation;
+}
+
+.welcome__install {
+  position: relative;
+  margin-top: var(--space-6);
+  width: 100%;
+  max-width: 20rem;
+}
+
+/* ---- Short mobile landscape ------------------------------------------- */
+@media (orientation: landscape) and (max-height: 30rem) {
+  .welcome {
+    justify-content: flex-start;
+    padding-top: calc(var(--safe-top) + var(--space-3));
+    padding-bottom: calc(var(--safe-bottom) + var(--space-3));
+  }
+  .welcome__eyebrow { display: none; }
+  .welcome__brand { margin-bottom: var(--space-3); font-size: var(--text-2xl); }
+  .welcome__brand-the { font-size: var(--text-sm); }
+  .welcome__cta { min-height: 46px; }
+  .welcome__avatar-ring { width: 3.5rem; height: 3.5rem; }
+  .welcome__install { margin-top: var(--space-3); }
+}

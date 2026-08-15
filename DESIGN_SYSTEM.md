@@ -115,6 +115,34 @@ Target widths: 320, 360, 375, 390, 412, 430, tablet, desktop.
 
 ---
 
+## Welcome / Profile shell
+
+The first thing anyone sees, before there is a table to sit at.
+
+**Welcome** (`platform/components/Welcome.tsx`) is brand and atmosphere
+first, never a form - one lamp, the wordmark, and exactly one primary
+action: `Enter Cardroom` for a first-time visitor, or `Continue as <name>`
+plus a quiet `Change profile` link for a returning one. It is the true
+entry point for a normal launch (an invite link bypasses it entirely - see
+ARCHITECTURE.md) and reuses Home's same lamp/backdrop treatment so the two
+read as the same room, just quieter, since there is nothing to choose yet.
+
+**Player Profile** (`platform/components/PlayerProfile.tsx`) is the compact
+sheet behind both first-time setup and later editing - display name and an
+avatar, nothing else, per `PROJECT_STATE.md`'s note on this being local
+identity, not an account system. It reuses the shared `AvatarPicker`
+structurally (the grid, the radiogroup, the selection state) but repaints
+its legacy gold/dark-green colours to the card-room palette with a scoped
+override, rather than forking the component or changing its shared base
+styles - `Landing`'s own avatar step deliberately keeps the legacy look for
+now, so the override must not leak there either.
+
+Both screens are quieter than Home - fewer elements, more restraint - but
+share its typography, brass weight, spacing rhythm and lack of
+glassmorphism. Do not add a second visual theme here.
+
+---
+
 ## Arrangement screen language
 
 The player has physically received cards and is laying them out.

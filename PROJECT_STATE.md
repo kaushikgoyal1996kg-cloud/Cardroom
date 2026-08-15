@@ -25,6 +25,8 @@ Legend: ✅ built and tested · 🟡 partial · ⛔ not built
 | Startup / config errors | ✅ | `StartupErrorBoundary` wraps `GameProvider`; a missing or localhost `VITE_SERVER_URL` in a production build shows a real screen, never a blank page. |
 | CORS | ✅ | Explicit allow-list; production refuses to start without `ALLOWED_ORIGINS`. |
 | PWA / installability | 🟡 | Manifest (`Cardroom` branding, unlocked orientation, maskable dark/brass icons), hand-written `sw.js` (app-shell caching, explicit cross-origin/`/socket.io/` bypass, player-confirmed updates only), `offline.html`, install + update banners. Added 2026-08-14 — see `SESSION_CHANGELOG.md`. Not yet verified on a real device (same standing limitation as the rest of this table). |
+| Local player identity | ✅ | `lib/identity.ts` — stable `profileId` + name + avatar, `localStorage`, independent of the reconnect/session token. Added 2026-08-15 — see `SESSION_CHANGELOG.md`. Explicitly not a real account system; see that entry's note on the distinction. |
+| Android/PWA Back navigation | ✅ | `lib/useBackGuard.ts` syncs one history entry per meaningful screen and intercepts Back where leaving needs confirmation (Lobby, an active game). Entry-level screens (Welcome/Profile/CardRoom) and room-level screens each own their own guard instance — not a second router. Added 2026-08-15. Real-device Back-button QA still needed — see `STAGING-CHECKLIST.md`. |
 
 ---
 
@@ -112,7 +114,7 @@ code.
 | Suite | Count | Location |
 |---|---|---|
 | Server | 307 | `server/tests/` (19 files) |
-| Client | 236 | `client/src/**/*.test.*` (11 files) |
+| Client | 315 | `client/src/**/*.test.*` (20 files) |
 
 Server covers: Hazari engine (the original 152, untouched), platform rooms,
 game registry, arrangement fairness, a **real Socket.IO** fairness integration

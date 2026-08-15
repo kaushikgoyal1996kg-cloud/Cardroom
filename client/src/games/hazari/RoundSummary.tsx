@@ -1,5 +1,6 @@
 import { useGame } from '../../lib/GameStore';
 import { PlayingCard } from '../../platform/components/PlayingCard';
+import { LoadingSpinner } from '../../components/LoadingSpinner';
 import './RoundSummary.css';
 
 const SET_LABELS = ['Set 1', 'Set 2', 'Set 3', 'Set 4'];
@@ -15,7 +16,15 @@ const SET_LABELS = ['Set 1', 'Set 2', 'Set 3', 'Set 4'];
  */
 export function RoundSummary() {
   const { room, lastRoundResult, gameState, myPlayerId, startNextRound } = useGame();
-  if (!room || !lastRoundResult || !gameState) return null;
+  // Defensive fallback, not the primary guard - see RoomLobby.tsx's comment
+  // on the same pattern.
+  if (!room || !lastRoundResult || !gameState) {
+    return (
+      <div className="waiting-screen">
+        <LoadingSpinner message="Returning to Cardroom…" />
+      </div>
+    );
+  }
 
   const nameOf = (pid: string) => room.players.find((p) => p.playerId === pid)?.name ?? pid;
   const isHost = room.players.find((p) => p.playerId === myPlayerId)?.isHost ?? false;

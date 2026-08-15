@@ -9,6 +9,25 @@
 .rsum {
   display: grid;
   grid-template-rows: 1fr auto;
+  /* Fallback cascade, not a switch to min-height/no-clip. `dvh` is the
+     correct unit (accounts for the mobile browser chrome that `vh` gets
+     wrong), but is a real, documented support gap on some Android WebView
+     versions - when a browser doesn't recognise a value it drops the WHOLE
+     declaration, not just that one line, so an unsupported dynamic-height
+     rule leaves .rsum with NO height constraint at all. Once that happens,
+     neither this overflow:hidden NOR .rsum__scroll's own overflow-y:auto
+     below ever has anything to actually trigger against - nothing is
+     capping the box for either of them to clip or scroll relative to. That
+     exactly matches the confirmed bug (content extends past a short
+     landscape viewport with no way to scroll to it), which is why this
+     stays a single, fixed-height, single-scroll-region shell - the safe,
+     already-correct pattern below - with a widely-supported fixed-viewport
+     value underneath as insurance, rather than loosening the constraint
+     itself (which would risk the page AND .rsum__scroll both becoming
+     independently scrollable - two nested scroll regions instead of one,
+     and no guarantee .rsum__actions stays reachable at the bottom either).
+     See SESSION_CHANGELOG.md. */
+  height: 100vh;
   height: 100dvh;
   background:
     radial-gradient(ellipse 90% 45% at 50% 0%, var(--room-800), transparent 70%),

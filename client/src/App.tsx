@@ -18,6 +18,8 @@ import { TutorialModal } from './components/TutorialModal';
 import { ChatPanel } from './components/ChatPanel';
 import { VoiceCallPanel } from './components/VoiceCallPanel';
 import { UpdateBanner } from './components/UpdateBanner';
+import { ConfirmDialog } from './components/ConfirmDialog';
+import { useBackGuard } from './lib/useBackGuard';
 import { hasSeenTutorial } from './lib/tutorial';
 import './App.css';
 
@@ -73,6 +75,8 @@ export function App() {
     room,
     gameState,
     myPlayerId,
+    lastRoundResult,
+    winnerInfo,
     myHand,
     myArrangedSets,
     gameError,
@@ -82,6 +86,8 @@ export function App() {
     requestSuggestionOptions,
     viewMode,
     leaveTable,
+    leaveSession,
+    returnToGame,
   } = useGame();
   const [showRules, setShowRules] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -89,6 +95,13 @@ export function App() {
   const [showRoundHistory, setShowRoundHistory] = useState(false);
   const [showConnBanner, setShowConnBanner] = useState(false);
   const [showTutorial, setShowTutorial] = useState(() => !hasSeenTutorial());
+  // Set only by the Android/PWA/browser Back guard below, when the current
+  // screen needs confirmation before it's safe to actually leave - never by
+  // any of the screens' own visible Leave buttons, which already call
+  // leaveSession/leaveTable directly. 'lobby' shows the plain "leave this
+  // room" wording; 'game' adds the bot-takeover warning, matching
+  // SettingsModal's existing in-game leave confirmation.
+  const [pendingLeaveConfirm, setPendingLeaveConfirm] = useState<null | 'lobby' | 'game'>(null);
 
   // Delay showing the connection banner briefly so a normal fast connection
   // never flashes it - only show once a wait is actually noticeable.
@@ -144,24 +157,34 @@ export function App() {
   } else if (room.status === 'LOBBY') {
     screen = <RoomLobby />;
     screenKey = 'lobby';
-  } else if (gameState?.state === 'GAME_COMPLETE' && !holdingFinalReveal) {
+  } else if (gameState?.state === 'GAME_COMPLETE' && !holdingFinalReveal && winnerInfo) {
+    // winnerInfo is required here defensively, not just by WinnerScreen's
+    // own guard: WinnerScreen (like the other screens below) independently
+    // calls useGame() and returns null if its own required state is
+    // missing. Requiring the SAME state here too means App never asks it
+    // to render in a state it would refuse - route state and GameStore
+    // state cannot "temporarily disagree" into a blank page, because
+    // there is only one place (here) that decides what to render, and it
+    // now checks everything the chosen screen actually needs.
     screen = <WinnerScreen />;
     screenKey = 'winner';
   } else if (
     (gameState?.state === 'ROUND_COMPLETE' || gameState?.state === 'DISMISSED_ROUND') &&
-    !holdingFinalReveal
+    !holdingFinalReveal &&
+    lastRoundResult
   ) {
     screen = <RoundSummary />;
     screenKey = 'round-summary';
   } else if (
     gameState &&
+    myPlayerId &&
     (PLAYING_STATES.has(gameState.state) ||
       (holdingFinalReveal && (gameState.state === 'ROUND_COMPLETE' || gameState.state === 'DISMISSED_ROUND' || gameState.state === 'GAME_COMPLETE')))
   ) {
     screen = <HazariTable />;
     screenKey = 'playing';
   } else if (gameState && ARRANGING_STATES.has(gameState.state)) {
-    screen = myArrangedSets ? (
+    screen = myArrangedSets && myPlayerId ? (
       <ArrangingWaitScreen />
     ) : dealingCeremony && myHand.length === 13 ? (
       <DealingTable />
@@ -180,7 +203,7 @@ export function App() {
         <LoadingSpinner message="Dealing the cards…" />
       </div>
     );
-    screenKey = myArrangedSets
+    screenKey = myArrangedSets && myPlayerId
       ? 'arranging-waiting'
       : dealingCeremony && myHand.length === 13
         ? 'dealing'
@@ -188,6 +211,13 @@ export function App() {
           ? 'arranging'
           : 'dealing';
   } else {
+    // The deliberate catch-all - a screen the app can ALWAYS safely land
+    // on. Reached both for genuinely transient moments (state still
+    // loading in) and for the defensive case above: something the chosen
+    // screen requires is missing, so falling through here instead of
+    // asking that screen to render anyway - and possibly return null - is
+    // the fix for "never render a blank page because route state and
+    // GameStore state temporarily disagree."
     screen = (
       <div className="waiting-screen">
         <LoadingSpinner message="Loading…" />
@@ -202,6 +232,70 @@ export function App() {
     gameState &&
     (ARRANGING_STATES.has(gameState.state) || PLAYING_STATES.has(gameState.state))
   );
+
+  // Android/PWA/browser Back guard. `screenKey` above already IS the
+  // existing screen-routing state (ARCHITECTURE.md: "a plain conditional
+  // chain in App.tsx"); this only keeps browser history in step with it and
+  // intercepts Back where leaving needs confirmation first. 'home' is
+  // excluded because HomeScreen owns its own, finer-grained back-guard
+  // internally while it is mounted - see HomeScreen.tsx.
+  const backGuard = useBackGuard({
+    screenKey,
+    disabled: screenKey === 'home',
+    onBack: () => {
+      switch (screenKey) {
+        case 'home-return':
+          // The player navigated here via Settings -> "Return to Landing
+          // Screen (stay connected)" - Back undoes exactly that, the same
+          // as tapping "Return to Room" would.
+          returnToGame();
+          return 'handled';
+        case 'lobby':
+          setPendingLeaveConfirm('lobby');
+          return 'blocked';
+        case 'dealing':
+        case 'arranging-waiting':
+        case 'arranging':
+        case 'playing':
+          setPendingLeaveConfirm('game');
+          return 'blocked';
+        case 'round-summary':
+        case 'winner':
+        case 'loading':
+        default:
+          // No sensible Back destination from a transient/result screen -
+          // absorb the press rather than unexpectedly exiting the PWA or
+          // silently abandoning anything. The screen's own buttons (Next
+          // round, Play Again, Return to Lobby, Leave) remain the way
+          // forward.
+          return 'blocked';
+      }
+    },
+  });
+
+  // A confirm dialog opened by a Back press can otherwise go stale if the
+  // room's status changes for a reason OTHER than that confirm/cancel while
+  // it's still open - e.g. the host starts the game while a different
+  // player has a Lobby leave-confirm sitting open. Rather than try to keep
+  // a stale dialog's wording in step, just dismiss it: screenKey changing
+  // out from under an open confirmation means whatever it was about no
+  // longer describes the current screen, and the player can press Back
+  // again for a dialog that matches wherever they actually are now.
+  useEffect(() => {
+    setPendingLeaveConfirm(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screenKey]);
+
+  function confirmLeave() {
+    backGuard.consumeAsBack();
+    if (pendingLeaveConfirm === 'lobby') leaveSession();
+    else if (pendingLeaveConfirm === 'game') leaveTable();
+    setPendingLeaveConfirm(null);
+  }
+
+  function cancelLeave() {
+    setPendingLeaveConfirm(null);
+  }
 
   return (
     // data-screen lets fixed chrome (the chat FAB in particular) reserve
@@ -244,6 +338,20 @@ export function App() {
         <div className="toast toast--error" onClick={clearGameError}>
           {gameError}
         </div>
+      )}
+      {pendingLeaveConfirm && (
+        <ConfirmDialog
+          title="Leave this room?"
+          message={
+            pendingLeaveConfirm === 'game'
+              ? "A computer player will take over your seat and the game will continue for everyone else. You won't be able to rejoin this game."
+              : "You'll leave the room. If you want back in, you'll need the room code again."
+          }
+          confirmLabel="Leave"
+          cancelLabel="Stay"
+          onConfirm={confirmLeave}
+          onCancel={cancelLeave}
+        />
       )}
     </div>
   );

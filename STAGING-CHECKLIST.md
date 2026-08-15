@@ -15,6 +15,28 @@ open. See `SESSION_CHANGELOG.md` for the dated entry.
 Automated tests cover the game logic underneath these flows. What they cannot
 cover is real phones, real networks, and real fingers.
 
+**Second-pass QA needed — 2026-08-15.** Five defects the owner confirmed on
+real Android PWA staging (Arrangement's voice/call FAB overlapping "Dealt";
+Hazari Table player names/Bot badges clipped or crowded; the end-of-hand
+RoundSummary not scrolling in landscape; plus an integration review of the
+existing background/reconnect and Leave-without-blank-screen fixes) have all
+been re-derived from the frozen source and fixed or confirmed correct in
+this environment — see `SESSION_CHANGELOG.md`'s "Frozen-checkpoint
+verification: Bugs 1-5" entry for the full reasoning on each. **None of the
+five are real-device verified.** All are arithmetic/test-level only in an
+environment with no browser access. Redeploy to staging and specifically
+re-check, on the same Android phone/orientations as the original report:
+
+- Hazari Arrangement, portrait and landscape: Rank/Suit/Dealt fully visible
+  and tappable with the voice/call toggle both collapsed and its panel open
+- The Hazari Table, portrait and landscape: every seat's name and Bot badge
+  (where present), and specifically the **top seat's dealer button** — its
+  on-screen offset changed (smaller, fixed-size nudge instead of the old
+  oversized one) and has not been seen on a real screen yet
+- The screen shown right after a hand/set ends (RoundSummary), in a short
+  landscape viewport specifically — confirm all score rows are reachable by
+  scrolling and Next Hand/Continue stays visible throughout
+
 ---
 
 ## What you need
@@ -154,6 +176,64 @@ Added 2026-08-14, entirely unverified on a real device yet — see
 - [ ] The service worker never visibly interferes with reconnection — do a
       normal reconnect drill (section 4) with the app installed and confirm
       it behaves identically to the browser tab version
+
+---
+
+## 11. Welcome, Profile & Identity
+
+Added 2026-08-15, entirely unverified on a real device yet.
+
+- [ ] First launch (no saved profile) shows the Welcome screen - brand and
+      one button, not a name/avatar form straight away
+- [ ] Tapping **Enter Cardroom** opens the compact profile sheet, not
+      anything resembling account registration
+- [ ] Leaving the name blank and tapping Continue shows a clear message,
+      not a silent no-op
+- [ ] Completing the profile enters THE CARD ROOM directly
+- [ ] Close the app fully (swipe away / force-stop), relaunch: Welcome now
+      shows the saved avatar and name with **Continue as `<name>`**, not
+      the setup sheet again
+- [ ] **Continue as `<name>`** enters THE CARD ROOM in one tap
+- [ ] **Change profile** (from Welcome, and from the small profile control
+      in THE CARD ROOM's header) opens the sheet pre-filled with the
+      current name/avatar
+- [ ] Editing the name/avatar and saving is reflected immediately in THE
+      CARD ROOM header and the next time the room is entered
+- [ ] Editing profile does **not** change anything about a room already in
+      progress, and is not reachable at all while inside one (no profile
+      control appears in the Lobby or at the table)
+
+## 12. Android/PWA Back navigation
+
+Added 2026-08-15, entirely unverified on a real device yet. Test in both a
+normal Chrome tab and the installed standalone PWA - they can differ.
+
+- [ ] Back from THE CARD ROOM (game selector) returns to Welcome, not the
+      previous website
+- [ ] Back from Welcome exits the app/tab normally - it is the true root,
+      it must not trap you
+- [ ] Back from the profile sheet returns to wherever it was opened from
+      (Welcome, or THE CARD ROOM if opened from its header control), not
+      always to Welcome
+- [ ] Back from the Room Lobby shows **Leave this room? Stay / Leave** -
+      it does not close the app or silently leave
+- [ ] **Stay** dismisses the dialog with nothing else happening
+- [ ] **Leave** actually leaves, the same as the Lobby's own Leave button
+- [ ] Back during Arrangement shows a confirmation (with the computer-
+      takeover wording) rather than silently abandoning the round or
+      closing the app
+- [ ] Back during an active hand shows the same guarded confirmation, and
+      confirming leaves the same way **Leave Table** in Settings does
+- [ ] Back on Round Summary or the Winner screen does nothing unexpected -
+      no dialog, no exit, no lost game - the screen's own buttons remain
+      the way forward
+- [ ] Rapid repeated Back presses never produce two dialogs, a duplicate
+      leave, or a duplicate room join
+- [ ] None of the above create a second/duplicate player in the room (see
+      `HANDOFF.md`'s existing note on duplicate-player causes - this is a
+      new potential source worth specifically ruling out)
+- [ ] The normal browser Back button (not just the Android system gesture)
+      behaves the same way when playing in an ordinary Chrome tab
 
 ---
 

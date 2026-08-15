@@ -11,6 +11,8 @@ import TOKENS_CSS from '../styles/tokens.css?raw';
 import ARR_CSS from '../../games/hazari/ArrangementTable.css?raw';
 import RSUM_CSS from '../../games/hazari/RoundSummary.css?raw';
 import WIN_CSS from '../../games/hazari/WinnerScreen.css?raw';
+import WELCOME_CSS from '../components/Welcome.css?raw';
+import PROFILE_CSS from '../components/PlayerProfile.css?raw';
 import RULES_TSX from '../../components/RulesModal.tsx?raw';
 import STATS_TSX from '../../components/StatsModal.tsx?raw';
 import TUTORIAL_TSX from '../../components/TutorialModal.tsx?raw';
@@ -102,6 +104,70 @@ describe('notch and home-indicator collisions', () => {
     expect(RSUM_CSS).toMatch(/overflow-y:\s*auto/);
     expect(WIN_CSS).toMatch(/overflow-y:\s*auto/);
     expect(RSUM_CSS).toMatch(/overscroll-behavior:\s*contain/);
+  });
+
+  it('both migrated screens fall back to 100vh before 100dvh, for browsers/webviews without dvh support', () => {
+    // Regression (Bug 5, confirmed on real Android PWA staging): if `dvh`
+    // is unsupported, the WHOLE `height: 100dvh` declaration is dropped,
+    // not just its value - leaving the shell with no height constraint at
+    // all, and nothing for its internal overflow-y:auto to trigger
+    // against. A same-property cascade (100vh declared first, 100dvh
+    // second) means an unsupporting browser silently keeps the 100vh line
+    // instead of ending up with no height rule at all.
+    //
+    // Comments are stripped before matching (same reasoning as the
+    // "safe-area insets" check below): RoundSummary.css's own explanatory
+    // comment for this exact fallback legitimately contains the literal
+    // text "height: 100dvh" as prose, which the raw regex would otherwise
+    // double-count as a third declaration - a false failure on CSS that is
+    // actually correct, not evidence of a missing fallback.
+    const stripComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '');
+    const ruleBody = (css: string, selector: string) => {
+      const withoutComments = stripComments(css);
+      const start = withoutComments.indexOf(`${selector} {`);
+      if (start === -1) throw new Error(`no rule found for ${selector}`);
+      const openBrace = withoutComments.indexOf('{', start);
+      const closeBrace = withoutComments.indexOf('\n}', openBrace); // flat rule, no nesting - first close wins
+      return withoutComments.slice(openBrace, closeBrace);
+    };
+    for (const [name, block] of [
+      ['RoundSummary', ruleBody(RSUM_CSS, '.rsum')],
+      ['WinnerScreen', ruleBody(WIN_CSS, '.winner')],
+    ] as const) {
+      const heightLines = [...block.matchAll(/height:\s*100(v|dv)h/g)];
+      expect(heightLines.length, `${name}: expected both a 100vh and a 100dvh height line`).toBe(2);
+      expect(heightLines[0][1], `${name}: 100vh must come first (the fallback)`).toBe('v');
+      expect(heightLines[1][1], `${name}: 100dvh must come second (the preferred value)`).toBe('dv');
+    }
+  });
+
+  it('both migrated screens keep a single scroll region - overflow:hidden on the shell, not min-height/no-clip', () => {
+    // Regression: an earlier version of this fix switched the shell from a
+    // fixed height + overflow:hidden to min-height + no clipping, on the
+    // theory that letting the page itself scroll as a fallback beats a
+    // dead end. That theory doesn't hold up against .rsum__scroll's own
+    // min-height:0 + overflow-y:auto (already a complete, correct,
+    // SINGLE-scroll-region mechanism on its own) and risks the opposite of
+    // what it intended - two independently scrollable regions (the page
+    // AND the internal one), with no guarantee the action rail
+    // (.rsum__actions / .winner__actions, `auto`-sized, the second grid
+    // row) stays pinned at the bottom rather than scrolling away with the
+    // rest of the page.
+    const ruleBody = (css: string, selector: string) => {
+      const start = css.indexOf(`${selector} {`);
+      if (start === -1) throw new Error(`no rule found for ${selector}`);
+      const openBrace = css.indexOf('{', start);
+      const closeBrace = css.indexOf('\n}', openBrace);
+      return css.slice(openBrace, closeBrace);
+    };
+    for (const [name, css, selector] of [
+      ['RoundSummary', RSUM_CSS, '.rsum'],
+      ['WinnerScreen', WIN_CSS, '.winner'],
+    ] as const) {
+      const body = ruleBody(css, selector);
+      expect(body, `${name}: shell must not be min-height-only`).not.toMatch(/^\s*min-height:\s*100/m);
+      expect(body, `${name}: shell must clip, not rely on page scroll`).toMatch(/overflow:\s*hidden/);
+    }
   });
 
   it('both migrated screens keep their action rails reachable and landscape-aware', () => {
@@ -210,6 +276,42 @@ describe('the chat toggle never covers an essential gameplay control', () => {
     return SPACE_2 + status + TOUCH_MIN + dismissSummary + SPACE_2;
   }
 
+  /**
+   * The gap the reserve must ALSO clear above .arr__actions: the sort
+   * control (.arr__hand-bar, "Your cards … Rank Suit Dealt") together with
+   * the fan of cards sitting directly beneath it - confirmed on real
+   * Android PWA staging as the voice/chat FAB stack covering "Dealt"
+   * (SESSION_CHANGELOG.md, "Bug 3").
+   *
+   * The real DOM order (verified against ArrangementTable.tsx's actual JSX,
+   * not assumed from the stylesheet) bottom-to-top above .arr__actions is:
+   *   .arr__fan (the fanned cards) THEN .arr__hand-bar (the sortbar row).
+   * Both sit between the rail and the sortbar, so BOTH must be counted -
+   * an earlier version of this function counted only the sortbar row plus
+   * .arr__hand's own top padding (which is on the far side of the sortbar
+   * from the rail, and so irrelevant here), omitting the fan entirely. The
+   * fan is by far the largest term (~80px, one small card plus its
+   * padding), so that omission undershot the true figure substantially.
+   *
+   * This DOES vary by orientation: .arr__fan's own padding is smaller in
+   * landscape (`padding-top: 14px; padding-bottom: var(--space-1)`) than
+   * portrait's base `padding: 18px 0 var(--space-2)` - verified directly
+   * against ArrangementTable.css, not assumed. The sortbar row itself
+   * (.arr__hand-bar) is untouched by the landscape rule, so that part is
+   * identical in both orientations. Mirrors hazariRail()'s existing
+   * orientation parameter for the same reason.
+   */
+  function arrangementFanAndSortbar(orientation: 'portrait' | 'landscape'): number {
+    const fanPaddingTop = orientation === 'landscape' ? 14 : 18; // .arr__fan padding, not a token
+    const fanPaddingBottom = orientation === 'landscape' ? SPACE_1 : SPACE_2; // .arr__fan padding
+    const fanHeight = fanPaddingTop + CARD_SM_H + fanPaddingBottom;
+    const sortbarPadding = 2; // .sortbar { padding: 2px }, not a token
+    const sortbarBtnMinHeight = 30; // .sortbar__btn { min-height: 30px }, not a token
+    const handBarMarginBottom = SPACE_1; // .arr__hand-bar { margin-bottom: var(--space-1) }
+    const sortbarRow = sortbarBtnMinHeight + sortbarPadding * 2 + handBarMarginBottom;
+    return fanHeight + sortbarRow;
+  }
+
   /** Reads a declared reserve out of tokens.css, portrait or landscape. */
   function reserveFor(screen: 'playing' | 'arranging', orientation: 'portrait' | 'landscape'): number {
     const landscapeBlock = TOKENS_CSS.slice(
@@ -230,8 +332,10 @@ describe('the chat toggle never covers an essential gameplay control', () => {
     expect(reserveFor('playing', 'portrait')).toBeGreaterThanOrEqual(hazariRail('portrait'));
   });
 
-  it('the PORTRAIT reserve clears the Arrangement rail', () => {
-    expect(reserveFor('arranging', 'portrait')).toBeGreaterThanOrEqual(arrangementRail());
+  it('the PORTRAIT reserve clears the Arrangement rail AND the fan/sort control above it', () => {
+    expect(reserveFor('arranging', 'portrait')).toBeGreaterThanOrEqual(
+      arrangementRail() + arrangementFanAndSortbar('portrait')
+    );
   });
 
   it('the LANDSCAPE reserve clears the compact Hazari rail', () => {
@@ -242,13 +346,27 @@ describe('the chat toggle never covers an essential gameplay control', () => {
     expect(reserve).toBeGreaterThanOrEqual(hazariRail('landscape'));
   });
 
-  it('the LANDSCAPE reserve clears the Arrangement rail', () => {
-    // .arr__actions is NOT compacted in landscape, so the requirement is the
-    // same as portrait. Asserting against the real height rather than
-    // assuming "landscape rails are shorter".
+  it('the LANDSCAPE reserve clears the Arrangement rail AND the fan/sort control above it', () => {
+    // .arr__actions is NOT compacted in landscape, so that part of the
+    // requirement is the same as portrait - but .arr__fan's own padding IS
+    // smaller in landscape, so this must NOT reuse the portrait figure
+    // verbatim.
     const reserve = reserveFor('arranging', 'landscape');
     expect(reserve).toBeGreaterThan(0);
-    expect(reserve).toBeGreaterThanOrEqual(arrangementRail());
+    expect(reserve).toBeGreaterThanOrEqual(arrangementRail() + arrangementFanAndSortbar('landscape'));
+  });
+
+  it('the landscape Arrangement reserve is not needlessly larger than portrait requires', () => {
+    // Regression: an earlier version of this reserve applied the PORTRAIT
+    // fan padding (18px/8px top/bottom) to landscape too, over-reserving by
+    // 8px. Not unsafe on its own, but a real discrepancy between the
+    // reserve and what the layout actually needs - this pins landscape
+    // strictly below portrait instead of allowing it to silently drift
+    // back to the same (wrong-for-landscape) figure.
+    const portraitRequirement = arrangementRail() + arrangementFanAndSortbar('portrait');
+    const landscapeRequirement = arrangementRail() + arrangementFanAndSortbar('landscape');
+    expect(landscapeRequirement).toBeLessThan(portraitRequirement);
+    expect(reserveFor('arranging', 'landscape')).toBeLessThan(reserveFor('arranging', 'portrait'));
   });
 
   it('landscape reserves are not larger than portrait, so the toggle is not pushed up needlessly', () => {
@@ -378,6 +496,8 @@ describe('landscape and short viewports', () => {
   it('round summary adapts', () => expect(PLAY_CSS).toMatch(LANDSCAPE));
   it('the table adapts', () => expect(TABLE_CSS).toMatch(LANDSCAPE));
   it('the arrangement screen adapts', () => expect(ARR_CSS).toMatch(LANDSCAPE));
+  it('welcome adapts', () => expect(WELCOME_CSS).toMatch(LANDSCAPE));
+  it('the player profile sheet adapts', () => expect(PROFILE_CSS).toMatch(LANDSCAPE));
 
   it('the lobby stops vertically centring on short screens, so nothing clips', () => {
     expect(LOBBY_CSS).toMatch(/@media \(max-height: 40rem\)[\s\S]*justify-content:\s*flex-start/);

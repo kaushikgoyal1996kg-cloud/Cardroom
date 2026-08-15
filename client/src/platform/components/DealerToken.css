@@ -4,7 +4,18 @@
 
 .dealer-token {
   position: absolute;
-  transform: translate(-50%, -50%);
+  /* Fixed pixel nudge toward the table centre - NOT a percentage of the
+     felt (see DealerToken.tsx for why). Scaled by --seat-scale so it
+     shrinks exactly as much as the avatar does for smaller seat tiers;
+     the narrow-phone override below shrinks it further, matching the
+     token's own size reduction at that breakpoint. */
+  --dealer-pull: 8px;
+  transform:
+    translate(-50%, -50%)
+    translate(
+      calc(var(--dealer-pull-dir-x, 0) * var(--dealer-pull) * var(--seat-scale, 1)),
+      calc(var(--dealer-pull-dir-y, 0) * var(--dealer-pull) * var(--seat-scale, 1))
+    );
   width: 1.75rem;
   height: 1.75rem;
   display: grid;
@@ -17,10 +28,13 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
   pointer-events: none;
   z-index: 3;
-  /* Slides across the felt when the deal passes on. */
+  /* Slides across the felt when the deal passes on. The pull direction can
+     change too (a new dealer at a different anchor) - transitioning
+     transform alongside left/top keeps that in step rather than snapping. */
   transition:
     left var(--dur-slow) var(--ease-settle),
-    top var(--dur-slow) var(--ease-settle);
+    top var(--dur-slow) var(--ease-settle),
+    transform var(--dur-slow) var(--ease-settle);
 }
 
 .dealer-token__face {
@@ -32,6 +46,6 @@
 }
 
 @media (max-width: 23.75rem) {
-  .dealer-token { width: 1.5rem; height: 1.5rem; }
+  .dealer-token { width: 1.5rem; height: 1.5rem; --dealer-pull: 6px; }
   .dealer-token__face { font-size: var(--text-sm); }
 }

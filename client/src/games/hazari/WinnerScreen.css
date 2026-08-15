@@ -10,6 +10,21 @@
   position: relative;
   display: grid;
   grid-template-rows: 1fr auto;
+  /* Fallback cascade, not min-height/no-clip - see RoundSummary.css's
+     .rsum for the full reasoning (a real dvh-support gap on some Android
+     WebView versions drops the WHOLE height declaration, not just
+     shrinks it, leaving nothing for either overflow:hidden or
+     .winner__scroll's own overflow-y:auto to trigger against).
+     This screen was not itself part of the confirmed end-of-hand
+     scrolling bug (that was RoundSummary, shown on ROUND_COMPLETE /
+     DISMISSED_ROUND - this shows on GAME_COMPLETE, the full match end) -
+     but shares the identical layout primitive (verified: same
+     grid-template-rows, same .winner__scroll min-height:0 +
+     overflow-y:auto pairing, explicitly built to be RoundSummary's twin),
+     so the same latent risk applies here too. Precautionary hardening,
+     not a claim this screen was independently confirmed broken. See
+     SESSION_CHANGELOG.md. */
+  height: 100vh;
   height: 100dvh;
   background:
     radial-gradient(ellipse 80% 40% at 50% 10%, var(--room-700), transparent 70%),

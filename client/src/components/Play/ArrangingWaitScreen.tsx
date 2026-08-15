@@ -1,5 +1,6 @@
 import { useGame } from '../../lib/GameStore';
 import { AvatarBadge } from '../Lobby/AvatarPicker';
+import { LoadingSpinner } from '../LoadingSpinner';
 import type { PlayerId } from '../../game/types';
 import './Play.css';
 
@@ -7,7 +8,15 @@ const SIDE_LABELS = ['bottom', 'left', 'top', 'right'] as const;
 
 export function ArrangingWaitScreen() {
   const { room, gameState, myPlayerId } = useGame();
-  if (!room || !gameState || !myPlayerId) return null;
+  // Defensive fallback, not the primary guard - see RoomLobby.tsx's comment
+  // on the same pattern.
+  if (!room || !gameState || !myPlayerId) {
+    return (
+      <div className="waiting-screen">
+        <LoadingSpinner message="Returning to Cardroom…" />
+      </div>
+    );
+  }
 
   const allIds = room.players.map((p) => p.playerId);
   const myIndex = allIds.indexOf(myPlayerId);

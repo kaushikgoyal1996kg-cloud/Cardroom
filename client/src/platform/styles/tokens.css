@@ -196,6 +196,40 @@
      = 112.8px, IDENTICAL in landscape: the landscape rule touches the header,
        hint, fan and trays but never .arr__actions.
 
+   ArrangementTable also needs its reserve to clear the sort control
+   (.arr__hand-bar, "Your cards … Rank Suit Dealt") sitting above the fan,
+   not just .arr__actions below it - confirmed on real Android PWA staging
+   as the voice/chat FAB stack landing on top of "Dealt" (see
+   SESSION_CHANGELOG.md).
+
+   RE-DERIVED (previous 158px/150px checkpoint values were wrong - see
+   SESSION_CHANGELOG.md "Bug 3" entry for the full audit). The earlier
+   derivation added .arr__hand's own top padding (8px portrait / 0
+   landscape) - which sits ABOVE the sortbar, on the far side from the FAB,
+   and so is irrelevant to clearing it - while it omitted .arr__fan
+   entirely: the actual fan of cards, which sits BETWEEN .arr__actions and
+   the sortbar and is by far the largest term (≈80px). Omitting it
+   undershot the true figure by roughly the height of a card. Rebuilt
+   bottom-up, matching the real DOM order .arr__actions → .arr__fan →
+   .arr__hand-bar (verified against ArrangementTable.tsx's actual render
+   order, not assumed from the stylesheet):
+
+     .arr__actions                         = 112.8px (both orientations)
+   + .arr__fan (padding + one small card)
+       portrait:  18px + 53.96px + 8px     =  79.96px
+       landscape: 14px + 53.96px + 4px     =  71.96px
+   + .arr__hand-bar (sortbar row + its own margin-bottom)
+       30px min-height + 2px + 2px padding + 4px margin-bottom = 38px
+       (identical in both orientations - not touched by the landscape rule)
+   ---------------------------------------------------------------------
+   = 230.76px portrait, 222.76px landscape
+
+   152, 158 and every other historical value has come from *estimating*
+   this figure at some point; 236 / 228 below are the first values actually
+   built by measuring the real chain of boxes between the rail and the
+   sortbar, with a small buffer (~5px, in line with the other reserves
+   here) for the rail's 1px border-top that the arithmetic above omits.
+
    Safe-area is deliberately NOT included here: the rail's own padding already
    adds it, and the chat toggle adds it once more itself. Including it in the
    reserve would double-count the inset. */
@@ -205,20 +239,27 @@
 }
 
 .app-root[data-screen='arranging'] {
-  --action-reserve: 116px;
+  --action-reserve: 236px;
 }
 
 /* Phone landscape.
    The rails are only marginally shorter here - the landscape rules compact
    padding, not the action row - so the reserve must be KEPT, not dropped.
    Dropping it put the chat toggle straight on top of "Play" and "Confirm
-   hand" whenever a player rotated their phone. */
+   hand" whenever a player rotated their phone.
+
+   Arrangement's own landscape figure is SMALLER than portrait's, not equal
+   to it - .arr__fan's own padding is smaller in landscape (18px/8px top/
+   bottom in portrait vs 14px/4px in landscape - see above), so reusing the
+   portrait value here would over-reserve by 8px. Harmless on its own (it
+   only pushes the toggle slightly higher than strictly necessary), but not
+   what the number claims to be derived from - kept precise instead. */
 @media (orientation: landscape) and (max-height: 30rem) {
   .app-root[data-screen='playing'] {
     --action-reserve: 144px;
   }
   .app-root[data-screen='arranging'] {
-    --action-reserve: 116px;
+    --action-reserve: 228px;
   }
 }
 

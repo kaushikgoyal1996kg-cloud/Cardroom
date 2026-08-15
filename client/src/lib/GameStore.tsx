@@ -153,6 +153,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [voiceParticipants, setVoiceParticipants] = useState<string[]>([]);
   const [speakingPlayerIds, setSpeakingPlayerIds] = useState<string[]>([]);
 
+  // Guards against a stale reconnect ack (from an earlier, since-superseded
+  // connect/disconnect cycle on a flaky connection) applying its result
+  // after a NEWER attempt has already resolved - see onConnect below.
+  const reconnectAttemptRef = useRef(0);
+
   useEffect(() => {
     const socket = socketRef.current;
 
@@ -161,17 +166,39 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setHasConnectedOnce(true);
       const stored = readSession();
       if (stored) {
+        const attempt = ++reconnectAttemptRef.current;
         // The server replays this player's hand as part of reconnect
         // restoration. That is not a new deal and must not animate.
         suppressDealAnimation.current = true;
         setRestoration((r) => ({ active: true, generation: r.generation }));
         socket.emit('room:reconnect', { token: stored.token }, (res: RoomAck) => {
+          if (attempt !== reconnectAttemptRef.current) return; // superseded by a newer attempt - ignore
           if (res.ok && res.room) {
             setRoom(res.room);
             setMyPlayerId(res.playerId ?? null);
             setMyName(stored.playerName);
           } else {
+            // An authoritative "no" from the server (bad/expired token, the
+            // room is gone, or the seat is gone) - not merely "still
+            // trying". Only NOW is it safe to clear whatever room/game
+            // state is still sitting in React state from before the
+            // disconnect; clearing it any earlier (e.g. on the disconnect
+            // itself, or while a reconnect is still in flight) could drop a
+            // player who was about to reconnect successfully. Previously
+            // this branch only cleared the stored token, leaving a "ghost"
+            // table on screen that looked normal but would only fail -
+            // confusingly, as "You're not in a game right now" - the next
+            // time the player tried to interact with it.
             clearSession();
+            setRoom(null);
+            setMyPlayerId(null);
+            setMyHand([]);
+            setMyArrangedSets(null);
+            setGameState(null);
+            setLastRoundResult(null);
+            setWinnerInfo(null);
+            setViewMode('active');
+            setRoomError("Your table timed out while you were away. You'll need to start or join a new one.");
           }
           // Release on the next tick, after the restoration burst of events.
           setTimeout(() => {
@@ -250,6 +277,28 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       playChatSound();
     };
 
+    // Mobile browsers/PWAs throttle or fully suspend background tabs, and
+    // can restore a page from the back-forward cache after a WebSocket has
+    // already been force-closed. socket.io's own automatic reconnection
+    // (see socket.ts) eventually notices and retries on its own, but its
+    // backoff timer can be paused or badly delayed across a suspend/resume
+    // cycle - waiting on it alone is what let a returning player see a
+    // stale "ghost" table instead of a prompt reconnect. Nudge it directly
+    // the moment the app is actually visible again; `.connect()` is a
+    // documented no-op if already connected or already connecting.
+    //
+    // This deliberately does NOT touch history/navigation in any way -
+    // visibility and pageshow are unrelated to popstate, and useBackGuard
+    // only ever listens for popstate - so returning from another app is
+    // never mistaken for a Back press. See ARCHITECTURE.md.
+    function onForeground() {
+      if (document.visibilityState === 'visible' && !socket.connected) {
+        socket.connect();
+      }
+    }
+    document.addEventListener('visibilitychange', onForeground);
+    window.addEventListener('pageshow', onForeground);
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('room:update', onRoomUpdate);
@@ -265,6 +314,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (socket.connected) onConnect();
 
     return () => {
+      document.removeEventListener('visibilitychange', onForeground);
+      window.removeEventListener('pageshow', onForeground);
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('room:update', onRoomUpdate);

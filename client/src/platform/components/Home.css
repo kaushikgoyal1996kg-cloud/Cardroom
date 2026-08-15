@@ -70,7 +70,7 @@
 .home__identity {
   margin-top: var(--space-4);
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-2);
   min-height: var(--touch-min);
   padding: var(--space-2) var(--space-4);
@@ -81,6 +81,11 @@
   font: inherit;
   cursor: pointer;
   transition: border-color var(--dur-fast) var(--ease-smooth);
+}
+
+.home__identity-avatar {
+  display: inline-flex;
+  align-items: center;
 }
 
 .home__identity:hover {

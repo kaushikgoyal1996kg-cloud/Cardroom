@@ -1,6 +1,7 @@
 import { useGame } from '../../lib/GameStore';
 import { AvatarBadge } from '../../components/Lobby/AvatarPicker';
 import { Confetti } from '../../components/Confetti';
+import { LoadingSpinner } from '../../components/LoadingSpinner';
 // Shares .score-list with the round summary, so the two screens read as a pair.
 import './RoundSummary.css';
 import './WinnerScreen.css';
@@ -15,7 +16,15 @@ import './WinnerScreen.css';
  */
 export function WinnerScreen() {
   const { room, myPlayerId, winnerInfo, leaveSession, playAgain } = useGame();
-  if (!room || !winnerInfo) return null;
+  // Defensive fallback, not the primary guard - see RoomLobby.tsx's comment
+  // on the same pattern.
+  if (!room || !winnerInfo) {
+    return (
+      <div className="waiting-screen">
+        <LoadingSpinner message="Returning to Cardroom…" />
+      </div>
+    );
+  }
 
   const me = room.players.find((p) => p.playerId === myPlayerId);
   const isHost = me?.isHost ?? false;

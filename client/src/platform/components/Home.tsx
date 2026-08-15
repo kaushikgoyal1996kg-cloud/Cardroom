@@ -1,10 +1,16 @@
 import { useState } from 'react';
 import { GAME_CATALOG, catalogEntry } from '../games/catalog';
+import { AvatarBadge } from '../../components/Lobby/AvatarPicker';
 import type { GameId } from '../../game/types';
 import './Home.css';
 
 export interface HomeProps {
   playerName: string;
+  /** Shown alongside the name in the header profile control (Part 6: "a
+   *  small avatar/profile control in the global shell/header is
+   *  acceptable"). Optional so existing callers/tests that don't pass it
+   *  still render sensibly. */
+  playerAvatar?: string;
   onEditName: () => void;
   onPlay: (game: GameId) => void;
   onCreateTable: (game: GameId) => void;
@@ -23,6 +29,7 @@ export interface HomeProps {
  */
 export function Home({
   playerName,
+  playerAvatar,
   onEditName,
   onPlay,
   onCreateTable,
@@ -55,8 +62,13 @@ export function Home({
         <p className="home__eyebrow">The</p>
         <h1 className="home__brand">Card Room</h1>
         <button type="button" className="home__identity" onClick={onEditName}>
+          {playerAvatar && (
+            <span className="home__identity-avatar">
+              <AvatarBadge avatar={playerAvatar} size="sm" />
+            </span>
+          )}
           <span className="home__identity-name">{playerName}</span>
-          <span className="home__identity-edit">Change name</span>
+          <span className="home__identity-edit">Profile</span>
         </button>
       </header>
 

@@ -85,7 +85,7 @@ export const Seat = memo(function Seat({ player, position, isDealer, isActive }:
 
       <div className="seat__info">
         <p className="seat__name">
-          {player.name}
+          <span className="seat__name-text">{player.name}</span>
           {player.isBot && <span className="seat__tag seat__tag--bot">Bot</span>}
         </p>
 

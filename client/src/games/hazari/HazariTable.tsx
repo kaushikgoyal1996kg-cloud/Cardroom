@@ -3,6 +3,7 @@ import { useGame } from '../../lib/GameStore';
 import { CardTable, type PlayedSetView } from '../../platform/components/CardTable';
 import type { SeatPlayer } from '../../platform/components/Seat';
 import { PlayingCard } from '../../platform/components/PlayingCard';
+import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { playCardPlaySound, playRevealSound, playPointsSound } from '../../lib/sound';
 import { hapticMedium } from '../../lib/haptics';
 import { classifySet, labelFor, setValue } from '../../game/handClassification';
@@ -102,7 +103,15 @@ export function HazariTable() {
     }));
   }, [room, gameState, voiceParticipants, speakingPlayerIds]);
 
-  if (!room || !gameState || !myPlayerId) return null;
+  // Defensive fallback, not the primary guard - see RoomLobby.tsx's comment
+  // on the same pattern.
+  if (!room || !gameState || !myPlayerId) {
+    return (
+      <div className="waiting-screen">
+        <LoadingSpinner message="Returning to Cardroom…" />
+      </div>
+    );
+  }
 
   const currentSetIdx = gameState.currentSetIndex;
   const playOrder = gameState.currentPlayOrder ?? [];

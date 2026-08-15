@@ -138,6 +138,23 @@ Each of these was a deliberate choice, several after finding real bugs.
   unverified. This remains the single largest open risk.
 - Dealing and play-travel **timing** needs human judgement on a device.
   Constants live in `client/src/platform/table/seatLayout.ts`.
+- **`DealerToken`'s felt-relative positioning is a real architectural
+  tension, not fully resolved — 2026-08-15.** The token (and every seat)
+  is positioned as a percentage of the felt, but the felt's pixel size
+  varies hugely across the supported range (a 320px phone up to the
+  60rem/72dvh desktop cap in `CardTable.css`) while the avatar and name
+  text stay fixed-px. That mismatch is what caused the token to land on a
+  seat's own name label for centre-ward-downward anchors (`top`,
+  `top-left`, `top-right`) — see `SESSION_CHANGELOG.md`'s "Bug 4" entry.
+  The fix (`DealerToken.tsx`/`.css`) makes the token's *pull* a small fixed
+  pixel amount instead of a felt percentage, which closes that specific
+  collision arithmetically at every supported seat-scale/breakpoint
+  (`DealerToken.test.tsx`), but the same fixed-px-vs-percentage tension
+  still exists everywhere else seats are positioned (`seatLayout.ts`,
+  `Seat.css`) — it has simply never been large enough elsewhere to cause a
+  provable collision yet. If a future change enlarges any seat element,
+  re-run the same kind of arithmetic check before assuming percentage
+  positioning is safe.
 - Reconnect animation suppression closes on the existing next-tick lifecycle.
   There is **no explicit server "restoration complete" event**; a sufficiently
   delayed restoration burst could still be read as new.

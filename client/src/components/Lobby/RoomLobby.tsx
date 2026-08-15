@@ -1,12 +1,25 @@
 import { useState } from 'react';
 import { useGame } from '../../lib/GameStore';
 import { AvatarBadge } from './AvatarPicker';
+import { LoadingSpinner } from '../LoadingSpinner';
 import './RoomLobby.css';
 
 export function RoomLobby() {
   const { room, myPlayerId, setReady, startGame, addBot, leaveSession } = useGame();
   const [shareCopied, setShareCopied] = useState(false);
-  if (!room) return null;
+  // Defensive fallback, not the primary guard - App.tsx's routing already
+  // only selects this screen once `room` is set. Kept here too so this
+  // component can never itself return a blank page if some future change
+  // (or a not-yet-found edge case) ever asks it to render without one -
+  // see the confirmed "blank black screen after Leave" bug and
+  // ARCHITECTURE.md's note on this invariant.
+  if (!room) {
+    return (
+      <div className="waiting-screen">
+        <LoadingSpinner message="Returning to Cardroom…" />
+      </div>
+    );
+  }
 
   const me = room.players.find((p) => p.playerId === myPlayerId);
   const isHost = me?.isHost ?? false;

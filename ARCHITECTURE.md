@@ -207,6 +207,47 @@ That key is also set as `data-screen` on `.app-root`, which lets fixed chrome
 (the chat FAB) reserve space for the current screen's action rail
 declaratively, since CSS variables cascade downward only.
 
+**Entry flow** (`HomeScreen.tsx`, only rendered while `room` is null) is the
+same style of plain conditional chain, one level down: an internal
+`entryStage` (`'welcome' | 'profile' | 'cardroom'`) picks between `Welcome`,
+`PlayerProfile` and `Home` for a normal launch. An invite link (`?join=...`)
+or an in-flight reconnect for that exact room bypasses this entirely and
+falls through to the existing `Landing`/waiting-spinner paths, unchanged -
+see the "Persistent local identity" and "Android/PWA Back navigation"
+sections below for why that boundary is deliberate.
+
+**Persistent local identity** (`lib/identity.ts`) is a `localStorage`-backed
+`{ profileId, name, avatar }`, separate from `GameStore`'s reconnect/session
+token (`haazari_session_v1`) both in storage key and in purpose: `profileId`
+identifies *this device's saved profile*, generated once and stable across
+edits; the session token identifies *a seat in a specific room* and is
+owned entirely by `GameStore`. Neither module reads or writes the other's
+key. `profileId` is not sent to the server today - see PROJECT_STATE.md and
+Part 12 of the brief this shipped against for why that's a deliberate,
+revisitable choice rather than an oversight.
+
+**Android/PWA Back navigation** (`lib/useBackGuard.ts`) is a shared hook, not
+a second router: it observes a `screenKey` the caller already computed (the
+existing conditional chains above) and keeps one browser/PWA history entry
+in step with it, intercepting Back where leaving needs confirmation first.
+Two independent call sites use it - `App.tsx` for room-level screens (Lobby,
+an active game, round-summary/winner, home-return) and `HomeScreen.tsx` for
+entry-level screens (Welcome/Profile/CardRoom) - never both at once, since
+`App.tsx`'s instance is explicitly `disabled` while `screenKey === 'home'`
+(i.e. while `HomeScreen` is mounted and owns Back itself). A screen either
+returns `'root'` (no interception - lets Back exit the app/tab, used only
+for true entry points: Welcome, an invite link's own landing), `'handled'`
+(a safe, reversible state change the caller already made, e.g.
+`setEntryStage('welcome')`), or `'blocked'` (the pop is cancelled; used both
+for confirmation-guarded leaves and for absorbing a press on a screen with
+no sensible Back destination, like round-summary). A confirmed Leave calls
+`consumeAsBack()` immediately before the state change that follows, so the
+next history sync replaces the blocked entry instead of stacking a new one
+on top of it. See `App.tsx`'s `pendingLeaveConfirm` effect for why a
+guarded dialog is also cleared - not left stale - if the room's status
+changes for a reason other than that dialog's own confirm/cancel (e.g. the
+host starts the game while another player has a Lobby leave-confirm open).
+
 **Table primitives** in `platform/components/` are shared and game-agnostic:
 `CardTable` takes players, dealer, played sets and dealing flags. `seatLayout`
 provides hand-tuned seat rings for 2–9 players, deal timing and the
