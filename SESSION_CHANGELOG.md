@@ -25,6 +25,157 @@ why, without any conversation context.
 
 ---
 
+## 2026-08-16 — Third real-device retest: Bugs 1-3 confirmed PASS; Bug 4 (side-seat names) and Bug 5 (result-screen scroll) genuinely fixed
+
+- **Model:** Sonnet
+- **Context:** Bugs 1 (backgrounding), 2 (Leave Table), and 3 (Arrangement
+  FAB) are now OWNER-VERIFIED REAL-DEVICE PASS on the Android PWA. Per
+  instruction, neither their code nor their tests were touched this
+  session - confirmed by hash diff at the end (zero server files changed;
+  zero client files outside the Bug 4/5 scope changed). Bugs 4 and 5
+  remained open, each with new, more specific real-device detail.
+- **Bug 4 (side-seat names, "Nawab" specifically) - found and fixed a
+  SECOND real bug underneath the previous session's fix:** The prior
+  session's inward-anchoring fix (a flat 6.5rem/5.25rem allowance) was
+  re-verified against the real geometry rather than trusted, and found
+  wrong in two compounding ways:
+  1. `layout.test.ts`'s felt-width formula assumed
+     `.hazari__table-area`'s horizontal padding scaled with viewport width
+     (8px narrow / 16px regular). It does not - it is a flat
+     `var(--space-2)` (8px) on EACH side, 16px total, at every width
+     (`HazariTable.css`). This made the narrow-breakpoint felt-width
+     estimate too generous, directly undermining the "safe" figure it
+     produced.
+  2. That flat allowance was applied to diagonal anchors (`top-left` etc)
+     as well as pure `left`/`right`. On larger, currently-unreachable-but-
+     shared ring sizes (5-9 players), some diagonal anchors sit much
+     closer to the felt's own centre already (the 9-player ring's inner
+     `top-left`/`top-right`, only 18 percentage points out, vs pure
+     `left`/`right`'s real >=31.6 on every ring) - a flat width generous
+     enough for the reachable 4-player case would have overshot those
+     anchors' centreline by 40-60px, a real, provable regression on ring
+     sizes Hazari does not use today but the layout code must not break.
+
+  **Fix:** replaced the flat constant with a per-seat, viewport-dynamic
+  `calc()` in `Seat.css`, driven by a new `--identity-dist` CSS custom
+  property (`Seat.tsx`, computed as `|50 - x|` from each seat's own real
+  position - not guessed per anchor name, which cannot distinguish "this
+  ring's left seat" from "a different ring's left seat"), floored at the
+  existing guaranteed-width baseline so nothing regresses. Scoped strictly
+  to pure `left`/`right` (diagonal anchors reverted to the proven-safe
+  centred default - explicitly NOT part of this bug, and provably unsafe
+  under the same treatment on some ring sizes). Verified arithmetically
+  against every supported player count (2-9), not just the reachable one.
+  **Honestly documented, not fixed:** a 7+ character name AND a Bot badge
+  AND the single tightest width (390px) may still ellipsize - the
+  geometrically safe ceiling at that specific combination is a few pixels
+  short of what "Kaushik"-as-a-bot needs. A dedicated test
+  (`Seat.test.tsx`) records this shortfall explicitly rather than either
+  silently failing to guarantee it or quietly relaxing the safety margin
+  to paper over it.
+- **Bug 5 (end-of-hand result screen not scrollable) - THIRD structure,
+  after two prior real-device failures:** This retest's own real-device
+  evidence ("physical vertical swiping does NOT scroll the result
+  content") ruled out BOTH prior approaches: the original fixed-height/
+  nested-scroll shell, and the following session's normal-page-flow/
+  sticky-footer redesign. Traced the full ancestor chain from the result
+  rows to `<body>` for every mechanism the retest asked about
+  (`touch-action`, JS-level `touchmove`/`preventDefault` handlers,
+  `overscroll-behavior`, transformed ancestors, the viewport meta tag) -
+  found no single definitive blocker via static analysis, but confirmed
+  `index.html`'s viewport meta tag carries `maximum-scale=1`, a
+  documented source of touch-handling side effects on some Android
+  WebView versions (flagged, not fully diagnosed as causal).
+
+  Rebuilt to the retest's own explicit required structure: a BOUNDED
+  shell (not page flow) with exactly ONE internal scroll region.
+  Critically, the shell's height is no longer governed by CSS `dvh`
+  alone - `--js-vh` (set inline by `RoundSummary.tsx`/`WinnerScreen.tsx`)
+  is a height measured directly in JS via `useVisualViewport()`, an
+  EXISTING hook already used elsewhere in this app for exactly this kind
+  of reliability problem (mobile keyboard avoidance), reading
+  `window.visualViewport`/`window.innerHeight` rather than trusting a CSS
+  unit whose accuracy in Android PWA standalone mode had already cost two
+  rounds of this bug. `100vh`/`100dvh` remain as the pre-mount/no-
+  `visualViewport` fallback. `.rsum__scroll`/`.winner__scroll` are
+  `flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden`,
+  now also explicitly `touch-action: pan-y`. The action rows
+  (`.rsum__actions`/`.winner__actions`) are plain flex-column siblings
+  AFTER the scroll region - not sticky, not nested inside it - so they
+  keep their own natural height and can never be pushed off-screen or
+  scrolled away by content inside the scroll region.
+
+  **WinnerScreen was changed too**, for the same reason as both prior
+  rounds: not an independently confirmed defect, but sharing the exact
+  same shell primitive (explicitly built as RoundSummary's twin) - kept
+  in step on purpose rather than left on a structure already shown twice
+  to fail.
+
+  New component-level tests (`RoundSummary.test.tsx`,
+  `WinnerScreen.test.tsx`) verify the ACTUAL rendered DOM - that the
+  action row is a real sibling after the scroll region, not merely that
+  the right class names exist in a stylesheet - and that `--js-vh` is
+  correctly wired from a mocked `useVisualViewport()`. Rewrote
+  `mobileSafety.test.ts`'s CSS-level checks for the new structure. Every
+  new/changed assertion across both test files was proven meaningful by
+  reverting the corresponding code and confirming the test fails, then
+  restoring it - including catching a second instance of the exact
+  comment/regex-collision bug found in an earlier round, this time in
+  this session's own new explanatory comment.
+
+  **Honest caveat, not glossed over:** this session cannot verify on a
+  real device whether physical swiping now works. Every mechanism found
+  through static analysis (dvh reliability, nested-scroll-region
+  assumptions) has been addressed, but "swiping does nothing at all" is a
+  strong enough symptom that a genuinely different cause (the viewport
+  meta tag, or something else undiscoverable without a real device)
+  remains possible. Flagged explicitly in `STAGING-CHECKLIST.md` and
+  `HANDOFF.md` for particularly careful re-verification, not marked as
+  confidently solved.
+- **Files changed:** `client/src/platform/components/Seat.css` +
+  `Seat.tsx` + `Seat.test.tsx` (Bug 4), `client/src/games/hazari/
+  RoundSummary.css` + `RoundSummary.tsx` + new `RoundSummary.test.tsx`,
+  `client/src/games/hazari/WinnerScreen.css` + `WinnerScreen.tsx` + new
+  `WinnerScreen.test.tsx` (Bug 5), `client/src/platform/styles/
+  mobileSafety.test.ts` (Bug 5 tests), `client/src/platform/table/
+  layout.test.ts` (padding-formula fix shared with Bug 4's geometry).
+  **Nothing else touched** - confirmed by hash diff: zero server files
+  changed (Bugs 1-2's reconnect/leave logic untouched), zero
+  `tokens.css`/`ArrangementTable.css`/`GameStore.tsx` changes (Bug 1-3
+  untouched). `seatLayout.ts`'s seat x/y positions (fixed in the prior
+  session) were re-verified, not re-changed.
+- **Decisions:**
+  - Diagonal seat anchors were deliberately EXCLUDED from Bug 4's inward-
+    growth treatment, trading a plausible-but-unproven improvement for a
+    provable regression avoided on ring sizes Hazari does not use today.
+  - Bug 5's redesign is recorded as a full third structure, not a tweak,
+    specifically so a future session does not attempt to "fix" this again
+    by tuning vh/dvh values or overflow properties within either of the
+    two approaches already shown to fail on a real device.
+  - Every regression-sensitive test added or rewritten this session was
+    verified by deliberately breaking the corresponding code and
+    confirming failure, not just by a first-try pass - consistent with
+    the previous session's practice, now doubly warranted given how many
+    "test-verified" conclusions in this bug's history turned out wrong on
+    an actual device.
+  - Not deployed. Staging/production untouched, per standing instruction.
+- **Tests after:** server 310/310 (unchanged, rerun to confirm the
+  untouched baseline). Client 364/364 (338 baseline + 5 new
+  `RoundSummary.test.tsx` + 3 new `WinnerScreen.test.tsx` + 18 net new/
+  rewritten in `Seat.test.tsx`, replacing the prior session's 35 with a
+  corrected 35). All four remaining commands (client typecheck, client
+  build, server typecheck, server build) clean.
+- **New debt:** none knowingly introduced beyond what's already recorded
+  in `HANDOFF.md`. **Bugs 4 and 5 are NOT real-device verified** by this
+  session - both remain arithmetic/component-test-level only. Given Bug
+  5's history (two prior real-device failures despite clean test suites
+  each time), this is flagged with unusual emphasis in
+  `STAGING-CHECKLIST.md`: a clean suite here has specifically NOT been
+  sufficient evidence twice already.
+- **Baseline status:** accepted, pending real-device retest of Bugs 4-5.
+
+---
+
 ## 2026-08-15 (evening) — Second real-device retest: Bugs 1, 2, 4 & 5 genuinely fixed; Bug 3 re-verified
 
 - **Model:** Sonnet

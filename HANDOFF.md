@@ -126,23 +126,29 @@ Each of these was a deliberate choice, several after finding real bugs.
 
 ## Known technical debt
 
-- **A clean local test suite has now twice not been sufficient evidence
-  that a mobile fix actually works — 2026-08-15.** Two rounds in a row,
-  fixes that were fully arithmetic/test-verified in this environment (no
-  browser access) were confirmed still failing on the next real-device
-  retest, for reasons the tests could not have caught: a `dvh` value that
-  is *recognised but numerically wrong* in Android PWA standalone mode
-  (not merely unsupported — no vh-then-dvh fallback catches that), and a
-  nested `overflow: auto` region not reliably keeping touch-scroll capture
-  on some WebView versions (see `SESSION_CHANGELOG.md`'s "Second real-device
-  retest" entry, Bug 5, for the specific case this cost a full round on).
-  Treat "the arithmetic checks out and the suite is green" as necessary,
-  not sufficient, for anything involving viewport units, nested scroll
-  regions, or precise pixel geometry on a real phone — and prefer patterns
-  with a long, boring track record of just working everywhere (normal page
-  scroll, `position: sticky`) over ones that depend on a specific unit or
-  nested-scroll-capture behaving exactly as documented, even when the
-  documented behaviour is exactly what the arithmetic assumes.
+- **A clean local test suite has now THREE TIMES not been sufficient
+  evidence that a mobile fix actually works — 2026-08-16, updated.** Three
+  rounds in a row for Bug 5 specifically: a fixed-height/nested-scroll
+  shell, then a normal-page-flow/sticky-footer redesign, both fully
+  arithmetic/test-verified in this environment (no browser access) and
+  both confirmed still failing on the next real-device retest -
+  "physical vertical swiping does NOT scroll the result content" on both,
+  a stronger symptom than either round's own theory (dvh inaccuracy,
+  nested-scroll-capture unreliability) fully explains on its own. **The
+  advice this note used to give - "prefer normal page scroll and
+  `position: sticky`, they have a long boring track record" - was itself
+  wrong, or at least insufficient; that exact pattern is what failed the
+  SECOND time.** Do not treat either "bounded shell with nested scroll"
+  or "page flow with sticky footer" as the safe, proven choice - both
+  have independently failed real-device testing once. The current
+  (third) structure additionally uses a JS-measured viewport height
+  (`useVisualViewport()`) rather than trusting CSS `dvh` alone, and has
+  NOT yet been confirmed on a real device either - see
+  `SESSION_CHANGELOG.md`'s "Third real-device retest" entry. Treat "the
+  arithmetic checks out and the suite is green" as necessary, not
+  sufficient, for anything involving viewport units, nested scroll
+  regions, touch-gesture handling, or precise pixel geometry on a real
+  phone - this has now been true three times in a row for the same bug.
 - **No automated/in-environment browser or device verification is possible.**
   Chromium download and apt are both blocked in this build environment, so no
   session working from this repo can render or screenshot anything itself.
@@ -155,16 +161,30 @@ Each of these was a deliberate choice, several after finding real bugs.
   unverified. This remains the single largest open risk.
 - Dealing and play-travel **timing** needs human judgement on a device.
   Constants live in `client/src/platform/table/seatLayout.ts`.
-- **RoundSummary/WinnerScreen no longer use a fixed-height/nested-scroll
-  shell — 2026-08-15, second rewrite.** If a future session is tempted to
-  "simplify" `.rsum`/`.winner` back to `height: 100dvh; overflow: hidden`
-  with an internal `overflow-y: auto` region: don't, without a real device
-  in hand to check it on. That exact pattern is what Bug 5 was, twice, and
-  the current `min-height` + normal-flow + `position: sticky` action bar
-  approach was specifically chosen because it does not depend on `dvh`
-  accuracy or nested-scroll-capture behaviour at all — see
-  `SESSION_CHANGELOG.md`'s "Second real-device retest" entry for the full
-  reasoning.
+- **RoundSummary/WinnerScreen: THIRD structure as of 2026-08-16 - a
+  bounded shell again, but governed by a JS-measured height, not CSS
+  `dvh` alone.** History, in order: (1) fixed `height:100dvh` +
+  `overflow:hidden` shell with a nested `overflow-y:auto` scroll region -
+  failed real-device testing. (2) normal page flow (`min-height`) with a
+  `position:sticky` action bar - ALSO failed real-device testing
+  ("swiping does NOT scroll" - a stronger symptom than either round's own
+  theory fully explains). (3) current: back to a bounded shell
+  (`height: var(--js-vh, 100dvh)`, `overflow:hidden`, ONE
+  `flex:1 1 auto; min-height:0; overflow-y:auto; touch-action:pan-y`
+  scroll child, action row a plain sibling AFTER it, not nested inside
+  and not sticky) - but `--js-vh` is set inline by
+  `RoundSummary.tsx`/`WinnerScreen.tsx` from `useVisualViewport()` (an
+  existing hook, `platform/lib/useVisualViewport.ts`, previously used
+  only for keyboard avoidance), a JS measurement of the real viewport,
+  not a CSS unit. If a future session is tempted to simplify this back to
+  either of the two prior approaches: don't, without a real device in
+  hand - both have independently, provably failed already. If structure
+  (3) ALSO turns out to fail, the next thing to suspect is NOT the
+  scroll-region CSS (extensively covered by three attempts now) but
+  something upstream of it entirely - `index.html`'s viewport meta tag
+  carries `maximum-scale=1`, a documented source of Android WebView
+  touch-handling side effects, flagged but not confirmed causal this
+  round; that would be the next thing to test removing.
 - **`DealerToken`'s felt-relative positioning is a real architectural
   tension, not fully resolved — 2026-08-15.** The token (and every seat)
   is positioned as a percentage of the felt, but the felt's pixel size
@@ -180,12 +200,20 @@ Each of these was a deliberate choice, several after finding real bugs.
   got the same category of fix on 2026-08-15 (second retest) once the
   margin check was corrected to measure against the felt rather than
   `.table` — several seats were provably outside the felt's real clipping
-  boundary at common phone widths. The underlying fixed-px-vs-percentage
-  tension is not eliminated, only pushed back below the currently-provable
-  threshold again — if a future change enlarges any seat element or adds a
-  reachable 5-9 player game, re-run the same kind of arithmetic check
-  (`platform/table/layout.test.ts` now measures against the felt
-  correctly) before assuming percentage positioning is safe.
+  boundary at common phone widths. **Update, 2026-08-16:** the SIDE-SEAT
+  NAME's own width allocation (`Seat.css`) got a further version of this
+  same fix - a per-seat `calc()` driven by `--identity-dist` (`Seat.tsx`,
+  each seat's own real `|50-x|`), not a flat constant, specifically
+  because a flat constant was tried and found UNSAFE for some
+  (currently unreachable) larger ring sizes. If a future change enlarges
+  any seat element or adds a reachable 5-9 player game, treat that
+  pattern (measure the specific seat's own real distance in JS, don't
+  guess a single constant per anchor NAME) as the template, and re-run
+  `platform/table/layout.test.ts` (which measures against the felt
+  correctly, and against the FELT'S real padding formula, as of
+  2026-08-16 - its earlier width-dependent padding assumption was itself
+  found wrong, see `SESSION_CHANGELOG.md`) before assuming percentage
+  positioning is safe.
 - Reconnect animation suppression closes on the existing next-tick lifecycle.
   There is **no explicit server "restoration complete" event**; a sufficiently
   delayed restoration burst could still be read as new.

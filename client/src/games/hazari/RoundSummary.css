@@ -2,49 +2,47 @@
    Round summary
 
    Same room as the table: dark warm ground, brass accents, cards shown as
-   cards. "Next round" stays reachable regardless of how many sets are
-   listed via a STICKY action bar over normal page scroll - see the note on
-   .rsum below for why this replaced an earlier fixed-height/nested-scroll
-   shell.
+   cards. A bounded shell with exactly ONE internal scroll region, so
+   "Next round" always stays reachable regardless of how many sets are
+   listed - see the note on .rsum below for the history of what this
+   replaced and why.
    ========================================================================== */
 
 .rsum {
-  /* REDESIGNED 2026-08-15 (Bug 5 SECOND real-device retest - still failing
-     after the previous fix, which only touched a test file and a comment;
-     no actual runtime behaviour had changed). That ruled out the
-     comment/test explanation and meant the fixed-height/nested-scroll
-     shell this replaced was never actually proven correct on a real
-     device - only argued for on paper.
+  /* THIRD STRUCTURE for this bug (Bug 5, 2026-08-15 THIRD real-device
+     retest - both a fixed-height/nested-scroll shell AND a
+     normal-page-flow/sticky-footer redesign were each confirmed still
+     failing on a real Android PWA - "physical vertical swiping does NOT
+     scroll the result content" - the second as much as the first).
 
-     The previous approach pinned .rsum to exactly one viewport
-     (`height: 100vh`/`100dvh`, `overflow: hidden`) and made
-     .rsum__scroll (not the page) the ONE scroll region inside it. That
-     depends on two things a real Android PWA does not reliably guarantee:
-     `dvh` computing the actual usable height in standalone display mode
-     (a documented rough edge, not just a support gap - the value can be
-     recognised but still wrong, which no `100vh`-then-`100dvh` fallback
-     cascade can catch, since that only helps when the *later* declaration
-     is dropped outright), and a NESTED overflow:auto region reliably
-     receiving/keeping touch-scroll capture rather than the outer page
-     (a known category of WebView inconsistency).
+     Going back to a bounded shell (not page flow) per this retest's own
+     explicit direction, but no longer trusting CSS `dvh` ALONE as the
+     bound: `--js-vh` (set inline by RoundSummary.tsx via
+     `useVisualViewport()`, an existing hook already used elsewhere in
+     this app for exactly this kind of reliability problem - the
+     mobile-keyboard-avoidance case) is a height measured directly from
+     `window.visualViewport`/`window.innerHeight` in JS, not inferred from
+     a CSS unit whose accuracy in Android PWA standalone mode has already
+     cost two rounds of this bug. `100dvh`/`100vh` remain as the fallback
+     for the one moment before that JS effect has run on first paint, and
+     for the rare browser with no `visualViewport` at all (the hook itself
+     degrades to `window.innerHeight` there, so this still has a real
+     value even then) - but the JS-measured value, once available, is
+     what actually governs the shell's bound.
 
-     This version depends on neither. .rsum now sits in NORMAL page flow
-     (min-height, not height) - if its content is taller than the screen,
-     the PAGE grows and the browser's own, universally-reliable scroll
-     takes over, the same mechanism every ordinary long web page already
-     uses. `.rsum__actions` below uses `position: sticky` instead of being
-     a fixed grid row inside a clipped shell, so "Next round" still stays
-     visually pinned to the bottom of the screen as the page scrolls -
-     sticky has been reliably supported in every target browser for years,
-     unlike precise dvh accuracy in PWA standalone mode. Confirmed nothing
-     between here and <body> clips or fixes its own height in a way that
-     would block this (App.css: .app-root is min-height, not height;
-     .screen-fade sets no height at all; global.css: html/body/#root use
-     height: 100%, which does not clip an overflowing child by default). */
-  min-height: 100vh;
-  min-height: 100dvh;
+     `overflow: hidden` here is deliberately paired with .rsum__scroll
+     being the ONE flex:1 1 auto child with its own overflow-y: auto -
+     the shell clips because the scroll region below is the intended,
+     sole scroller, not because clipping itself is the goal. */
   display: flex;
   flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  height: var(--js-vh, 100dvh);
+  max-height: 100vh;
+  max-height: 100dvh;
+  max-height: var(--js-vh, 100dvh);
+  overflow: hidden;
   background:
     radial-gradient(ellipse 90% 45% at 50% 0%, var(--room-800), transparent 70%),
     var(--room-950);
@@ -53,11 +51,23 @@
 }
 
 .rsum__scroll {
-  /* No longer a scroll container itself (see .rsum above) - just the
-     normal-flow content block. `flex: 1` still fills any leftover
-     vertical space when content is shorter than one screen, so
-     .rsum__actions reads as bottom-anchored either way. */
-  flex: 1;
+  /* The ONE intended scroll region in this shell - everything else is
+     either fixed-size (the header, naturally, since it is not flex: 1) or
+     entirely outside this element (.rsum__actions, a sibling below it,
+     not a descendant - see that rule for why). */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  /* Explicit, not relied-on-by-default: permits vertical panning/scroll
+     gestures specifically, so nothing upstream (the viewport meta tag's
+     `maximum-scale=1`, primarily meant to disable pinch-zoom, has known
+     side effects on touch handling in some Android WebView versions) can
+     be read as ambiguous about whether a vertical swipe starting on this
+     element should scroll it. */
+  touch-action: pan-y;
   padding:
     calc(env(safe-area-inset-top, 0px) + var(--space-5))
     calc(env(safe-area-inset-right, 0px) + var(--space-4))
@@ -272,26 +282,25 @@
 /* ---- Action rail -------------------------------------------------------- */
 
 .rsum__actions {
-  /* Sticky, not a fixed grid row inside a clipped shell - see .rsum's own
-     comment above for why. Sticks to the bottom of the page as it
-     scrolls, so "Next round" reads as pinned exactly as before, without
-     depending on a hard-height parent to pin it within. */
-  position: sticky;
-  bottom: 0;
+  /* A plain flex child, not sticky and not a scroll-region descendant -
+     it sits BELOW .rsum__scroll (a sibling, in normal flow) in the shell's
+     own flex column. Because the shell (.rsum) is height-bounded with
+     overflow: hidden, and this row is NOT flex: 1 (so it takes only its
+     own natural height), it is always fully visible: .rsum__scroll's
+     `flex: 1 1 auto` only ever claims the space left over after this
+     row's own height is subtracted, every time, regardless of how much
+     content is inside .rsum__scroll (that content scrolls WITHIN its own
+     region; it can never push this row off the bottom of the shell). */
   padding:
     var(--space-3)
     calc(env(safe-area-inset-right, 0px) + var(--space-4))
     calc(env(safe-area-inset-bottom, 0px) + var(--space-3))
     calc(env(safe-area-inset-left, 0px) + var(--space-4));
   border-top: 1px solid var(--room-800);
-  /* Solid at the bottom (not the 0.65 alpha this used when it was
-     guaranteed to sit flush against .rsum__scroll's own last pixel with
-     nothing beneath it) - content now legitimately keeps scrolling
-     BEHIND this bar once it starts sticking, so the lower edge needs to
-     fully cover it for the button to stay clearly legible, fading to
-     transparent only at the very top edge for a soft veil rather than a
-     hard line. */
-  background: linear-gradient(180deg, transparent, var(--room-950) 65%, var(--room-950));
+  /* A plain solid ground, not a gradient - nothing scrolls behind this
+     row any more (it is fully outside .rsum__scroll), so there is nothing
+     for a fade-to-transparent top edge to blend into. */
+  background: var(--room-950);
 }
 
 .rsum__next {

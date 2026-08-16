@@ -8,23 +8,30 @@
 
 .winner {
   position: relative;
-  /* REDESIGNED 2026-08-15, matching RoundSummary.css's .rsum - see that
-     file's comment for the full reasoning (a second real-device retest
-     showed Bug 5 still failing after a fix that, in hindsight, only
-     touched a test file and a comment - no runtime behaviour had
-     actually changed, which is what prompted moving off a fixed-height/
-     nested-scroll shell entirely rather than continuing to tune it).
+  /* THIRD STRUCTURE, matching RoundSummary.css's .rsum - see that file's
+     comment for the full reasoning (a THIRD real-device retest showed
+     Bug 5 still failing after BOTH a fixed-height/nested-scroll shell AND
+     a normal-page-flow/sticky-footer redesign - "physical vertical
+     swiping does NOT scroll the result content" on both). Bounded shell
+     restored, this time governed by a JS-measured viewport height
+     (`--js-vh`, set inline by WinnerScreen.tsx via `useVisualViewport()`)
+     rather than trusting CSS `dvh` alone.
      This screen was not itself part of the original confirmed end-of-hand
      scrolling bug (that was RoundSummary, shown on ROUND_COMPLETE /
      DISMISSED_ROUND - this shows on GAME_COMPLETE, the full match end),
-     but shared the identical layout primitive, so gets the identical fix
-     for the same reason it got the identical precautionary hardening
-     before: not an independent confirmed defect, kept in step on
-     purpose. */
-  min-height: 100vh;
-  min-height: 100dvh;
+     but shares the identical layout primitive (explicitly built as
+     RoundSummary's twin), so gets the identical fix for the same reason
+     it got identical treatment before: not an independent confirmed
+     defect, kept in step on purpose. */
   display: flex;
   flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  height: var(--js-vh, 100dvh);
+  max-height: 100vh;
+  max-height: 100dvh;
+  max-height: var(--js-vh, 100dvh);
+  overflow: hidden;
   background:
     radial-gradient(ellipse 80% 40% at 50% 10%, var(--room-700), transparent 70%),
     var(--room-950);
@@ -50,10 +57,15 @@
 
 .winner__scroll {
   position: relative;
-  /* No longer a scroll container itself (see .winner above) - normal-flow
-     content block; flex: 1 fills leftover space when content is shorter
-     than one screen. */
-  flex: 1;
+  /* The ONE intended scroll region - see RoundSummary.css's
+     .rsum__scroll for the full reasoning on every property here. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   padding:
     calc(env(safe-area-inset-top, 0px) + var(--space-6))
     calc(env(safe-area-inset-right, 0px) + var(--space-4))
@@ -146,10 +158,8 @@
 /* ---- Actions ------------------------------------------------------------ */
 
 .winner__actions {
-  /* Sticky, not a fixed grid row inside a clipped shell - see .winner's
-     own comment above. */
-  position: sticky;
-  bottom: 0;
+  /* A plain flex child, not sticky - see RoundSummary.css's
+     .rsum__actions for the full reasoning (identical structure). */
   display: grid;
   gap: var(--space-2);
   padding:
@@ -158,11 +168,8 @@
     calc(env(safe-area-inset-bottom, 0px) + var(--space-3))
     calc(env(safe-area-inset-left, 0px) + var(--space-4));
   border-top: 1px solid var(--room-800);
-  /* Solid at the bottom, same reasoning as RoundSummary.css's
-     .rsum__actions: content now legitimately scrolls BEHIND this bar
-     once it starts sticking, so it needs full coverage at its own lower
-     edge to keep the buttons clearly legible. */
-  background: linear-gradient(180deg, transparent, var(--room-950) 65%, var(--room-950));
+  /* Plain solid ground - nothing scrolls behind this row any more. */
+  background: var(--room-950);
 }
 
 .winner__actions > * {

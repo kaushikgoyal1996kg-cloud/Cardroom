@@ -58,6 +58,20 @@ export const Seat = memo(function Seat({ player, position, isDealer, isActive }:
 
   const statusText = CONNECTION_TEXT[player.connection];
 
+  // How far this seat's identity block may safely grow toward the table
+  // centre before it would start crossing the felt's own visual
+  // centreline - a PER-SEAT, viewport-DYNAMIC value (Seat.css turns it
+  // into an actual max-width via calc(), scaled by the real viewport
+  // width), not a single hardcoded constant. A fixed constant generous
+  // enough for THIS ring (4-player Hazari, where "left"/"right" sit at a
+  // real 31.6 percentage points from centre) proved unsafe for anchors on
+  // OTHER, currently-unreachable-but-shared ring sizes that sit much
+  // closer to centre already (the 9-player ring's inner top-left/
+  // top-right, only 18 points from centre) - see Seat.css's own comment
+  // on `.seat--left .seat__name` for the full reasoning (Bug 4, 2026-08-15
+  // FOURTH retest).
+  const identityDist = Math.round(Math.abs(50 - x) * 100) / 100;
+
   return (
     <div
       className={classes}
@@ -65,6 +79,7 @@ export const Seat = memo(function Seat({ player, position, isDealer, isActive }:
         left: `${x}%`,
         top: `${y}%`,
         '--seat-scale': scale,
+        '--identity-dist': identityDist,
       } as React.CSSProperties}
     >
       <div className="seat__avatar-wrap">

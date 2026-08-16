@@ -98,22 +98,20 @@ describe('notch and home-indicator collisions', () => {
     }
   });
 
-  it('both migrated screens size against dvh (a floor, not a clip) and fall back to 100vh first', () => {
-    // Regression (Bug 5, confirmed on real Android PWA staging - TWICE:
-    // the first fix only touched a test file and a comment, no runtime
-    // behaviour actually changed, which is exactly why it was still
-    // failing on the second real-device retest). `min-height`, not
-    // `height`: this is now a FLOOR so short content still fills the
-    // screen, not a CEILING that clips or requires a nested scroll region
-    // to work around - see .rsum's own comment in RoundSummary.css for
-    // the full reasoning. The vh-then-dvh cascade is still worth keeping
-    // (100vh is the universally-supported floor; 100dvh, where accurate,
-    // is the nicer one - a browser that drops the second line entirely
-    // just keeps the first), but is COSMETIC insurance now, not the fix
-    // itself - unlike the old fixed-height shell, an unsupported/dropped
-    // dvh line here cannot reintroduce clipping or lost scrollability,
-    // because nothing about reachability depends on this value being
-    // exactly right any more.
+  it('both migrated screens are a BOUNDED shell (height, not min-height), governed by a JS-measured viewport height with a CSS dvh/vh fallback', () => {
+    // Regression (Bug 5, confirmed on real Android PWA staging - THREE
+    // TIMES now: a fixed-height/nested-scroll shell, then a normal-page-
+    // flow/sticky-footer redesign, both confirmed still failing -
+    // "physical vertical swiping does NOT scroll the result content" on
+    // both). The THIRD structure goes back to a bounded shell (per this
+    // retest's own explicit direction: "stop relying on page scroll"),
+    // but no longer trusts CSS `dvh` alone - `--js-vh` is set inline by
+    // RoundSummary.tsx/WinnerScreen.tsx from `useVisualViewport()`, a
+    // JS measurement of the real, current viewport
+    // (`window.visualViewport`/`window.innerHeight`), not a CSS unit
+    // whose accuracy in Android PWA standalone mode has already cost two
+    // rounds of this bug. `100vh`/`100dvh` remain as the pre-mount
+    // fallback via `var(--js-vh, 100dvh)`.
     const stripComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '');
     const ruleBody = (css: string, selector: string) => {
       const withoutComments = stripComments(css);
@@ -127,28 +125,82 @@ describe('notch and home-indicator collisions', () => {
       ['RoundSummary', ruleBody(RSUM_CSS, '.rsum')],
       ['WinnerScreen', ruleBody(WIN_CSS, '.winner')],
     ] as const) {
-      const heightLines = [...block.matchAll(/min-height:\s*100(v|dv)h/g)];
-      expect(heightLines.length, `${name}: expected both a 100vh and a 100dvh min-height line`).toBe(2);
-      expect(heightLines[0][1], `${name}: 100vh must come first (the fallback)`).toBe('v');
-      expect(heightLines[1][1], `${name}: 100dvh must come second (the preferred value)`).toBe('dv');
-      // The old pattern - a hard `height` cap - must not come back; that's
-      // the one thing that turns "shorter than expected" into "clipped
-      // and unreachable" again.
-      expect(block, `${name}: must not use a hard height cap`).not.toMatch(/^\s*height:\s*100/m);
+      for (const prop of ['height', 'max-height']) {
+        // Match the property at the START of a declaration only (a
+        // leading word boundary that isn't preceded by "max-" when
+        // checking `height`), so `height:` and `max-height:` are counted
+        // separately rather than the `height:` regex also matching the
+        // tail end of every `max-height:` line.
+        const re = new RegExp(`(?:^|;)\\s*${prop}:\\s*100(v|dv)h`, 'g');
+        const lines = [...block.matchAll(re)];
+        expect(lines.length, `${name}: expected both a 100vh and a 100dvh ${prop} fallback line`).toBe(2);
+        expect(lines[0][1], `${name}: ${prop}'s 100vh must come first (the fallback)`).toBe('v');
+        expect(lines[1][1], `${name}: ${prop}'s 100dvh must come second`).toBe('dv');
+      }
+      expect(block, `${name}: must be governed by the JS-measured height, with dvh as its fallback`).toMatch(
+        /(?:^|;)\s*height:\s*var\(--js-vh,\s*100dvh\)/
+      );
+      expect(block, `${name}: must also cap max-height at the JS-measured value`).toMatch(
+        /max-height:\s*var\(--js-vh,\s*100dvh\)/
+      );
+      // The min-height-only pattern from the SECOND (page-scroll) attempt
+      // must not come back - this shell must be a hard bound again, not a
+      // floor that lets the page itself grow taller.
+      expect(block, `${name}: must not be min-height-only (that was the page-scroll attempt)`).not.toMatch(
+        /^\s*min-height:/m
+      );
     }
   });
 
-  it('both migrated screens let the PAGE scroll rather than clipping to a fixed shell', () => {
-    // The specific thing that failed twice: a shell pinned to exactly one
-    // viewport (`height: 100vh`/`100dvh`, `overflow: hidden`) with the
-    // ONLY scroll region nested inside it, betting on `dvh` being
-    // accurate and that nested region reliably capturing touch-scroll on
-    // every real Android PWA context - two things this environment could
-    // never verify and a real device twice showed were not both true.
-    // `.rsum`/`.winner` must not clip their own overflow any more -
-    // content taller than one screen must be free to make the WHOLE PAGE
-    // taller, so the browser's own, universally-reliable scroll takes
-    // over.
+  it('both migrated screens clip the shell and scroll internally - exactly ONE scroll region, not the page', () => {
+    // Per this retest's explicit direction: "Do NOT depend on: document/
+    // body scroll... an overflow-y:auto declaration with no proven
+    // bounded parent." The shell (.rsum/.winner) clips its own overflow
+    // (overflow: hidden) BECAUSE its scroll-region child
+    // (.rsum__scroll/.winner__scroll) is the one intended scroller, with
+    // its own flex: 1 1 auto + min-height: 0 + overflow-y: auto - the
+    // classic, well-defined "bounded flex column, one scrolling child"
+    // shape, not page flow.
+    const stripComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '');
+    const ruleBody = (css: string, selector: string) => {
+      const withoutComments = stripComments(css);
+      const start = withoutComments.indexOf(`${selector} {`);
+      if (start === -1) throw new Error(`no rule found for ${selector}`);
+      const openBrace = withoutComments.indexOf('{', start);
+      const closeBrace = withoutComments.indexOf('\n}', openBrace);
+      return withoutComments.slice(openBrace, closeBrace);
+    };
+    for (const [name, css, shellSel, scrollSel] of [
+      ['RoundSummary', RSUM_CSS, '.rsum', '.rsum__scroll'],
+      ['WinnerScreen', WIN_CSS, '.winner', '.winner__scroll'],
+    ] as const) {
+      const shell = ruleBody(css, shellSel);
+      expect(shell, `${name}: shell must clip - the scroll child below is the intended scroller`).toMatch(
+        /overflow:\s*hidden/
+      );
+      expect(shell, `${name}: shell must be a flex column`).toMatch(/display:\s*flex/);
+      expect(shell, `${name}: shell must be flex-direction: column`).toMatch(/flex-direction:\s*column/);
+
+      const scroll = rule(css, scrollSel);
+      expect(scroll, `${name}: scroll region must be flex: 1 1 auto`).toMatch(/flex:\s*1\s+1\s+auto/);
+      expect(scroll, `${name}: scroll region must have min-height: 0 (the classic flex-child overflow gotcha)`).toMatch(
+        /min-height:\s*0/
+      );
+      expect(scroll, `${name}: scroll region must be the one that scrolls`).toMatch(/overflow-y:\s*auto/);
+      expect(scroll, `${name}: scroll region must not scroll horizontally`).toMatch(/overflow-x:\s*hidden/);
+      expect(scroll, `${name}: must explicitly permit vertical pan gestures`).toMatch(/touch-action:\s*pan-y/);
+    }
+  });
+
+  it("both migrated screens' action/footer rows stay within the shell's own bounds, outside the scroll region", () => {
+    // Per this retest: "footer... stays within modal bounds... is either
+    // fixed/sticky inside the shell or outside the scroll body". This
+    // structure chose "outside the scroll body": .rsum__actions/
+    // .winner__actions are plain flex-column siblings AFTER the
+    // flex: 1 1 auto scroll region, so they always keep their own natural
+    // height and can never be pushed off-screen or clipped by content
+    // inside the scroll region - the scroll region only ever gets
+    // whatever space is left over once these rows take theirs.
     const stripComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '');
     const ruleBody = (css: string, selector: string) => {
       const withoutComments = stripComments(css);
@@ -159,30 +211,18 @@ describe('notch and home-indicator collisions', () => {
       return withoutComments.slice(openBrace, closeBrace);
     };
     for (const [name, css, selector] of [
-      ['RoundSummary', RSUM_CSS, '.rsum'],
-      ['WinnerScreen', WIN_CSS, '.winner'],
-    ] as const) {
-      const body = ruleBody(css, selector);
-      expect(body, `${name}: shell must not clip its own overflow`).not.toMatch(/overflow:\s*hidden/);
-      expect(body, `${name}: shell must be a flex column so its content area can grow`).toMatch(/display:\s*flex/);
-    }
-  });
-
-  it("both migrated screens' action bars are STICKY, so they stay pinned to the bottom of the screen as the page scrolls", () => {
-    // The other half of the redesign: since the shell no longer clips (see
-    // above), the action bar can no longer rely on being "the fixed second
-    // row of a box that's exactly one screen tall" to stay in view -
-    // `position: sticky; bottom: 0` is what keeps "Next round"/"Play
-    // again" pinned to the bottom of the VIEWPORT (not the shell) as the
-    // page scrolls past it, without depending on precise viewport-unit
-    // accuracy or a nested scroll region at all.
-    for (const [name, css, selector] of [
       ['RoundSummary', RSUM_CSS, '.rsum__actions'],
       ['WinnerScreen', WIN_CSS, '.winner__actions'],
     ] as const) {
-      const body = rule(css, selector);
-      expect(body, `${name}: action bar must be position: sticky`).toMatch(/position:\s*sticky/);
-      expect(body, `${name}: action bar must stick to the bottom`).toMatch(/bottom:\s*0/);
+      const body = ruleBody(css, selector);
+      // Must NOT be flex: 1 (that would let it compete with the scroll
+      // region for space) and must NOT be position: sticky/fixed (it
+      // does not need to be - it is already outside the scrolling
+      // element entirely, so it can never scroll out of view).
+      expect(body, `${name}: action row must not claim flex growth`).not.toMatch(/flex:\s*1/);
+      expect(body, `${name}: action row must not be sticky - it's already outside the scroll region`).not.toMatch(
+        /position:\s*sticky/
+      );
     }
   });
 

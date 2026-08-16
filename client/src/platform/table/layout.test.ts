@@ -11,9 +11,16 @@ import { buildSeatLayout } from './seatLayout';
 
 /** `.table`'s own box for a given viewport width, per CardTable.css. */
 function tableBox(viewportWidth: number) {
-  // .table is width:100% of a padded column, capped at 60rem, aspect 4/5
-  // (3/4 below 380px).
-  const horizontalPadding = viewportWidth <= 380 ? 8 : 16;
+  // .table sits inside .hazari__table-area, whose own horizontal padding
+  // is a FLAT `var(--space-2)` (8px) on EACH side - 16px total - at every
+  // width (HazariTable.css), not the width-dependent 8px-narrow/
+  // 16px-regular split this function used to assume. That made the
+  // narrow-breakpoint felt-width estimate below too GENEROUS (the real
+  // felt is narrower there than this formula previously computed) - one
+  // real contributor to Bug 4 still failing for "Nawab" after the
+  // margins here had already been "fixed" and this suite was green
+  // (2026-08-15, FOURTH retest).
+  const horizontalPadding = 16;
   const width = Math.min(viewportWidth - horizontalPadding, 960);
   const ratio = viewportWidth <= 380 ? 4 / 3 : 5 / 4;
   return { width, height: width * ratio };

@@ -113,6 +113,14 @@
 /* ---- Info -------------------------------------------------------------- */
 
 .seat__info {
+  display: flex;
+  flex-direction: column;
+  /* `stretch`, not `center`: preserves the guaranteed-width fix above for
+     .seat__name/.seat__score/.seat__status by default (each becomes a flex
+     item of this column and gets the seat's full 5.5rem/4.5rem cross-size
+     unless overridden below) - see .seat's own comment for why a
+     content-computed width isn't good enough. */
+  align-items: stretch;
   text-align: center;
   max-width: 100%;
 }
@@ -128,6 +136,109 @@
   color: var(--ink-100);
   max-width: 5.5rem;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* Left/right seats sit close to the felt's own edge (`.table__felt {
+   overflow: hidden }`, CardTable.css) - there is real, but limited, room to
+   grow OUTWARD before clipping, and much more room toward the table
+   centre. A name centred under the avatar (the default above, correct for
+   top/bottom/self) puts HALF of any extra width on the dangerous outward
+   side for no benefit - confirmed on real Android PWA staging as ordinary
+   names (5-7 characters - "Nawab", "Kaushik") still truncating at the
+   side seats specifically, portrait more visibly than landscape, even
+   after the shrink-to-fit width-guarantee fix above (Bug 4, 2026-08-15
+   THIRD retest), and STILL truncating for "Nawab" on the right seat
+   specifically after the first inward-anchoring attempt, a flat 6.5rem/
+   5.25rem (Bug 4, 2026-08-15 FOURTH retest).
+
+   The anchoring direction is unchanged from the third attempt: for
+   left/right, the identity column anchors at the SAME edge it already
+   had - `.seat`'s own left edge for a left-anchored seat, right edge for
+   a right-anchored one - matching where the seat's OWN geometric safety
+   margin (seatLayout.ts) was actually measured - and is allowed to grow
+   ONLY toward the table centre from there. (The diagonal anchors that
+   shared this treatment in the third attempt no longer do - see the
+   comment further below for why.)
+
+   What changed this round is where the WIDTH ALLOWANCE comes from. A
+   single flat constant cannot be both generous enough for the reachable
+   4-player Hazari ring (whose left/right sit a real 31.6 percentage
+   points from the felt's centre - plenty of safe room) AND safe for
+   OTHER, currently-unreachable-but-shared ring sizes whose anchors sit
+   much closer to centre already (the 9-player ring's inner top-left/
+   top-right, only 18 points from centre - a flat value generous enough
+   for the first would overshoot the second's own centreline by 40-60px,
+   likely colliding with the OPPOSITE seat's identity growing the same way
+   toward it). `layout.test.ts`'s felt-width formula was also found to be
+   wrong at narrow viewports specifically - it assumed
+   `.hazari__table-area`'s horizontal padding scaled with viewport width
+   (8px narrow / 16px regular); it does not, it is a flat `var(--space-2)`
+   (8px) on EACH side, 16px total, at every width (HazariTable.css) - one
+   real contributor to why the previous flat figure was still too tight
+   for "Nawab" specifically.
+
+   Fix: `--identity-dist` (Seat.tsx) is this SEAT's own actual distance
+   from the felt's horizontal centre, in percentage points - the same
+   `|50 - x|` for every anchor, computed once per seat from its real
+   position rather than guessed per anchor NAME (which cannot distinguish
+   "this ring's left seat" from "a different ring's left seat" - CSS class
+   selectors only see the anchor name, not which ring produced it). The
+   calc() below turns that into an actual pixel allowance scaled by the
+   REAL, live viewport width (`100vw`), using the same felt-width formula
+   as Seat.test.tsx/layout.test.ts (padding subtracted, `~0.972` derived
+   from `.table`'s own 1.4% padding on each side), with an 8px buffer.
+   `max(5.5rem, ...)` is the floor: an anchor whose own geometry does not
+   benefit from this (like the 9-player ring's inner anchors above) simply
+   keeps the guaranteed base width from the stretch fix earlier in this
+   file - this can only ever WIDEN the allowance relative to that
+   baseline, never narrow it. Verified in Seat.test.tsx, per anchor, per
+   target width, across every supported player count (2-9) - not just the
+   one this bug was reported on. */
+.seat--left .seat__name {
+  align-self: flex-start;
+  justify-content: flex-start;
+  width: max-content;
+  max-width: max(5.5rem, calc(var(--identity-dist, 18) / 100 * (100vw - 16px) * 0.972 - 8px));
+}
+
+.seat--right .seat__name {
+  align-self: flex-end;
+  justify-content: flex-end;
+  width: max-content;
+  max-width: max(5.5rem, calc(var(--identity-dist, 18) / 100 * (100vw - 16px) * 0.972 - 8px));
+}
+
+/* Scoped to PURE left/right only, not the diagonal anchors (top-left,
+   bottom-left, etc) that earlier attempts also included. Reason: the
+   default symmetric/centred behaviour (the `align-items: stretch` fix
+   earlier in this file) already splits the guaranteed base width HALF on
+   each side of the anchor - safe everywhere, including for a diagonal
+   anchor that happens to sit close to the felt's centre (some do, on
+   larger rings). Switching to `align-self: flex-start/flex-end` moves the
+   FULL width to one side instead of splitting it - a real improvement for
+   `left`/`right`, which sit a comfortable >=31.6 percentage points from
+   centre on EVERY supported ring (2-9, verified in Seat.test.tsx) with
+   real margin to spare - but for a diagonal anchor close to centre
+   already (the 9-player ring's inner top-left/top-right, only 18 points
+   out), the exact same change would put the WHOLE guaranteed width on the
+   inward side instead of half of it, which can overshoot the centreline
+   by 40-60px even at the guaranteed-floor width alone - worse than doing
+   nothing. Diagonal anchors were not part of what this bug ever reported
+   broken, so they keep the proven-safe default instead of trading a
+   plausible improvement for a real, provable regression on a ring size
+   Hazari does not use today but the layout code must still not break. */
+
+/* Scoped to left/right only, matching .seat__name above - keeps
+   .seat__score/.seat__status reading consistently with the name for the
+   anchors that actually changed, while diagonal anchors (still centred,
+   unchanged) keep their own text centred too rather than looking
+   mismatched (name centred, score/status pulled to one side). */
+.seat--left .seat__info {
+  text-align: left;
+}
+
+.seat--right .seat__info {
+  text-align: right;
 }
 
 /* The name text specifically, not the whole flex row - text-overflow does
@@ -219,6 +330,19 @@
   .seat__avatar { width: 2.25rem; height: 2.25rem; font-size: var(--text-base); }
   .seat.is-self .seat__avatar { width: 2.5rem; height: 2.5rem; }
   .seat__name { max-width: 4.5rem; font-size: var(--text-xs); }
+
+  /* Same dynamic, per-seat calc() as the base rule above, just with the
+     narrow breakpoint's own numbers: `.table`'s padding is 1.2% (not
+     1.4%) below this width (CardTable.css), giving a very slightly
+     different multiplier, and the floor matches `.seat`'s own narrower
+     4.5rem here (not 5.5rem) - both still derived the same way, not
+     re-guessed. Scoped to left/right only - see the base rule's own
+     comment for why diagonal anchors are excluded. */
+  .seat--left .seat__name,
+  .seat--right .seat__name {
+    width: max-content;
+    max-width: max(4.5rem, calc(var(--identity-dist, 18) / 100 * (100vw - 16px) * 0.976 - 6px));
+  }
 }
 
 /* Voice-call indicator. Present on the seat so you can see who is on the

@@ -1,6 +1,7 @@
 import { useGame } from '../../lib/GameStore';
 import { PlayingCard } from '../../platform/components/PlayingCard';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { useVisualViewport } from '../../platform/lib/useVisualViewport';
 import './RoundSummary.css';
 
 const SET_LABELS = ['Set 1', 'Set 2', 'Set 3', 'Set 4'];
@@ -16,6 +17,15 @@ const SET_LABELS = ['Set 1', 'Set 2', 'Set 3', 'Set 4'];
  */
 export function RoundSummary() {
   const { room, lastRoundResult, gameState, myPlayerId, startNextRound } = useGame();
+  // A JS-measured viewport height, not just CSS `dvh` - see .rsum's own
+  // comment in RoundSummary.css for why (Bug 5, 2026-08-15 THIRD
+  // real-device retest: `dvh` alone was not reliable enough in Android
+  // PWA standalone mode across two previous attempts). `viewportHeight`
+  // falls back to `window.innerHeight` on browsers with no
+  // `visualViewport` at all, and to 0 during SSR/pre-mount - the `|| 0`
+  // guard below means the CSS `dvh` fallback in the custom property's own
+  // `var(..., 100dvh)` default governs until a real measurement exists.
+  const { viewportHeight } = useVisualViewport();
   // Defensive fallback, not the primary guard - see RoomLobby.tsx's comment
   // on the same pattern.
   if (!room || !lastRoundResult || !gameState) {
@@ -45,7 +55,10 @@ export function RoundSummary() {
   );
 
   return (
-    <div className="rsum">
+    <div
+      className="rsum"
+      style={viewportHeight ? ({ '--js-vh': `${viewportHeight}px` } as React.CSSProperties) : undefined}
+    >
       <div className="rsum__scroll">
         <header className="rsum__head">
           {lastRoundResult.dismissed ? (

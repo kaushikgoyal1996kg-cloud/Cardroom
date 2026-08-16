@@ -2,6 +2,7 @@ import { useGame } from '../../lib/GameStore';
 import { AvatarBadge } from '../../components/Lobby/AvatarPicker';
 import { Confetti } from '../../components/Confetti';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { useVisualViewport } from '../../platform/lib/useVisualViewport';
 // Shares .score-list with the round summary, so the two screens read as a pair.
 import './RoundSummary.css';
 import './WinnerScreen.css';
@@ -16,6 +17,10 @@ import './WinnerScreen.css';
  */
 export function WinnerScreen() {
   const { room, myPlayerId, winnerInfo, leaveSession, playAgain } = useGame();
+  // A JS-measured viewport height - see RoundSummary.tsx's own comment for
+  // the full reasoning (identical rationale, this screen shares the exact
+  // same shell primitive).
+  const { viewportHeight } = useVisualViewport();
   // Defensive fallback, not the primary guard - see RoomLobby.tsx's comment
   // on the same pattern.
   if (!room || !winnerInfo) {
@@ -33,10 +38,14 @@ export function WinnerScreen() {
 
   const standings = [...room.players].sort(
     (a, b) => (winnerInfo.finalScores[b.playerId] ?? 0) - (winnerInfo.finalScores[a.playerId] ?? 0)
+
   );
 
   return (
-    <div className="winner">
+    <div
+      className="winner"
+      style={viewportHeight ? ({ '--js-vh': `${viewportHeight}px` } as React.CSSProperties) : undefined}
+    >
       <Confetti />
       {/* A single warm pool of light over the winner, rather than flashing
           effects. This is the one celebratory flourish on the screen. */}

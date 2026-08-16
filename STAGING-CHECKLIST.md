@@ -15,6 +15,44 @@ open. See `SESSION_CHANGELOG.md` for the dated entry.
 Automated tests cover the game logic underneath these flows. What they cannot
 cover is real phones, real networks, and real fingers.
 
+**Third-pass QA update — 2026-08-16.** Bugs 1 (backgrounding), 2 (Leave
+Table), and 3 (Arrangement FAB vs Dealt) are now **owner-verified real-device
+PASS** — confirmed working on the installed Android PWA. Neither their code
+nor tests were touched this round (confirmed by hash diff). **Bugs 4 (side-
+seat names) and 5 (end-of-hand result-screen scroll) were each CONFIRMED
+STILL FAILING** on this same retest, with more specific detail than before
+(Bug 4: "Nawab" specifically, right-side, portrait; Bug 5: "physical vertical
+swiping does NOT scroll the result content" at all, ruling out the previous
+session's page-scroll redesign as much as the original nested-scroll shell).
+Both were re-derived and fixed again — see `SESSION_CHANGELOG.md`'s "Third
+real-device retest" entry for the full root-cause reasoning. **Neither Bug 4
+nor Bug 5 is real-device verified after this round.** Bug 5 in particular has
+now failed real-device testing on TWO PRIOR STRUCTURES despite a clean test
+suite each time — treat a clean suite as necessary, not sufficient, evidence
+for this one specifically. Redeploy to staging and re-check:
+
+- Hazari Table, portrait specifically (the retest's own emphasis — landscape
+  was reported improved): the right-side seat's name ("Nawab" or similar,
+  5-7 ordinary characters) must display IN FULL, not "Na…" — check with both
+  a human-named and a Bot-labelled right seat if possible; a very long name
+  (7+ characters) on a Bot-labelled seat at a narrow phone width may still
+  ellipsize by design (documented, not a regression) — see `Seat.test.tsx`
+- The screen shown right after a hand/set ends (RoundSummary) AND the final
+  match-winner screen (WinnerScreen), in a short landscape viewport:
+  **physical touch-swipe must actually scroll the result content** — this is
+  the specific thing that did not work at all in the previous structure
+  despite the CSS looking correct. The shell's height is now driven by a
+  JS-measured viewport value, not CSS `dvh` alone — worth checking this
+  screen specifically right after rotating the phone, since that is when a
+  stale/incorrect measurement would be most likely to show up
+- Confirm Bugs 1-3 still pass after this redeploy too, as a sanity check
+  that nothing in this round's changes affected them (none of their files
+  were touched, but a real-device pass costs little to reconfirm)
+
+---
+
+## Prior QA rounds
+
 **Second-pass QA update — 2026-08-15.** The five items below were retested
 by the owner on real Android PWA staging. Bugs 1, 2, 4 and 5 were each
 CONFIRMED STILL FAILING despite the previous session's fixes and full test
@@ -22,37 +60,10 @@ suite passing — the previous session's conclusions on those four were each
 wrong or incomplete in specific ways, now corrected; see
 `SESSION_CHANGELOG.md`'s "Second real-device retest" entry for the full
 root-cause reasoning on each. Bug 3 was re-verified only (no change).
-**None of the five are real-device verified AGAIN after this round either.**
-Given the track record above, treat every item below as genuinely open
-until an owner actually sees it on a phone — a clean test suite has now
-twice not been sufficient evidence on its own. Redeploy to staging and
-specifically re-check, on the same Android phone/orientations as the
-original reports:
-
-- **Backgrounding an active game** (switch away to another app briefly,
-  switch back): the table must reconnect silently — no
-  "You're not in a game right now"
-- **Leave Table** from an active hand: must land on a real screen
-  immediately, never an indefinite "Loading…"
-- Hazari Arrangement, portrait and landscape: Rank/Suit/Dealt fully visible
-  and tappable with the voice/call toggle both collapsed and its panel open
-- The Hazari Table, portrait and landscape: ordinary short names (e.g.
-  "Raja", "Nawab") must display IN FULL, not "R…"/"Na…" — this is the
-  specific thing that was still broken last round despite looking fixed on
-  paper; and the **top seat's dealer button** — its on-screen offset has
-  changed again (seat positions were re-derived, not just the token) and
-  has not been seen on a real screen yet
-- The screen shown right after a hand/set ends (RoundSummary) AND the
-  final match-winner screen (WinnerScreen), in a short landscape viewport
-  specifically — confirm all score rows are reachable by scrolling and
-  Next Hand/Continue/Play Again stays visible and legible (readable
-  against any content now scrolling behind it) throughout. This one was
-  redesigned from a different approach entirely this round (page scroll +
-  a sticky action bar, not an internal scroll region) after the previous
-  approach failed real-device testing twice — worth a specifically
-  careful look.
 
 ---
+
+
 
 ## What you need
 
