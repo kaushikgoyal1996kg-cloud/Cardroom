@@ -85,3 +85,30 @@
   justify-content: space-between;
   font-size: 0.78rem;
 }
+
+/* Premium stats/history surfaces — quiet inlays, not dashboard tables. */
+.stats-modal__note { color: var(--ink-400); opacity: 1; line-height: 1.45; }
+.stats-modal__empty { display: grid; justify-items: center; gap: .35rem; color: var(--ink-400); }
+.stats-modal__empty p { margin: .3rem 0 0; color: var(--ink-300); }
+.stats-modal__empty small { color: var(--ink-500); }
+.stats-modal__empty-mark {
+  width: 2.65rem; height: 2.65rem; display: grid; place-items: center;
+  border: 1px solid rgba(200,164,92,.38); border-radius: 50%; color: var(--brass-400);
+  font: 500 .68rem/1 var(--font-display); letter-spacing: .08em; background: rgba(7,6,5,.32);
+}
+.stats-table__header { color: var(--brass-400); border-bottom-color: rgba(168,132,63,.18); }
+.stats-table__row {
+  border: 1px solid rgba(168,132,63,.1);
+  background: linear-gradient(90deg, rgba(20,16,13,.58), rgba(8,7,6,.32));
+  color: var(--ink-300);
+}
+.stats-table__name { color: var(--ink-100); }
+.round-history-row {
+  border-color: rgba(168,132,63,.13);
+  background: linear-gradient(90deg, rgba(20,16,13,.58), rgba(8,7,6,.32));
+}
+.round-history-row__header { color: var(--ink-200); }
+.round-history-row__player { color: var(--ink-300); }
+.round-history-row__winner { margin: 0 0 .45rem; color: var(--ink-400); font-size: var(--text-sm); }
+.round-history-row__winner strong { color: var(--brass-300); font-weight: 600; }
+.round-history-row__sudden { color: var(--brass-400); font-weight: 500; }

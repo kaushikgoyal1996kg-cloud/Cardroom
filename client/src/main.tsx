@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { App } from './App';
 import { GameProvider } from './lib/GameStore';
 import { StartupErrorBoundary } from './platform/components/StartupErrorBoundary';
+import { NativeBackBridge } from './platform/components/NativeBackBridge';
 import './styles/global.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -11,6 +12,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         inside GameStore's own initialisation - a boundary inside it would
         never see it. */}
     <StartupErrorBoundary>
+      <NativeBackBridge />
       <GameProvider>
         <App />
       </GameProvider>

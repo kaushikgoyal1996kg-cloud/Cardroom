@@ -14,9 +14,8 @@ const PLAYABLE_STATES = ['PLAYING_SET_1', 'PLAYING_SET_2', 'PLAYING_SET_3', 'PLA
  * now" helper used by tests.
  */
 function findPendingBotAction(room: RoomState): PendingBotAction | null {
-  // Bots are a Hazari feature today. Narrowing here means a room running any
-  // other game simply has no pending bot actions, rather than the bot loop
-  // reaching into an engine that does not have these methods.
+  // This controller is Hazari-specific; Kitti has its own controller.
+  // Narrowing here keeps each game engine isolated behind its own adapter.
   const game = asHazari(room.game);
   if (!game) return null;
 

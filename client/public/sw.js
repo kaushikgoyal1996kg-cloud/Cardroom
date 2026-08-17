@@ -1,4 +1,4 @@
-// Cardroom service worker.
+// The Card Room service worker.
 //
 // Scope, deliberately kept small:
 //   1. Cache the static app shell so a repeat visit (and a genuinely offline
@@ -9,12 +9,12 @@
 //      guard at the top of the fetch handler.
 //   3. Update without ever forcing a reload out from under a player mid
 //      game. A new SW installs and then WAITS; the page only tells it to
-//      take over when the player explicitly asks (see
+//      take over when the player explicitly asks while out of a live room (see
 //      registerServiceWorker.ts / UpdateBanner.tsx), never automatically.
 //
-// Bump this on any change to the precache list below - it is the only thing
-// that causes old caches to be cleaned up.
-const CACHE_VERSION = 'cardroom-v1';
+// Bump this with a release that changes the cached shell/branding below; it
+// gives the waiting worker a new identity and lets activation clean old caches.
+const CACHE_VERSION = 'cardroom-v2';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 
 const SHELL_URLS = [
@@ -32,7 +32,7 @@ self.addEventListener('install', (event) => {
   // Deliberately no self.skipWaiting() here - see the file header. A newly
   // installed worker sits in "waiting" until the page explicitly posts
   // SKIP_WAITING (only ever done from a player tapping "Refresh" on the
-  // update banner).
+  // update banner, which is hidden while a room is live).
 });
 
 self.addEventListener('activate', (event) => {

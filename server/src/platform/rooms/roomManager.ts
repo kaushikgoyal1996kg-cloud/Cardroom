@@ -4,14 +4,33 @@ import { DEFAULT_AVATAR, isValidAvatar } from './avatars.js';
 import { RECONNECT_WINDOW_MS } from './sessionConfig.js';
 import { canStartWith, getGame, maxPlayersFor, type GameId } from '../games/registry.js';
 
-// Room codes look like "HZR482" - a fixed "HZR" prefix + 3 random digits/letters
-// (Section 28 example). Excludes ambiguous chars (0/O, 1/I).
+// Room codes carry the game identity so an invite is self-explanatory:
+// HZR = Hazari, KIT = Kitti, TPT = Teen Patti. The three-character suffix
+// excludes ambiguous chars (0/O, 1/I). Existing Hazari codes keep HZR.
 const codeSuffix = customAlphabet('23456789ABCDEFGHJKLMNPQRSTUVWXYZ', 3);
 const playerIdGen = customAlphabet('23456789abcdefghjkmnpqrstuvwxyz', 12);
 const tokenGen = customAlphabet('23456789abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ', 32);
 
-const BOT_NAMES = ['Raja', 'Rani', 'Nawab', 'Maharani', 'Sultan', 'Begum', 'Vazir', 'Zamindar'];
-const BOT_AVATARS = ['🦁', '🐯', '🦜', '🐍', '🪷', '🔱', '🎭', '⭐'];
+// Computer seats use the newer Card Room identity set so they read as deliberate
+// table characters rather than leftover utility avatars. Pair name + avatar as
+// one identity and choose an UNUSED pair when bots are removed/re-added; using
+// only `existingBotCount` can duplicate a still-seated bot after a removal.
+const BOT_IDENTITIES = [
+  { name: 'Raja', avatar: '🐆' },
+  { name: 'Rani', avatar: '🦅' },
+  { name: 'Nawab', avatar: '🐺' },
+  { name: 'Maharani', avatar: '🐉' },
+  { name: 'Sultan', avatar: '🦉' },
+  { name: 'Begum', avatar: '🐎' },
+  { name: 'Vazir', avatar: '🐂' },
+  { name: 'Zamindar', avatar: '🦊' },
+] as const;
+
+const MAX_PLAY_MONEY_BOARD = 1_000_000;
+
+function supportsSharedPlayMoney(gameId: GameId): boolean {
+  return gameId === 'HAZARI' || gameId === 'KITTI';
+}
 
 export class RoomManagerError extends Error {}
 
@@ -27,10 +46,11 @@ export class RoomManager {
   /** token -> {roomCode, playerId} for fast reconnect lookups. */
   private tokenIndex = new Map<string, { roomCode: string; playerId: PlayerId }>();
 
-  private generateRoomCode(): string {
+  private generateRoomCode(gameId: GameId): string {
+    const prefix: Record<GameId, string> = { HAZARI: 'HZR', KITTI: 'KIT', TEEN_PATTI: 'TPT' };
     let code: string;
     do {
-      code = `HZR${codeSuffix()}`;
+      code = `${prefix[gameId]}${codeSuffix()}`;
     } while (this.rooms.has(code));
     return code;
   }
@@ -50,7 +70,7 @@ export class RoomManager {
         definition.unavailableReason ?? `${definition.name} is not available online yet.`
       );
     }
-    const roomCode = this.generateRoomCode();
+    const roomCode = this.generateRoomCode(gameId);
     const playerId = playerIdGen();
     const token = tokenGen();
 
@@ -72,6 +92,7 @@ export class RoomManager {
       status: 'LOBBY',
       createdAt: Date.now(),
       voiceCallParticipants: new Set(),
+      playMoney: { tableProfitLoss: { [playerId]: 0 } },
     };
 
     this.rooms.set(roomCode, room);
@@ -98,6 +119,8 @@ export class RoomManager {
       isBot: false,
     };
     room.players.set(playerId, slot);
+    room.playMoney.tableProfitLoss[playerId] = 0;
+    // A player joining after a proposal must explicitly accept it.
     this.tokenIndex.set(token, { roomCode, playerId });
     return { room, playerId, token };
   }
@@ -119,19 +142,44 @@ export class RoomManager {
     if (room.players.size >= maxPlayersFor(room.gameId)) {
       throw new RoomManagerError('This room is full.');
     }
-    const existingBotCount = [...room.players.values()].filter((p) => p.isBot).length;
+    const seatedBots = [...room.players.values()].filter((p) => p.isBot);
+    const identity = BOT_IDENTITIES.find(({ name, avatar }) =>
+      seatedBots.every((bot) => bot.name !== name && bot.avatar !== avatar)
+    ) ?? BOT_IDENTITIES[0];
     const playerId = playerIdGen();
     const slot: PlayerSlot = {
       playerId,
       token: tokenGen(), // unused for bots, but keeps the type simple/uniform
-      name: BOT_NAMES[existingBotCount % BOT_NAMES.length],
-      avatar: BOT_AVATARS[existingBotCount % BOT_AVATARS.length],
+      name: identity.name,
+      avatar: identity.avatar,
       connected: true,
       ready: true,
       isBot: true,
     };
     room.players.set(playerId, slot);
+    room.playMoney.tableProfitLoss[playerId] = 0;
+    room.playMoney.proposal?.acceptedBy.add(playerId); // bots auto-accept the optional board
     return slot;
+  }
+
+  /** Host-only lobby action for freeing a computer seat before Start. */
+  removeBot(roomCode: string, requestingPlayerId: PlayerId, botPlayerId: PlayerId): RoomState {
+    const room = this.getRoomOrThrow(roomCode);
+    if (room.hostId !== requestingPlayerId) {
+      throw new RoomManagerError('Only the host can remove a computer player.');
+    }
+    if (room.status !== 'LOBBY') {
+      throw new RoomManagerError('Computer seats can only be removed before the game starts.');
+    }
+    const slot = room.players.get(botPlayerId);
+    if (!slot || !slot.isBot) {
+      throw new RoomManagerError('That seat is not a computer player.');
+    }
+
+    room.players.delete(botPlayerId);
+    room.playMoney.proposal?.acceptedBy.delete(botPlayerId);
+    delete room.playMoney.tableProfitLoss[botPlayerId];
+    return room;
   }
 
   /**
@@ -152,11 +200,105 @@ export class RoomManager {
     slot.disconnectedAt = undefined;
     this.tokenIndex.delete(slot.token);
     room.voiceCallParticipants.delete(playerId); // bots don't take voice calls with them
+
+    // A temporary disconnect deliberately does NOT transfer host rights, but
+    // Leave Table is permanent for this human session: its reconnect token is
+    // invalidated above and a computer owns the seat from now on. If that seat
+    // was host, hand room-level controls (Next Round / Play Again) to the first
+    // remaining HUMAN so the table cannot deadlock behind a bot host. The bot's
+    // engine seat/playerId is untouched, so dealer/score/turn rules do not move.
+    if (room.hostId === playerId) {
+      const nextHumanHost = [...room.players.values()].find((player) => player.playerId !== playerId && !player.isBot);
+      if (nextHumanHost) room.hostId = nextHumanHost.playerId;
+    }
     return slot;
   }
 
-  /** Reconnects a previously-joined player using their persistent token (Section 42). */
-  reconnect(token: string, newSocketId: string): { room: RoomState; playerId: PlayerId } {
+  /**
+   * Voluntary session exit from a lobby or a completed game. Unlike a disconnect, this permanently releases the
+   * seat/token immediately. If the host leaves while other humans remain,
+   * host responsibility moves to the first remaining human in seating order;
+   * if no humans remain, the lobby is deleted instead of leaving a bot-only
+   * zombie room behind.
+   */
+  leaveSession(roomCode: string, playerId: PlayerId): RoomState | undefined {
+    const room = this.getRoomOrThrow(roomCode);
+    const safeToRemove = room.status === 'LOBBY' || room.game?.isComplete() === true;
+    if (!safeToRemove) throw new RoomManagerError('Use Leave Table during an active game.');
+    return this.releaseSeat(room, playerId);
+  }
+
+  /**
+   * Permanently releases a seat while a game is active. The room layer does
+   * NOT decide whether that is legal for a particular game; the concrete
+   * game controller must first update/settle its own authoritative engine.
+   * This keeps the room package game-agnostic while allowing open-ended games
+   * such as Teen Patti to remove a human instead of converting them to a bot.
+   */
+  releaseActiveSeat(roomCode: string, playerId: PlayerId): RoomState | undefined {
+    const room = this.getRoomOrThrow(roomCode);
+    if (room.status !== 'IN_GAME') throw new RoomManagerError('There is no active game at this table.');
+    return this.releaseSeat(room, playerId);
+  }
+
+  /**
+   * Ends an open-ended active session and reopens the room as a lobby while
+   * preserving the remaining seats. Any game-owned setup is cleared because
+   * the participant set has changed and must be agreed again.
+   */
+  returnActiveSessionToLobby(roomCode: string): RoomState {
+    const room = this.getRoomOrThrow(roomCode);
+    room.status = 'LOBBY';
+    room.game = undefined;
+    room.gameSetup = undefined;
+    room.playMoney.proposal = undefined;
+    room.playMoney.activeMatch = undefined;
+    for (const slot of room.players.values()) slot.ready = slot.isBot;
+    return room;
+  }
+
+  private releaseSeat(room: RoomState, playerId: PlayerId): RoomState | undefined {
+    const slot = room.players.get(playerId);
+    if (!slot) throw new RoomManagerError('Player not in this room.');
+
+    room.voiceCallParticipants.delete(playerId);
+    this.tokenIndex.delete(slot.token);
+    const departingHost = room.hostId === playerId;
+    room.players.delete(playerId);
+    if (departingHost) room.playMoney.proposal = undefined;
+    else room.playMoney.proposal?.acceptedBy.delete(playerId);
+    delete room.playMoney.tableProfitLoss[playerId];
+
+    const remainingHumans = [...room.players.values()].filter((p) => !p.isBot);
+    if (remainingHumans.length === 0) {
+      for (const p of room.players.values()) this.tokenIndex.delete(p.token);
+      this.rooms.delete(room.roomCode);
+      return undefined;
+    }
+
+    if (departingHost) room.hostId = remainingHumans[0].playerId;
+    return room;
+  }
+
+  /**
+   * Binds one concrete Socket.IO connection to an existing seat. The seat is
+   * the identity; reconnecting never creates another PlayerSlot. If another
+   * socket was still attached (bfcache, duplicate tab, suspended PWA), its id
+   * is returned so the network layer can detach that stale connection.
+   */
+  bindSocket(roomCode: string, playerId: PlayerId, socketId: string): string | undefined {
+    const room = this.getRoomOrThrow(roomCode);
+    const slot = room.players.get(playerId);
+    if (!slot) throw new RoomManagerError('Player not in this room.');
+    const previousSocketId = slot.socketId && slot.socketId !== socketId ? slot.socketId : undefined;
+    slot.connected = true;
+    slot.socketId = socketId;
+    slot.disconnectedAt = undefined;
+    return previousSocketId;
+  }
+
+  /** Reconnects a previously-joined player using their persistent secret token. */
+  reconnect(token: string, newSocketId: string): { room: RoomState; playerId: PlayerId; previousSocketId?: string } {
     const entry = this.tokenIndex.get(token);
     if (!entry) throw new RoomManagerError('Invalid or expired session token.');
     const room = this.rooms.get(entry.roomCode);
@@ -169,19 +311,27 @@ export class RoomManager {
       throw new RoomManagerError('Reconnection window has expired.');
     }
 
-    slot.connected = true;
-    slot.socketId = newSocketId;
-    slot.disconnectedAt = undefined;
-    return { room, playerId: entry.playerId };
+    const previousSocketId = this.bindSocket(room.roomCode, entry.playerId, newSocketId);
+    return { room, playerId: entry.playerId, previousSocketId };
   }
 
-  markDisconnected(roomCode: string, playerId: PlayerId): void {
+  markDisconnected(roomCode: string, playerId: PlayerId, socketId?: string): void {
     const room = this.rooms.get(roomCode);
     const slot = room?.players.get(playerId);
     if (!slot) return;
+    // A superseded browser/PWA instance can disconnect AFTER a newer socket
+    // has reclaimed this same seat. Never let that stale disconnect flip the
+    // newly-online player back to Waiting/Disconnected.
+    if (socketId && slot.socketId && slot.socketId !== socketId) return;
     slot.connected = false;
     slot.disconnectedAt = Date.now();
     slot.socketId = undefined;
+    // In the lobby, Ready means "I am here and ready to start now". A human
+    // who has actually lost transport must opt in again after reconnect;
+    // otherwise a host could start Kitti with an offline seat and deadlock
+    // the human-only match before the first action. Active games keep their
+    // game-owned state untouched and rely on the reconnect window instead.
+    if (room?.status === 'LOBBY' && !slot.isBot) slot.ready = false;
     room?.voiceCallParticipants.delete(playerId); // a dropped connection also drops out of any voice call
   }
 
@@ -204,11 +354,120 @@ export class RoomManager {
     if (!startCheck.ok) {
       throw new RoomManagerError(startCheck.error!);
     }
+    const allHumansOnline = [...room.players.values()].every((p) => p.isBot || p.connected);
+    if (!allHumansOnline) {
+      throw new RoomManagerError('Every human player must be online before starting.');
+    }
     const allReady = [...room.players.values()].every((p) => p.ready);
     if (!allReady) {
       throw new RoomManagerError('All players must be ready before starting.');
     }
+    if (room.playMoney.proposal) {
+      const missingAcceptance = [...room.players.values()].some(
+        (p) => !p.isBot && !room.playMoney.proposal!.acceptedBy.has(p.playerId)
+      );
+      if (missingAcceptance) {
+        throw new RoomManagerError('Every human player must accept the play-money board before starting.');
+      }
+    }
     room.status = 'IN_GAME';
+    return room;
+  }
+
+  /** Host proposes an optional virtual board for the next Hazari/Kitti match. */
+  proposePlayMoney(roomCode: string, requestingPlayerId: PlayerId, amount: number): RoomState {
+    const room = this.getRoomOrThrow(roomCode);
+    if (!supportsSharedPlayMoney(room.gameId)) {
+      throw new RoomManagerError('This play-money board applies only to Hazari and Kitti.');
+    }
+    if (room.status !== 'LOBBY') throw new RoomManagerError('The board is locked once a match starts.');
+    if (room.hostId !== requestingPlayerId) throw new RoomManagerError('Only the host can propose the play-money board.');
+    if (!Number.isSafeInteger(amount) || amount <= 0 || amount > MAX_PLAY_MONEY_BOARD) {
+      throw new RoomManagerError(`Board amount must be a whole number from 1 to ${MAX_PLAY_MONEY_BOARD}.`);
+    }
+    const acceptedBy = new Set<PlayerId>([requestingPlayerId]);
+    for (const slot of room.players.values()) if (slot.isBot) acceptedBy.add(slot.playerId);
+    room.playMoney.proposal = { amount, proposedBy: requestingPlayerId, acceptedBy };
+    return room;
+  }
+
+  /** A human player accepts the host's current proposal. Bots are auto-accepted. */
+  acceptPlayMoney(roomCode: string, playerId: PlayerId): RoomState {
+    const room = this.getRoomOrThrow(roomCode);
+    if (room.status !== 'LOBBY') throw new RoomManagerError('The board is locked once a match starts.');
+    const slot = room.players.get(playerId);
+    if (!slot) throw new RoomManagerError('Player not in this room.');
+    const proposal = room.playMoney.proposal;
+    if (!proposal) throw new RoomManagerError('There is no play-money board to accept.');
+    proposal.acceptedBy.add(playerId);
+    return room;
+  }
+
+  /** Any human can explicitly veto the optional board; unanimity is required. */
+  declinePlayMoney(roomCode: string, playerId: PlayerId): RoomState {
+    const room = this.getRoomOrThrow(roomCode);
+    if (room.status !== 'LOBBY') throw new RoomManagerError('The board is locked once a match starts.');
+    const slot = room.players.get(playerId);
+    if (!slot) throw new RoomManagerError('Player not in this room.');
+    if (slot.isBot) throw new RoomManagerError('Computer players auto-accept the play-money board.');
+    if (!room.playMoney.proposal) throw new RoomManagerError('There is no play-money board to decline.');
+    room.playMoney.proposal = undefined;
+    return room;
+  }
+
+  /** Host withdraws the proposal; the match can then start with no play money. */
+  cancelPlayMoney(roomCode: string, requestingPlayerId: PlayerId): RoomState {
+    const room = this.getRoomOrThrow(roomCode);
+    if (room.status !== 'LOBBY') throw new RoomManagerError('The board is locked once a match starts.');
+    if (room.hostId !== requestingPlayerId) throw new RoomManagerError('Only the host can withdraw the play-money board.');
+    room.playMoney.proposal = undefined;
+    return room;
+  }
+
+  /**
+   * Locks the accepted board at match start and records each seat's virtual
+   * contribution. There is intentionally no wallet/balance requirement yet:
+   * this is a room-session P/L ledger, so no arbitrary starting balance is
+   * invented and no player can ever owe or withdraw real money.
+   */
+  beginPlayMoneyMatch(roomCode: string): RoomState {
+    const room = this.getRoomOrThrow(roomCode);
+    if (!supportsSharedPlayMoney(room.gameId)) return room;
+    const proposal = room.playMoney.proposal;
+    if (!proposal) {
+      room.playMoney.activeMatch = undefined;
+      return room;
+    }
+    const participantIds = [...room.players.keys()];
+    const missingAcceptance = [...room.players.values()].some(
+      (p) => !p.isBot && !proposal.acceptedBy.has(p.playerId)
+    );
+    if (missingAcceptance) throw new RoomManagerError('Every human player must accept the play-money board before starting.');
+
+    for (const id of participantIds) {
+      room.playMoney.tableProfitLoss[id] = (room.playMoney.tableProfitLoss[id] ?? 0) - proposal.amount;
+    }
+    room.playMoney.activeMatch = {
+      amount: proposal.amount,
+      pot: proposal.amount * participantIds.length,
+      participantIds,
+      settled: false,
+    };
+    room.playMoney.proposal = undefined;
+    return room;
+  }
+
+  /** Awards the full virtual pot once, to the authoritative match winner. */
+  settlePlayMoney(roomCode: string, winnerId: PlayerId): RoomState {
+    const room = this.getRoomOrThrow(roomCode);
+    const active = room.playMoney.activeMatch;
+    if (!active || active.settled) return room;
+    if (!active.participantIds.includes(winnerId)) {
+      throw new RoomManagerError('Play-money winner was not a participant in this match.');
+    }
+    room.playMoney.tableProfitLoss[winnerId] = (room.playMoney.tableProfitLoss[winnerId] ?? 0) + active.pot;
+    active.settled = true;
+    active.winnerId = winnerId;
     return room;
   }
 
@@ -230,6 +489,8 @@ export class RoomManager {
     }
     room.status = 'LOBBY';
     room.game = undefined;
+    room.playMoney.proposal = undefined;
+    room.playMoney.activeMatch = undefined;
     for (const slot of room.players.values()) {
       slot.ready = slot.isBot; // bots stay auto-ready; humans opt back in
     }
@@ -264,6 +525,19 @@ export class RoomManager {
       maxPlayers: maxPlayersFor(room.gameId),
       hostId: room.hostId,
       gameState: room.game?.state,
+      playMoney: {
+        proposal: room.playMoney.proposal
+          ? {
+              amount: room.playMoney.proposal.amount,
+              proposedBy: room.playMoney.proposal.proposedBy,
+              acceptedBy: [...room.playMoney.proposal.acceptedBy],
+            }
+          : null,
+        activeMatch: room.playMoney.activeMatch
+          ? { ...room.playMoney.activeMatch, participantIds: [...room.playMoney.activeMatch.participantIds] }
+          : null,
+        tableProfitLoss: { ...room.playMoney.tableProfitLoss },
+      },
     };
   }
 

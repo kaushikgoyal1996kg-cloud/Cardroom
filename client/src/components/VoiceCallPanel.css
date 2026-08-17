@@ -158,3 +158,73 @@
     max-height: 62dvh;
   }
 }
+
+/* ==========================================================================
+   Card-room visual pass. Keep the carefully-derived fixed positioning above;
+   only the material, hierarchy and touch ergonomics change here.
+   ========================================================================== */
+.voice-call-toggle {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(200,164,92,.42);
+  background: linear-gradient(180deg, rgba(61,46,35,.96), rgba(21,17,14,.98));
+  color: var(--ink-100);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 8px 22px rgba(0,0,0,.34);
+}
+.voice-call-toggle--active {
+  background: linear-gradient(180deg, #326748, #1f4934);
+  border-color: rgba(122,184,143,.58);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 3px rgba(91,158,114,.08), 0 8px 22px rgba(0,0,0,.34);
+}
+.voice-call-toggle__badge {
+  background: var(--brass-400);
+  color: var(--room-950);
+  border-color: var(--felt-900);
+}
+.voice-call-panel {
+  border: 1px solid rgba(200,164,92,.34);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 86% 0%, rgba(46,96,74,.2), transparent 38%),
+    linear-gradient(165deg, rgba(39,29,23,.98), rgba(15,13,11,.99));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 18px 50px rgba(0,0,0,.48);
+}
+.voice-call-panel__header {
+  color: var(--brass-300);
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: .04em;
+  border-bottom-color: rgba(200,164,92,.16);
+}
+.voice-call-panel__close {
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  padding: 0;
+}
+.voice-call-panel__actions .btn,
+.voice-call-panel__join {
+  min-height: var(--touch-min);
+}
+.voice-call-panel__leave {
+  background: rgba(164,87,79,.16);
+  border-color: rgba(164,87,79,.62);
+  color: var(--ink-100);
+}
+.voice-call-panel__you,
+.voice-call-panel__participant {
+  min-height: 38px;
+  padding: 6px 4px;
+  border-bottom: 1px solid rgba(200,164,92,.07);
+}
+.voice-call-dot--live { background: var(--status-connected); }
+.voice-call-dot--muted { background: var(--ink-400); }
+.voice-call-dot--speaking { background: var(--brass-300); }
+@keyframes voice-call-speaking-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220,192,134,.5); }
+  50% { box-shadow: 0 0 0 5px rgba(220,192,134,0); }
+}
+.voice-call-panel__join,
+.voice-call-panel__actions .btn { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; }
+.voice-call-panel__join svg,
+.voice-call-panel__actions svg,
+.voice-call-panel__close svg { width: 1rem; height: 1rem; }

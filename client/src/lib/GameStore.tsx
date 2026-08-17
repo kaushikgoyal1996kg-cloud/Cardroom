@@ -1,23 +1,36 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { getSocket, type RoomAck, type TablesAck } from './socket';
+import { getSocket, type RoomAck, type TablesAck, type TeenPattiLeaveAck, type TeenPattiSetupAck } from './socket';
 import type {
   Card,
   ChatMessage,
   DismissalReason,
   GameId,
+  PlayerId,
   FourSets,
   HaazariPublicStatePayload,
+  KittiGroups,
+  KittiPublicStatePayload,
+  KittiRoundResult,
   PublicRoomInfo,
   RoundResult,
   TableSummary,
+  TeenPattiAction,
+  TeenPattiLobbySetup,
+  TeenPattiPlayerSettlement,
+  TeenPattiPrivateStatePayload,
+  TeenPattiPublicStatePayload,
+  TeenPattiRoundOutcome,
+  TeenPattiRoundVariantConfig,
+  TeenPattiTableConfig,
 } from '../game/types';
 import { DEFAULT_AVATAR } from '../game/avatars';
 import { playDealSound, playChatSound, playErrorSound, playRoundCompleteSound, playVictorySound } from './sound';
 import { hapticMedium, hapticError, hapticSuccess, hapticVictory } from './haptics';
 import { recordGameResult, getAllStats, type PlayerStats } from './stats';
-import type { SuggestionOptionsAck } from './socket';
+import type { KittiSuggestionAck, SuggestionOptionsAck } from './socket';
 import { friendlyGameError } from './errorMessages';
 import { VoiceCallManager, isVoiceCallSupported } from './voiceCall';
+import { requestReturnToCardRoom } from './navigation';
 
 const SESSION_KEY = 'haazari_session_v1';
 
@@ -39,6 +52,19 @@ interface GameContextValue {
   lastRoundResult: RoundResult | null;
   roundHistory: RoundResult[];
   winnerInfo: { winnerId: string; finalScores: Record<string, number> } | null;
+  kittiHand: Card[];
+  kittiArrangedGroups: KittiGroups | null;
+  kittiDeciderHand: Card[];
+  kittiState: KittiPublicStatePayload | null;
+  lastKittiRoundResult: KittiRoundResult | null;
+  kittiRoundHistory: KittiRoundResult[];
+  kittiWinnerInfo: { winnerId: string; roundsWon: Record<string, number> } | null;
+  teenPattiSetup: TeenPattiLobbySetup | null;
+  teenPattiPrivate: TeenPattiPrivateStatePayload | null;
+  teenPattiState: TeenPattiPublicStatePayload | null;
+  lastTeenPattiRoundResult: TeenPattiRoundOutcome | null;
+  teenPattiRoundHistory: TeenPattiRoundOutcome[];
+  teenPattiSettlementNotice: TeenPattiPlayerSettlement | null;
   roomError: string | null;
   gameError: string | null;
   chatMessages: ChatMessage[];
@@ -90,14 +116,31 @@ interface GameContextValue {
   setReady: (ready: boolean) => void;
   startGame: () => void;
   addBot: () => void;
+  removeBot: (playerId: PlayerId) => void;
   playAgain: () => void;
+  proposePlayMoney: (amount: number) => void;
+  acceptPlayMoney: () => void;
+  declinePlayMoney: () => void;
+  cancelPlayMoney: () => void;
   confirmArrangement: (sets: FourSets) => void;
   playSet: () => void;
   requestDismissal: (reason: DismissalReason, proposedSets?: FourSets) => void;
   startNextRound: () => void;
+  requestKittiSuggestion: () => Promise<KittiSuggestionAck>;
+  confirmKittiArrangement: (groups: KittiGroups) => void;
+  playKittiHand: () => void;
+  playKittiDecider: () => void;
+  startNextKittiRound: () => void;
+  proposeTeenPattiSetup: (tableConfig: TeenPattiTableConfig, roundVariant: TeenPattiRoundVariantConfig) => Promise<TeenPattiSetupAck>;
+  acceptTeenPattiSetup: (revision: number) => Promise<TeenPattiSetupAck>;
+  teenPattiAction: (action: TeenPattiAction) => void;
+  topUpTeenPatti: (amount: number) => void;
+  startNextTeenPattiRound: () => void;
+  leaveTeenPattiTable: () => Promise<TeenPattiLeaveAck>;
+  clearTeenPattiSettlementNotice: () => void;
   leaveTable: () => void;
   sendChat: (message: string, kind: 'text' | 'emoji' | 'voice', durationSec?: number) => void;
-  getStats: () => { name: string; stats: PlayerStats }[];
+  getStats: (gameId: GameId) => { name: string; stats: PlayerStats }[];
   clearGameError: () => void;
   leaveSession: () => void;
 }
@@ -125,6 +168,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const myPlayerIdRef = useRef<string | null>(null);
   const myNameRef = useRef<string>('');
   const roomRef = useRef<PublicRoomInfo | null>(null);
+  const gameStateRef = useRef<HaazariPublicStatePayload | null>(null);
+  const kittiStateRef = useRef<KittiPublicStatePayload | null>(null);
+  const teenPattiStateRef = useRef<TeenPattiPublicStatePayload | null>(null);
+  const teenPattiDealRoundRef = useRef<number | null>(null);
   useEffect(() => {
     myPlayerIdRef.current = myPlayerId;
   }, [myPlayerId]);
@@ -140,6 +187,28 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [lastRoundResult, setLastRoundResult] = useState<RoundResult | null>(null);
   const [roundHistory, setRoundHistory] = useState<RoundResult[]>([]);
   const [winnerInfo, setWinnerInfo] = useState<{ winnerId: string; finalScores: Record<string, number> } | null>(null);
+  const [kittiHand, setKittiHand] = useState<Card[]>([]);
+  const [kittiArrangedGroups, setKittiArrangedGroups] = useState<KittiGroups | null>(null);
+  const [kittiDeciderHand, setKittiDeciderHand] = useState<Card[]>([]);
+  const [kittiState, setKittiState] = useState<KittiPublicStatePayload | null>(null);
+  const [lastKittiRoundResult, setLastKittiRoundResult] = useState<KittiRoundResult | null>(null);
+  const [kittiRoundHistory, setKittiRoundHistory] = useState<KittiRoundResult[]>([]);
+  const [kittiWinnerInfo, setKittiWinnerInfo] = useState<{ winnerId: string; roundsWon: Record<string, number> } | null>(null);
+  const [teenPattiSetup, setTeenPattiSetup] = useState<TeenPattiLobbySetup | null>(null);
+  const [teenPattiPrivate, setTeenPattiPrivate] = useState<TeenPattiPrivateStatePayload | null>(null);
+  const [teenPattiState, setTeenPattiState] = useState<TeenPattiPublicStatePayload | null>(null);
+  const [lastTeenPattiRoundResult, setLastTeenPattiRoundResult] = useState<TeenPattiRoundOutcome | null>(null);
+  const [teenPattiRoundHistory, setTeenPattiRoundHistory] = useState<TeenPattiRoundOutcome[]>([]);
+  const [teenPattiSettlementNotice, setTeenPattiSettlementNotice] = useState<TeenPattiPlayerSettlement | null>(null);
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
+  useEffect(() => {
+    kittiStateRef.current = kittiState;
+  }, [kittiState]);
+  useEffect(() => {
+    teenPattiStateRef.current = teenPattiState;
+  }, [teenPattiState]);
   const [roomError, setRoomError] = useState<string | null>(null);
   const [gameError, setGameError] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -152,6 +221,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [voiceMuted, setVoiceMuted] = useState(false);
   const [voiceParticipants, setVoiceParticipants] = useState<string[]>([]);
   const [speakingPlayerIds, setSpeakingPlayerIds] = useState<string[]>([]);
+  // Remember an intentional live call across a temporary transport drop. The
+  // local peer graph is torn down immediately, then rebuilt only AFTER the
+  // authoritative room reconnect has completed.
+  const rejoinVoiceAfterReconnectRef = useRef(false);
+  const rejoinVoiceMutedRef = useRef(false);
 
   // Guards against a stale reconnect ack (from an earlier, since-superseded
   // connect/disconnect cycle on a flaky connection) applying its result
@@ -207,6 +281,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             // table on screen that looked normal but would only fail -
             // confusingly, as "You're not in a game right now" - the next
             // time the player tried to interact with it.
+            rejoinVoiceAfterReconnectRef.current = false;
+            rejoinVoiceMutedRef.current = false;
             clearSession();
             setRoom(null);
             setMyPlayerId(null);
@@ -215,6 +291,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             setGameState(null);
             setLastRoundResult(null);
             setWinnerInfo(null);
+            setKittiHand([]);
+            setKittiArrangedGroups(null);
+            setKittiDeciderHand([]);
+            setKittiState(null);
+            setLastKittiRoundResult(null);
+            setKittiRoundHistory([]);
+            setKittiWinnerInfo(null);
+            setTeenPattiSetup(null);
+            setTeenPattiPrivate(null);
+            setTeenPattiState(null);
+            setLastTeenPattiRoundResult(null);
+            setTeenPattiRoundHistory([]);
+            teenPattiDealRoundRef.current = null;
             setViewMode('active');
             setRoomError("Your table timed out while you were away. You'll need to start or join a new one.");
           }
@@ -231,11 +320,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
     const onDisconnect = () => {
       setConnectionStatus('disconnected');
-      // The server has already dropped us from any voice call on its side
-      // (see the disconnect handler in socketHandlers.ts) - tear down our
-      // local peer connections and mic stream too rather than leaving them
-      // dangling while we're disconnected.
-      voiceManagerRef.current?.leave();
+      // The server has already dropped us from any voice call on its side.
+      // Remember whether the player was in the call, but DO NOT emit a
+      // voice:leave while disconnected (Socket.IO would buffer/replay it).
+      rejoinVoiceAfterReconnectRef.current = voiceManagerRef.current?.isJoined ?? false;
+      rejoinVoiceMutedRef.current = voiceManagerRef.current?.isMuted ?? false;
+      voiceManagerRef.current?.leave(false);
       voiceManagerRef.current = null;
       setInVoiceCall(false);
       setVoiceParticipants([]);
@@ -252,6 +342,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           setMyHand([]);
           setMyArrangedSets(null);
           setRoundHistory([]);
+          setKittiHand([]);
+          setKittiArrangedGroups(null);
+          setKittiDeciderHand([]);
+          setKittiState(null);
+          setLastKittiRoundResult(null);
+          setKittiRoundHistory([]);
+          setKittiWinnerInfo(null);
+          setTeenPattiPrivate(null);
+          setTeenPattiState(null);
+          setLastTeenPattiRoundResult(null);
+          setTeenPattiRoundHistory([]);
+          teenPattiDealRoundRef.current = null;
         }
         return r;
       });
@@ -260,8 +362,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const onYourHand = ({ hand }: { hand: Card[] }) => {
       setMyHand(hand);
       setMyArrangedSets(null); // a fresh hand means a fresh round - any prior arrangement is stale
-      playDealSound();
       if (!suppressDealAnimation.current) {
+        playDealSound();
         setFreshDealCount((n) => n + 1);
       }
     };
@@ -296,20 +398,99 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
     const onRoundComplete = ({ result }: { result: RoundResult }) => {
       setLastRoundResult(result);
-      setRoundHistory((prev) => [...prev, result]);
-      playRoundCompleteSound();
-      hapticSuccess();
+      setRoundHistory((prev) => prev.some((entry) => entry.roundNumber === result.roundNumber) ? prev : [...prev, result]);
+      // A reconnect may legitimately replay the result payload purely to
+      // rebuild the current screen. Restore silently instead of celebrating
+      // the same round twice.
+      if (!restorationActiveRef.current) {
+        playRoundCompleteSound();
+        hapticSuccess();
+      }
     };
     const onGameOver = (payload: { winnerId: string; finalScores: Record<string, number> }) => {
       setWinnerInfo(payload);
+      if (restorationActiveRef.current) return;
       playVictorySound();
       hapticVictory();
       const pid = myPlayerIdRef.current;
       const name = myNameRef.current;
       if (pid && name) {
-        recordGameResult(name, pid === payload.winnerId, payload.finalScores[pid] ?? 0);
+        recordGameResult('HAZARI', name, pid === payload.winnerId, payload.finalScores[pid] ?? 0);
       }
     };
+    const onKittiHand = ({ hand }: { hand: Card[] }) => {
+      setKittiHand(hand);
+      setKittiArrangedGroups(null);
+      setKittiDeciderHand([]);
+      if (!suppressDealAnimation.current) {
+        playDealSound();
+        setFreshDealCount((n) => n + 1);
+      }
+    };
+    const onKittiArrangement = ({ groups }: { groups: KittiGroups }) => setKittiArrangedGroups(groups);
+    const onKittiDeciderHand = ({ hand }: { hand: Card[] }) => setKittiDeciderHand(hand);
+    const onKittiState = (state: KittiPublicStatePayload) => {
+      const previous = kittiStateRef.current;
+      const roundChanged = !!previous && previous.roundNumber !== state.roundNumber;
+      if (roundChanged && ['ARRANGING', 'WAITING_FOR_ARRANGEMENTS'].includes(state.state)) {
+        // A sudden-death spectator receives no private `yourHand` event by
+        // design. Clear the just-finished round's private cards here so they
+        // cannot keep rendering a stale rack while watching the leaders.
+        // Active players are repopulated immediately by `kitti:yourHand`.
+        setKittiHand([]);
+        setKittiArrangedGroups(null);
+        setKittiDeciderHand([]);
+      }
+      kittiStateRef.current = state;
+      setKittiState(state);
+    };
+    const onKittiRoundComplete = ({ result }: { result: KittiRoundResult }) => {
+      setLastKittiRoundResult(result);
+      setKittiRoundHistory((prev) => prev.some((entry) => entry.roundNumber === result.roundNumber) ? prev : [...prev, result]);
+      if (!restorationActiveRef.current) {
+        playRoundCompleteSound();
+        hapticSuccess();
+      }
+    };
+    const onKittiOver = (payload: { winnerId: string; roundsWon: Record<string, number> }) => {
+      setKittiWinnerInfo(payload);
+      if (restorationActiveRef.current) return;
+      playVictorySound();
+      hapticVictory();
+      const pid = myPlayerIdRef.current;
+      const name = myNameRef.current;
+      if (pid && name) {
+        recordGameResult('KITTI', name, pid === payload.winnerId, payload.roundsWon[pid] ?? 0);
+      }
+    };
+    const onTeenPattiSetup = ({ setup }: { setup: TeenPattiLobbySetup | null }) => setTeenPattiSetup(setup);
+    const onTeenPattiPrivate = (state: TeenPattiPrivateStatePayload) => setTeenPattiPrivate(state);
+    const onTeenPattiState = (state: TeenPattiPublicStatePayload) => {
+      const isNewDeal = state.state === 'BETTING' && teenPattiDealRoundRef.current !== state.roundNumber;
+      teenPattiDealRoundRef.current = state.roundNumber;
+      setTeenPattiState(state);
+      if (isNewDeal && !suppressDealAnimation.current && !restorationActiveRef.current) {
+        playDealSound();
+        setFreshDealCount((n) => n + 1);
+      }
+    };
+    const onTeenPattiRoundComplete = ({ result }: { result: TeenPattiRoundOutcome }) => {
+      setLastTeenPattiRoundResult(result);
+      setTeenPattiRoundHistory((prev) => prev.some((entry) => entry.roundNumber === result.roundNumber) ? prev : [...prev, result]);
+      if (!restorationActiveRef.current) {
+        playRoundCompleteSound();
+        hapticSuccess();
+      }
+    };
+    const onTeenPattiTableEnded = ({ settlements }: { reason: 'NOT_ENOUGH_PLAYERS'; settlements: TeenPattiPlayerSettlement[] }) => {
+      const mine = settlements.find((entry) => entry.playerId === myPlayerIdRef.current);
+      if (mine) setTeenPattiSettlementNotice(mine);
+      setTeenPattiPrivate(null);
+      setTeenPattiState(null);
+      setLastTeenPattiRoundResult(null);
+      teenPattiDealRoundRef.current = null;
+    };
+
     const onChatMessage = (msg: ChatMessage) => {
       setChatMessages((prev) => [...prev.slice(-99), msg]); // keep last 100
       setUnreadChatCount((n) => n + 1);
@@ -348,6 +529,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socket.on('game:error', onGameError);
     socket.on('hazari:roundComplete', onRoundComplete);
     socket.on('hazari:over', onGameOver);
+    socket.on('kitti:yourHand', onKittiHand);
+    socket.on('kitti:yourArrangement', onKittiArrangement);
+    socket.on('kitti:yourDeciderHand', onKittiDeciderHand);
+    socket.on('kitti:state', onKittiState);
+    socket.on('kitti:roundComplete', onKittiRoundComplete);
+    socket.on('kitti:over', onKittiOver);
+    socket.on('teenpatti:setup', onTeenPattiSetup);
+    socket.on('teenpatti:private', onTeenPattiPrivate);
+    socket.on('teenpatti:state', onTeenPattiState);
+    socket.on('teenpatti:roundComplete', onTeenPattiRoundComplete);
+    socket.on('teenpatti:tableEnded', onTeenPattiTableEnded);
     socket.on('room:chatMessage', onChatMessage);
 
     if (socket.connected) onConnect();
@@ -365,12 +557,30 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       socket.off('game:error', onGameError);
       socket.off('hazari:roundComplete', onRoundComplete);
       socket.off('hazari:over', onGameOver);
+      socket.off('kitti:yourHand', onKittiHand);
+      socket.off('kitti:yourArrangement', onKittiArrangement);
+      socket.off('kitti:yourDeciderHand', onKittiDeciderHand);
+      socket.off('kitti:state', onKittiState);
+      socket.off('kitti:roundComplete', onKittiRoundComplete);
+      socket.off('kitti:over', onKittiOver);
+      socket.off('teenpatti:setup', onTeenPattiSetup);
+      socket.off('teenpatti:private', onTeenPattiPrivate);
+      socket.off('teenpatti:state', onTeenPattiState);
+      socket.off('teenpatti:roundComplete', onTeenPattiRoundComplete);
+      socket.off('teenpatti:tableEnded', onTeenPattiTableEnded);
       socket.off('room:chatMessage', onChatMessage);
     };
   }, []);
 
   const createRoom = useCallback((playerName: string, avatar: string = DEFAULT_AVATAR, gameId: GameId = 'HAZARI') => {
     return new Promise<RoomAck>((resolve) => {
+      const existingRoomCode = roomRef.current?.roomCode ?? readSession()?.roomCode;
+      if (existingRoomCode) {
+        const error = `You're already seated in room ${existingRoomCode}. Return to that table or leave it before starting another one.`;
+        setRoomError(error);
+        resolve({ ok: false, error });
+        return;
+      }
       socketRef.current.emit('room:create', { playerName, avatar, gameId }, (res) => {
         if (res.ok && res.roomCode && res.playerId && res.token && res.room) {
           storeSession({ token: res.token, roomCode: res.roomCode, playerName });
@@ -387,6 +597,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const joinRoom = useCallback((roomCode: string, playerName: string, avatar: string = DEFAULT_AVATAR) => {
     return new Promise<RoomAck>((resolve) => {
+      const existingRoomCode = roomRef.current?.roomCode ?? readSession()?.roomCode;
+      if (existingRoomCode) {
+        const error = `You're already seated in room ${existingRoomCode}. Return to that table or leave it before joining another one.`;
+        setRoomError(error);
+        resolve({ ok: false, error });
+        return;
+      }
       socketRef.current.emit('room:join', { roomCode, playerName, avatar }, (res) => {
         if (res.ok && res.roomCode && res.playerId && res.token && res.room) {
           storeSession({ token: res.token, roomCode: res.roomCode, playerName });
@@ -403,6 +620,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const quickMatch = useCallback((playerName: string, avatar: string = DEFAULT_AVATAR, gameId: GameId = 'HAZARI') => {
     return new Promise<RoomAck>((resolve) => {
+      const existingRoomCode = roomRef.current?.roomCode ?? readSession()?.roomCode;
+      if (existingRoomCode) {
+        const error = `You're already seated in room ${existingRoomCode}. Return to that table or leave it before finding another one.`;
+        setRoomError(error);
+        resolve({ ok: false, error });
+        return;
+      }
       socketRef.current.emit('room:quickMatch', { playerName, avatar, gameId }, (res) => {
         if (res.ok && res.roomCode && res.playerId && res.token && res.room) {
           storeSession({ token: res.token, roomCode: res.roomCode, playerName });
@@ -453,8 +677,28 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socketRef.current.emit('room:addBot');
   }, []);
 
+  const removeBot = useCallback((playerId: PlayerId) => {
+    socketRef.current.emit('room:removeBot', { playerId });
+  }, []);
+
   const playAgain = useCallback(() => {
     socketRef.current.emit('room:playAgain');
+  }, []);
+
+  const proposePlayMoney = useCallback((amount: number) => {
+    socketRef.current.emit('room:playMoneyPropose', { amount });
+  }, []);
+
+  const acceptPlayMoney = useCallback(() => {
+    socketRef.current.emit('room:playMoneyAccept');
+  }, []);
+
+  const declinePlayMoney = useCallback(() => {
+    socketRef.current.emit('room:playMoneyDecline');
+  }, []);
+
+  const cancelPlayMoney = useCallback(() => {
+    socketRef.current.emit('room:playMoneyCancel');
   }, []);
 
   const sendChat = useCallback((message: string, kind: 'text' | 'emoji' | 'voice', durationSec?: number) => {
@@ -464,7 +708,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const markChatRead = useCallback(() => setUnreadChatCount(0), []);
-  const getStats = useCallback(() => getAllStats(), []);
+  const getStats = useCallback((gameId: GameId) => getAllStats(gameId), []);
 
   const joinVoiceCall = useCallback(() => {
     if (!myPlayerId || voiceManagerRef.current?.isJoined) return;
@@ -481,10 +725,28 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       onError: (message) => setGameError(message),
     });
     voiceManagerRef.current = manager;
-    manager.join().then(() => setInVoiceCall(manager.isJoined));
+    manager.join().then(() => {
+      if (manager.isJoined && rejoinVoiceMutedRef.current) {
+        manager.setMuted(true);
+        setVoiceMuted(true);
+      } else if (manager.isJoined) {
+        setVoiceMuted(false);
+      }
+      rejoinVoiceMutedRef.current = false;
+      setInVoiceCall(manager.isJoined);
+    });
   }, [myPlayerId]);
 
+  useEffect(() => {
+    if (!rejoinVoiceAfterReconnectRef.current) return;
+    if (connectionStatus !== 'connected' || restoration.active || !room || !myPlayerId) return;
+    rejoinVoiceAfterReconnectRef.current = false;
+    joinVoiceCall();
+  }, [connectionStatus, restoration.active, room, myPlayerId, joinVoiceCall]);
+
   const leaveVoiceCall = useCallback(() => {
+    rejoinVoiceAfterReconnectRef.current = false;
+    rejoinVoiceMutedRef.current = false;
     voiceManagerRef.current?.leave();
     voiceManagerRef.current = null;
     setInVoiceCall(false);
@@ -541,10 +803,142 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socketRef.current.emit('hazari:startNextRound');
   }, []);
 
+  const requestKittiSuggestion = useCallback(() => {
+    return new Promise<KittiSuggestionAck>((resolve) => {
+      if (actionsGatedRef.current) {
+        resolve({ ok: false, error: 'Reconnecting - try again in a moment.' });
+        return;
+      }
+      socketRef.current.emit('kitti:requestSuggestion', (res: KittiSuggestionAck) => resolve(res));
+    });
+  }, []);
+
+  const confirmKittiArrangement = useCallback((groups: KittiGroups) => {
+    if (actionsGatedRef.current) return;
+    const cardIdGroups = groups.map((group) => group.map((card) => card.id)) as [string[], string[], string[]];
+    // Do not optimistically mark the arrangement confirmed. Kitti ordering is
+    // strict and server-authoritative; only the server echo moves the client
+    // into the waiting state, so a rejected Group 1 > Group 2 > Group 3
+    // submission can never make the UI look accepted.
+    socketRef.current.emit('kitti:confirmArrangement', { cardIdGroups });
+  }, []);
+
+  const playKittiHand = useCallback(() => {
+    if (actionsGatedRef.current) return;
+    socketRef.current.emit('kitti:playHand');
+  }, []);
+
+  const playKittiDecider = useCallback(() => {
+    if (actionsGatedRef.current) return;
+    socketRef.current.emit('kitti:playDecider');
+  }, []);
+
+  const startNextKittiRound = useCallback(() => {
+    if (actionsGatedRef.current) return;
+    setLastKittiRoundResult(null);
+    socketRef.current.emit('kitti:startNextRound');
+  }, []);
+
+  const proposeTeenPattiSetup = useCallback((tableConfig: TeenPattiTableConfig, roundVariant: TeenPattiRoundVariantConfig) => {
+    return new Promise<TeenPattiSetupAck>((resolve) => {
+      socketRef.current.emit('teenpatti:proposeSetup', { tableConfig, roundVariant }, (res) => {
+        if (!res.ok) setRoomError(res.error ?? 'Could not propose Teen Patti settings.');
+        if (res.setup) setTeenPattiSetup(res.setup);
+        resolve(res);
+      });
+    });
+  }, []);
+
+  const acceptTeenPattiSetup = useCallback((revision: number) => {
+    return new Promise<TeenPattiSetupAck>((resolve) => {
+      socketRef.current.emit('teenpatti:acceptSetup', { revision }, (res) => {
+        if (!res.ok) setRoomError(res.error ?? 'Could not accept Teen Patti settings.');
+        if (res.setup) setTeenPattiSetup(res.setup);
+        resolve(res);
+      });
+    });
+  }, []);
+
+  const teenPattiAction = useCallback((action: TeenPattiAction) => {
+    if (actionsGatedRef.current) return;
+    const expectedSeq = teenPattiStateRef.current?.sequence;
+    socketRef.current.emit('teenpatti:action', { action, expectedSeq });
+  }, []);
+
+  const topUpTeenPatti = useCallback((amount: number) => {
+    if (actionsGatedRef.current) return;
+    socketRef.current.emit('teenpatti:topUp', { amount });
+  }, []);
+
+  const startNextTeenPattiRound = useCallback(() => {
+    if (actionsGatedRef.current) return;
+    setLastTeenPattiRoundResult(null);
+    setTeenPattiPrivate(null);
+    socketRef.current.emit('teenpatti:startNextRound');
+  }, []);
+
+  const leaveTeenPattiTable = useCallback(() => {
+    if (actionsGatedRef.current) {
+      return Promise.resolve({ ok: false, error: 'Reconnect before leaving the table.' } as TeenPattiLeaveAck);
+    }
+    return new Promise<TeenPattiLeaveAck>((resolve) => {
+      socketRef.current.emit('teenpatti:leaveTable', (res) => {
+        if (!res.ok) {
+          setGameError(res.error ?? 'Could not leave the Teen Patti table.');
+          resolve(res);
+          return;
+        }
+
+        if (res.settlement) setTeenPattiSettlementNotice(res.settlement);
+        // The server already removed call membership and detached this socket
+        // from the room. Close local media without emitting another voice event.
+        voiceManagerRef.current?.leave(false);
+        voiceManagerRef.current = null;
+        rejoinVoiceAfterReconnectRef.current = false;
+        rejoinVoiceMutedRef.current = false;
+        setInVoiceCall(false);
+        setVoiceMuted(false);
+        setVoiceParticipants([]);
+        setSpeakingPlayerIds([]);
+        requestReturnToCardRoom();
+        clearSession();
+        setRoom(null);
+        setMyPlayerId(null);
+        setMyHand([]);
+        setMyArrangedSets(null);
+        setGameState(null);
+        setLastRoundResult(null);
+        setWinnerInfo(null);
+        setKittiHand([]);
+        setKittiArrangedGroups(null);
+        setKittiDeciderHand([]);
+        setKittiState(null);
+        setLastKittiRoundResult(null);
+        setKittiRoundHistory([]);
+        setKittiWinnerInfo(null);
+        setTeenPattiSetup(null);
+        setTeenPattiPrivate(null);
+        setTeenPattiState(null);
+        setLastTeenPattiRoundResult(null);
+        setTeenPattiRoundHistory([]);
+        teenPattiDealRoundRef.current = null;
+        setViewMode('active');
+        resolve(res);
+      });
+    });
+  }, []);
+
+  const clearTeenPattiSettlementNotice = useCallback(() => setTeenPattiSettlementNotice(null), []);
+
   const leaveTable = useCallback(() => {
-    socketRef.current.emit('room:leaveTable');
-    voiceManagerRef.current?.leave();
+    // The room lifecycle event itself removes call membership server-side.
+    // Tear down locally without emitting a second voice event that could race
+    // with the socket being detached from the room.
+    voiceManagerRef.current?.leave(false);
     voiceManagerRef.current = null;
+    rejoinVoiceAfterReconnectRef.current = false;
+    rejoinVoiceMutedRef.current = false;
+    socketRef.current.emit('room:leaveTable');
     setInVoiceCall(false);
     setVoiceMuted(false);
     setVoiceParticipants([]);
@@ -552,6 +946,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     // This seat is now bot-controlled for the rest of the game - the local
     // player has no further part in it, so clear their session the same
     // way leaveSession() does and send them back to the landing screen.
+    requestReturnToCardRoom();
     clearSession();
     setRoom(null);
     setMyPlayerId(null);
@@ -560,18 +955,45 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setGameState(null);
     setLastRoundResult(null);
     setWinnerInfo(null);
+    setKittiHand([]);
+    setKittiArrangedGroups(null);
+    setKittiDeciderHand([]);
+    setKittiState(null);
+    setLastKittiRoundResult(null);
+    setKittiRoundHistory([]);
+    setKittiWinnerInfo(null);
+    setTeenPattiSetup(null);
+    setTeenPattiPrivate(null);
+    setTeenPattiState(null);
+    setLastTeenPattiRoundResult(null);
+    setTeenPattiRoundHistory([]);
+    teenPattiDealRoundRef.current = null;
     setViewMode('active');
   }, []);
 
   const clearGameError = useCallback(() => setGameError(null), []);
 
   const leaveSession = useCallback(() => {
-    voiceManagerRef.current?.leave();
+    const currentRoom = roomRef.current;
+    if (currentRoom?.status === 'IN_GAME') {
+      const complete =
+        (currentRoom.gameId === 'HAZARI' && gameStateRef.current?.state === 'GAME_COMPLETE') ||
+        (currentRoom.gameId === 'KITTI' && kittiStateRef.current?.state === 'MATCH_COMPLETE');
+      if (!complete) {
+        setGameError('This game is still in progress. Use the in-game Leave Table option instead.');
+        return;
+      }
+    }
+    voiceManagerRef.current?.leave(false);
     voiceManagerRef.current = null;
+    rejoinVoiceAfterReconnectRef.current = false;
+    rejoinVoiceMutedRef.current = false;
+    if (currentRoom) socketRef.current.emit('room:leave');
     setInVoiceCall(false);
     setVoiceMuted(false);
     setVoiceParticipants([]);
     setSpeakingPlayerIds([]);
+    requestReturnToCardRoom();
     clearSession();
     setRoom(null);
     setMyPlayerId(null);
@@ -580,6 +1002,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setGameState(null);
     setLastRoundResult(null);
     setWinnerInfo(null);
+    setKittiHand([]);
+    setKittiArrangedGroups(null);
+    setKittiDeciderHand([]);
+    setKittiState(null);
+    setLastKittiRoundResult(null);
+    setKittiRoundHistory([]);
+    setKittiWinnerInfo(null);
+    setTeenPattiSetup(null);
+    setTeenPattiPrivate(null);
+    setTeenPattiState(null);
+    setLastTeenPattiRoundResult(null);
+    setTeenPattiRoundHistory([]);
+    teenPattiDealRoundRef.current = null;
     setViewMode('active');
   }, []);
 
@@ -595,6 +1030,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     lastRoundResult,
     roundHistory,
     winnerInfo,
+    kittiHand,
+    kittiArrangedGroups,
+    kittiDeciderHand,
+    kittiState,
+    lastKittiRoundResult,
+    kittiRoundHistory,
+    kittiWinnerInfo,
+    teenPattiSetup,
+    teenPattiPrivate,
+    teenPattiState,
+    lastTeenPattiRoundResult,
+    teenPattiRoundHistory,
+    teenPattiSettlementNotice,
     roomError,
     gameError,
     chatMessages,
@@ -622,11 +1070,28 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setReady,
     startGame,
     addBot,
+    removeBot,
     playAgain,
+    proposePlayMoney,
+    acceptPlayMoney,
+    declinePlayMoney,
+    cancelPlayMoney,
     confirmArrangement,
     playSet,
     requestDismissal,
     startNextRound,
+    requestKittiSuggestion,
+    confirmKittiArrangement,
+    playKittiHand,
+    playKittiDecider,
+    startNextKittiRound,
+    proposeTeenPattiSetup,
+    acceptTeenPattiSetup,
+    teenPattiAction,
+    topUpTeenPatti,
+    startNextTeenPattiRound,
+    leaveTeenPattiTable,
+    clearTeenPattiSettlementNotice,
     leaveTable,
     sendChat,
     getStats,

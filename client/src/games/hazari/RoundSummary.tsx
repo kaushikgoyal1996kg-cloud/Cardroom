@@ -31,7 +31,7 @@ export function RoundSummary() {
   if (!room || !lastRoundResult || !gameState) {
     return (
       <div className="waiting-screen">
-        <LoadingSpinner message="Returning to Cardroom…" />
+        <LoadingSpinner message="Returning to the Card Room…" />
       </div>
     );
   }
@@ -40,13 +40,16 @@ export function RoundSummary() {
   const isHost = room.players.find((p) => p.playerId === myPlayerId)?.isHost ?? false;
   const total = Object.values(lastRoundResult.pointsThisRound).reduce((a, b) => a + b, 0);
 
-  // Highest scorer this round - the headline. Purely presentational; derived
-  // from the server's own pointsThisRound, never recomputed.
-  const roundLeader = [...room.players].sort(
-    (a, b) =>
-      (lastRoundResult.pointsThisRound[b.playerId] ?? 0) -
-      (lastRoundResult.pointsThisRound[a.playerId] ?? 0)
-  )[0];
+  // Highest score this round - presentation only. Hazari awards points per
+  // sub-round; it does not define a separate round-win tiebreak. If multiple
+  // players share the top round score, say so instead of inventing a single
+  // winner from seat order.
+  const topRoundScore = Math.max(
+    ...room.players.map((p) => lastRoundResult.pointsThisRound[p.playerId] ?? 0)
+  );
+  const roundLeaders = room.players.filter(
+    (p) => (lastRoundResult.pointsThisRound[p.playerId] ?? 0) === topRoundScore
+  );
 
   const standings = [...room.players].sort(
     (a, b) =>
@@ -76,11 +79,14 @@ export function RoundSummary() {
             <>
               <p className="rsum__eyebrow">Round {lastRoundResult.roundNumber}</p>
               <h1 className="rsum__title">
-                {roundLeader ? nameOf(roundLeader.playerId) : 'Round'} takes the round
+                {roundLeaders.length === 1
+                  ? `${nameOf(roundLeaders[0].playerId)} scored most`
+                  : 'Top score shared'}
               </h1>
               <p className="rsum__note">
-                {lastRoundResult.pointsThisRound[roundLeader?.playerId ?? ''] ?? 0} of {total}{' '}
-                points
+                {roundLeaders.length === 1
+                  ? `${topRoundScore} of ${total} points this round`
+                  : `${roundLeaders.map((p) => nameOf(p.playerId)).join(' · ')} — ${topRoundScore} points each`}
               </p>
             </>
           )}

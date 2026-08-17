@@ -57,8 +57,8 @@ describe('StartupErrorBoundary with a broken production config', () => {
       </Boundary>
     );
 
-    expect(screen.getByText(/isn't set up yet/i)).toBeTruthy();
-    expect(screen.getByText(/missing its server address/i)).toBeTruthy();
+    expect(screen.getByText(/can't connect yet/i)).toBeTruthy();
+    expect(screen.getByText(/missing its game-server connection/i)).toBeTruthy();
   });
 
   it('reassures the player it is not their phone or connection', async () => {
@@ -68,7 +68,7 @@ describe('StartupErrorBoundary with a broken production config', () => {
         <Exploding message="boom" />
       </Boundary>
     );
-    expect(screen.getByText(/nothing is wrong with your phone/i)).toBeTruthy();
+    expect(screen.getByText(/not a problem with your phone or internet connection/i)).toBeTruthy();
   });
 
   it('offers a retry control that is a real touch target', async () => {
@@ -109,7 +109,7 @@ describe('StartupErrorBoundary with a localhost URL in a production build', () =
         <Exploding message="boom" />
       </Boundary>
     );
-    expect(screen.getByText(/points at localhost/i)).toBeTruthy();
+    expect(screen.getByText(/points at a local game server/i)).toBeTruthy();
   });
 });
 
@@ -138,8 +138,8 @@ describe('StartupErrorBoundary with a healthy config', () => {
       </Boundary>
     );
     // Config is fine, so it must NOT claim the deployment is misconfigured.
-    expect(screen.queryByText(/isn't set up yet/i)).toBeNull();
-    expect(screen.getByText(/could not start/i)).toBeTruthy();
+    expect(screen.queryByText(/can't connect yet/i)).toBeNull();
+    expect(screen.getByText(/could not finish starting/i)).toBeTruthy();
     expect(document.body.textContent).not.toContain('some unrelated render bug');
   });
 });

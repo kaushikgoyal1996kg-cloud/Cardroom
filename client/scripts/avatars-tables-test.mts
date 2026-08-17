@@ -33,7 +33,7 @@ async function main() {
   console.log('  ✓ Invalid avatar rejected server-side, safe default used instead.');
 
   // 3. Browse Tables should show Alice's room as open (2/4 players).
-  const tablesRes: any = await new Promise((resolve) => carol.emit('room:listTables', resolve));
+  const tablesRes: any = await ack(carol, 'room:listTables', { gameId: 'HAZARI' });
   if (!tablesRes.ok) throw new Error('listTables failed: ' + tablesRes.error);
   const found = tablesRes.tables.find((t: any) => t.roomCode === createRes.roomCode);
   if (!found) throw new Error('Open table not found in browse list!');
@@ -42,14 +42,14 @@ async function main() {
   if (found.hostName !== 'Alice') throw new Error(`Expected host Alice, got ${found.hostName}`);
 
   // 4. Carol joins directly via the table browser's "Join" action.
-  const carolRes: any = await ack(carol, 'room:join', { roomCode: found.roomCode, playerName: 'Carol', avatar: '🦁' });
+  const carolRes: any = await ack(carol, 'room:join', { roomCode: found.roomCode, playerName: 'Carol', avatar: '🐆' });
   if (!carolRes.ok) throw new Error('carol join via browse failed: ' + carolRes.error);
-  console.log('  ✓ Carol joined directly from the tables browser.');
+  console.log('  ✓ Carol joined directly from the tables browser with the new Panther identity.');
 
   // 5. Once a 4th joins and the room is full, it must disappear from the browse list.
   const dave = await connect();
   await ack(dave, 'room:join', { roomCode: found.roomCode, playerName: 'Dave', avatar: '🦜' });
-  const tablesAfterFull: any = await new Promise((resolve) => carol.emit('room:listTables', resolve));
+  const tablesAfterFull: any = await ack(carol, 'room:listTables', { gameId: 'HAZARI' });
   const stillThere = tablesAfterFull.tables.find((t: any) => t.roomCode === found.roomCode);
   if (stillThere) throw new Error('Full table should NOT appear in the browse list anymore!');
   console.log('  ✓ Table correctly disappeared from Browse Tables once full.');

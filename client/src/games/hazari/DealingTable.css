@@ -11,8 +11,8 @@
   grid-template-rows: 1fr auto;
   height: 100dvh;
   background:
-    radial-gradient(ellipse 90% 50% at 50% 0%, var(--room-800), transparent 70%),
-    var(--room-950);
+    radial-gradient(ellipse 76% 45% at 50% -2%, rgba(102,73,45,.55), transparent 70%),
+    linear-gradient(180deg, #15120f, var(--room-950) 64%, #070605);
   color: var(--ink-200);
   font-family: var(--font-body);
   overflow: hidden;
@@ -40,6 +40,13 @@
   font-size: var(--text-lg);
   letter-spacing: var(--tracking-wide);
   color: var(--brass-300);
+  text-shadow: 0 2px 12px rgba(0,0,0,.55);
+  animation: dealing-caption 1.35s var(--ease-smooth) infinite alternate;
+}
+
+@keyframes dealing-caption {
+  from { opacity: .58; letter-spacing: var(--tracking-wide); }
+  to { opacity: 1; letter-spacing: calc(var(--tracking-wide) + .025em); }
 }
 
 @media (orientation: landscape) and (max-height: 30rem) {
@@ -48,4 +55,8 @@
     padding-bottom: calc(var(--safe-bottom) + var(--space-2));
     font-size: var(--text-base);
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dealing__caption { animation: none; }
 }

@@ -8,6 +8,7 @@ import {
   MAX_VOICE_DURATION_SEC,
 } from '../lib/voiceRecorder';
 import { useVisualViewport } from '../platform/lib/useVisualViewport';
+import { ChromeIcon } from '../platform/components/ChromeIcon';
 import './ChatPanel.css';
 
 const QUICK_REACTIONS = ['👍', '😂', '🔥', '👏', '😮', '😢', '🎉', '🤔'];
@@ -138,7 +139,7 @@ export function ChatPanel() {
   return (
     <>
       <button className="chat-toggle fab" onClick={() => setOpen((o) => !o)} aria-label="Toggle chat">
-        💬
+        <ChromeIcon name="chat" />
         {!open && unreadChatCount > 0 && (
           <span className="chat-toggle__badge">
             {Math.min(unreadChatCount, 9)}
@@ -155,16 +156,15 @@ export function ChatPanel() {
           <div className="chat-panel__header">
             <span>Table Chat</span>
             <button className="chat-panel__close" onClick={() => setOpen(false)} aria-label="Close chat">
-              ✕
+              <ChromeIcon name="close" />
             </button>
           </div>
 
           <div className="chat-panel__messages" ref={listRef}>
             {chatMessages.length === 0 && (
               <div className="text-muted chat-panel__empty">
-                <span className="empty-state__icon" aria-hidden="true">💬</span>
-                <br />
-                No messages yet — say hello!
+                <span className="chat-panel__empty-mark" aria-hidden="true">CR</span>
+                <span>No messages yet — the table is quiet.</span>
               </div>
             )}
             {chatMessages.map((m, i) => {
@@ -224,7 +224,7 @@ export function ChatPanel() {
                   onPointerCancel={() => recording && finishRecording(false)}
                   aria-label="Hold to record a voice note"
                 >
-                  {recording ? `${recordSeconds}s 🔴` : '🎤'}
+                  <>{recording ? <span className="chat-panel__recording-count">{recordSeconds}s</span> : <ChromeIcon name="mic" />}{recording && <span className="chat-panel__recording-dot" aria-hidden="true" />}</>
                 </button>
               ) : (
                 <button
@@ -233,7 +233,7 @@ export function ChatPanel() {
                   disabled={micPermission === 'checking'}
                   aria-label="Enable microphone for voice messages"
                 >
-                  {micPermission === 'checking' ? '…' : '🎤+'}
+                  {micPermission === 'checking' ? '…' : <ChromeIcon name="mic" />}
                 </button>
               )
             ) : (
@@ -248,7 +248,7 @@ export function ChatPanel() {
             </div>
           )}
           {voiceSupported && micPermission === 'unknown' && !text.trim() && !recording && (
-            <div className="chat-panel__recording-hint text-muted">Tap 🎤+ once to enable voice messages</div>
+            <div className="chat-panel__recording-hint text-muted">Tap the microphone once to enable voice messages</div>
           )}
         </div>
       )}

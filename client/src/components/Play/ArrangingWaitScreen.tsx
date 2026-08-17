@@ -1,83 +1,53 @@
 import { useGame } from '../../lib/GameStore';
-import { AvatarBadge } from '../Lobby/AvatarPicker';
+import { CardTable } from '../../platform/components/CardTable';
+import type { SeatPlayer } from '../../platform/components/Seat';
 import { LoadingSpinner } from '../LoadingSpinner';
-import type { PlayerId } from '../../game/types';
 import './Play.css';
 
-const SIDE_LABELS = ['bottom', 'left', 'top', 'right'] as const;
-
+/**
+ * Hazari hand-confirmed waiting state on the same physical table used by the
+ * rest of the match. No separate square felt / legacy lobby language.
+ */
 export function ArrangingWaitScreen() {
-  const { room, gameState, myPlayerId } = useGame();
-  // Defensive fallback, not the primary guard - see RoomLobby.tsx's comment
-  // on the same pattern.
+  const { room, gameState, myPlayerId, voiceParticipants, speakingPlayerIds } = useGame();
   if (!room || !gameState || !myPlayerId) {
-    return (
-      <div className="waiting-screen">
-        <LoadingSpinner message="Returning to Cardroom…" />
-      </div>
-    );
+    return <div className="waiting-screen"><LoadingSpinner message="Returning to your table…" /></div>;
   }
-
-  const allIds = room.players.map((p) => p.playerId);
-  const myIndex = allIds.indexOf(myPlayerId);
-  const seatOrder: PlayerId[] =
-    myIndex === -1 ? allIds : [0, 1, 2, 3].map((offset) => allIds[(myIndex + offset) % allIds.length]);
 
   const confirmed = new Set(gameState.playersConfirmedArrangement);
   const confirmedCount = confirmed.size;
+  const seats: SeatPlayer[] = room.players.map((p) => ({
+    playerId: p.playerId,
+    name: p.name,
+    avatar: p.avatar,
+    score: gameState.cumulativeScores[p.playerId] ?? 0,
+    scoreLabel: 'pts',
+    isBot: p.isBot,
+    connection: p.connected || p.isBot ? 'CONNECTED' : 'DISCONNECTED',
+    hasActed: confirmed.has(p.playerId),
+    statusLabel: confirmed.has(p.playerId) ? 'Ready' : 'Arranging',
+    inVoiceCall: voiceParticipants.includes(p.playerId),
+    speaking: speakingPlayerIds.includes(p.playerId),
+  }));
 
   return (
-    <div className="play-screen">
-      <header className="play-header">
-        <div className="play-header__meta">
-          <span className="text-muted">Room {room.roomCode}</span>
-          <span className="text-muted">Round {gameState.roundNumber}</span>
-        </div>
-        <div className="play-header__progress text-muted">{confirmedCount}/4 players ready</div>
+    <main className="arranging-wait">
+      <header className="arranging-wait__header">
+        <div><span>Hazari</span><strong>Round {gameState.roundNumber}</strong></div>
+        <p>{confirmedCount} / {room.players.length} hands confirmed</p>
       </header>
-
-      <div className="table-felt">
-        <div className="table-felt__base" aria-hidden="true" />
-        <div className="table-felt__quilt" aria-hidden="true" />
-        <div className="table-felt__vignette" aria-hidden="true" />
-        <div className="table-felt__emblem" aria-hidden="true">
-          ♠
-        </div>
-        {[0, 1, 2, 3].map((corner) => (
-          <span key={corner} className={`table-felt__rivet table-felt__rivet--${corner}`} aria-hidden="true" />
-        ))}
-        {seatOrder.map((pid, i) => {
-          const side = SIDE_LABELS[i];
-          const isMe = pid === myPlayerId;
-          const isDealer = pid === gameState.dealerId;
-          const isReady = confirmed.has(pid);
-          const info = room.players.find((p) => p.playerId === pid);
-          return (
-            <div key={pid} className={`seat seat--${side} ${isMe ? 'seat--me' : ''} ${isReady ? 'seat--turn' : ''}`}>
-              <div className="seat__badge-row">
-                {isDealer && <span className="seat__badge">Dealer</span>}
-                {info?.isBot && <span className="seat__badge seat__badge--bot">🤖 Bot</span>}
-                {info && !info.connected && !info.isBot && (
-                  <span className="seat__badge seat__badge--warn">Away</span>
-                )}
-              </div>
-              {info && <AvatarBadge avatar={info.avatar} size={isMe ? 'lg' : 'md'} ring />}
-              <div className="seat__name">
-                {info?.name ?? pid}
-                {isMe && ' (you)'}
-              </div>
-              <div className="seat__status">
-                {isReady ? <span className="seat__ready">✓ Ready</span> : <span className="text-muted">Arranging…</span>}
-              </div>
-            </div>
-          );
-        })}
+      <div className="arranging-wait__table">
+        <CardTable
+          players={seats}
+          selfId={myPlayerId}
+          dealerId={gameState.dealerId}
+          centreLabel={confirmedCount === room.players.length ? 'Everyone is ready' : 'Waiting for the table'}
+        />
       </div>
-
-      <div className="panel arranging-wait-panel">
-        <h2>Hand confirmed</h2>
-        <p className="text-muted">Waiting for the other players to arrange their hands…</p>
-      </div>
-    </div>
+      <footer className="arranging-wait__footer" role="status">
+        <span className="arranging-wait__check" aria-hidden="true">✓</span>
+        <div><strong>Hand confirmed</strong><p>Your cards are locked. The round starts as soon as everyone is ready.</p></div>
+      </footer>
+    </main>
   );
 }

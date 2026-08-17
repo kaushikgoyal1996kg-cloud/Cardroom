@@ -712,3 +712,185 @@
   .arr__fan-card + .arr__fan-card { margin-left: -0.5rem; }
   .arr__fan { justify-content: center; }
 }
+
+/* Premium release pass — material only; no tray/fan geometry is changed. */
+.arr {
+  background:
+    radial-gradient(ellipse 78% 43% at 50% -4%, rgba(98,70,43,.48), transparent 69%),
+    linear-gradient(180deg, #15120f, var(--room-950) 62%, #070605);
+}
+.arr__bar {
+  border-bottom-color: rgba(168,132,63,.12);
+  background: linear-gradient(180deg, rgba(20,17,14,.72), transparent);
+}
+.arr__felt {
+  background:
+    radial-gradient(ellipse 64% 48% at 50% 18%, rgba(71,127,98,.27), transparent 72%),
+    radial-gradient(ellipse 90% 82% at 50% 45%, #245542, var(--felt-700) 55%, var(--felt-900));
+  border-color: rgba(168,132,63,.4);
+  box-shadow:
+    inset 0 0 0 1px rgba(220,192,134,.52),
+    inset 0 0 0 3px rgba(48,33,20,.38),
+    inset 0 0 38px rgba(0,0,0,.5),
+    0 14px 38px rgba(0,0,0,.22);
+}
+.arr__actions {
+  border-top-color: rgba(168,132,63,.14);
+  background: linear-gradient(180deg, rgba(39,27,19,.18), rgba(10,8,7,.96));
+}
+
+/* ==========================================================================
+   Premium release 1.1 — bring the strongest Kitti arrangement ideas back to
+   Hazari without touching Hazari's 3/3/3/4 rules or validation.
+   ========================================================================== */
+.arr__bar {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'heading remaining'
+    'hint    hint';
+  align-items: center;
+  row-gap: 2px;
+}
+
+.arr__heading {
+  grid-area: heading;
+  min-width: 0;
+}
+
+.arr__eyebrow {
+  margin: 0 0 2px;
+  color: var(--brass-500);
+  font-size: .58rem;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+}
+
+.arr__title { grid-area: auto; }
+
+.arr__remaining {
+  align-self: center;
+  padding: .32rem .58rem;
+  border: 1px solid rgba(200,164,92,.24);
+  border-radius: var(--radius-pill);
+  background: rgba(7,8,7,.34);
+  box-shadow: inset 0 1px rgba(255,255,255,.025);
+}
+
+.arr__remaining.is-ready {
+  color: var(--room-950);
+  border-color: rgba(220,192,134,.72);
+  background: linear-gradient(180deg, #d7b66d, var(--brass-500));
+  font-weight: 700;
+}
+
+.arr__hint { max-width: 34rem; }
+
+.arr__felt::before {
+  content: 'HAZARI';
+  position: absolute;
+  left: 50%;
+  bottom: 5%;
+  translate: -50% 0;
+  color: rgba(240,232,211,.026);
+  font: 500 clamp(2.4rem, 13vw, 5.5rem)/1 var(--font-display);
+  letter-spacing: .18em;
+  text-indent: .18em;
+  pointer-events: none;
+}
+
+.tray {
+  border: 1px solid rgba(220,192,134,.075);
+  background: linear-gradient(180deg, rgba(4,13,10,.35), rgba(0,0,0,.22));
+  box-shadow:
+    inset 0 2px 6px rgba(0,0,0,.38),
+    inset 0 0 0 1px rgba(255,255,255,.012);
+}
+
+.tray::before {
+  content: '';
+  position: absolute;
+  left: .48rem;
+  top: .5rem;
+  bottom: .5rem;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, transparent, rgba(200,164,92,.5), transparent);
+  opacity: .58;
+  pointer-events: none;
+}
+
+.tray__plate { padding-left: .36rem; }
+.tray__rank-hint { white-space: nowrap; }
+
+/* Kitti exposed a useful mobile ergonomics improvement: the visible card can
+   stay compact while its tap target reaches the project's 44px minimum. */
+.tray__card {
+  min-width: var(--touch-min);
+  min-height: 3.37rem;
+  display: grid;
+  place-items: center;
+}
+
+.tray__empty {
+  width: var(--touch-min);
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  background: linear-gradient(180deg, rgba(0,0,0,.17), rgba(255,255,255,.01));
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.22);
+}
+
+.tray.can-accept .tray__empty:not(:disabled) {
+  box-shadow: inset 0 0 0 1px rgba(220,192,134,.18), 0 0 14px rgba(200,164,92,.07);
+}
+
+.sortbar {
+  border-color: rgba(168,132,63,.28);
+  background: rgba(8,7,6,.7);
+}
+
+.sortbar__btn {
+  min-height: var(--touch-min);
+  padding-inline: var(--space-2);
+}
+
+.sortbar__btn.is-active {
+  background: linear-gradient(180deg, #d1af68, var(--brass-500));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.28);
+}
+
+.arr__buttons {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.arr__btn-reset,
+.arr__btn-suggest {
+  padding-inline: var(--space-3);
+  color: var(--ink-300);
+  background: rgba(8,7,6,.38);
+}
+
+.arr__btn-confirm {
+  min-width: 8.5rem;
+  box-shadow: 0 7px 20px rgba(0,0,0,.2);
+}
+
+@media (max-width: 22.5rem) {
+  .arr__eyebrow { font-size: .52rem; }
+  .tray__rank-hint {
+    display: block;
+    font-size: .5rem;
+    letter-spacing: .08em;
+  }
+  .tray__plate { min-width: 3.45rem; }
+  .arr__buttons {
+    grid-template-columns: 1fr 1fr;
+  }
+  .arr__btn-confirm { grid-column: 1 / -1; }
+}
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .arr__eyebrow { display: none; }
+  .arr__remaining { padding-block: .2rem; }
+}

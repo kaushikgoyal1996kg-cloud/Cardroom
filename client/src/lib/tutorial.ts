@@ -1,16 +1,26 @@
-const TUTORIAL_SEEN_KEY = 'haazari_tutorial_seen_v1';
+import type { GuideGameId } from '../platform/games/gameGuides';
 
-export function hasSeenTutorial(): boolean {
+const GUIDE_SEEN_PREFIX = 'cardroom_game_guide_seen_v2';
+
+function keyFor(gameId: GuideGameId): string {
+  return `${GUIDE_SEEN_PREFIX}:${gameId}`;
+}
+
+/**
+ * Guides are remembered independently per game. Seeing Hazari must never
+ * suppress Kitti's guide (or vice versa) in a multi-game card room.
+ */
+export function hasSeenTutorial(gameId: GuideGameId): boolean {
   try {
-    return localStorage.getItem(TUTORIAL_SEEN_KEY) === 'true';
+    return localStorage.getItem(keyFor(gameId)) === 'true';
   } catch {
-    return true; // if storage is unavailable, don't force the tutorial every load
+    return true; // if storage is unavailable, don't trap the player in a modal
   }
 }
 
-export function markTutorialSeen(): void {
+export function markTutorialSeen(gameId: GuideGameId): void {
   try {
-    localStorage.setItem(TUTORIAL_SEEN_KEY, 'true');
+    localStorage.setItem(keyFor(gameId), 'true');
   } catch {
     /* ignore storage failures */
   }

@@ -11,7 +11,9 @@ import {
 import {
   createGameSession,
   asHazari,
+  asKitti,
   HazariSession,
+  KittiSession,
   GameNotAvailableError,
 } from '../src/platform/games/sessions.js';
 import { HaazariGame } from '../src/games/hazari/gameEngine.js';
@@ -40,7 +42,7 @@ describe('game registry stays in sync with each engine', () => {
   it('Teen Patti limits match TEEN_PATTI_RULES', () => {
     expect(GAMES.TEEN_PATTI.minPlayers).toBe(TEEN_PATTI_RULES.MIN_PLAYERS);
     expect(GAMES.TEEN_PATTI.maxPlayers).toBe(TEEN_PATTI_RULES.MAX_PLAYERS);
-    expect(GAMES.TEEN_PATTI.cardsPerPlayer).toBe(TEEN_PATTI_RULES.CARDS_PER_PLAYER);
+    expect(GAMES.TEEN_PATTI.cardsPerPlayer).toBe(TEEN_PATTI_RULES.CLASSIC_CARDS_PER_PLAYER);
   });
 
   it('Teen Patti seats up to 9', () => {
@@ -111,9 +113,11 @@ describe('rooms are game-aware', () => {
     expect(tables[0].status).toBe('LOBBY');
   });
 
-  it('refuses to create a room for a game with no controller', () => {
+  it('allows Kitti rooms now that its controller exists, while refusing unavailable games', () => {
     const rooms = new RoomManager();
-    expect(() => rooms.createRoom('Alice', 'KITTI')).toThrow(RoomManagerError);
+    const { room } = rooms.createRoom('Alice', 'KITTI');
+    expect(room.gameId).toBe('KITTI');
+    expect(room.roomCode.startsWith('KIT')).toBe(true);
     expect(() => rooms.createRoom('Alice', 'TEEN_PATTI')).toThrow(RoomManagerError);
   });
 
@@ -174,12 +178,16 @@ describe('game session factory', () => {
     expect(asHazari(session)).toBeInstanceOf(HaazariGame);
   });
 
-  it('a non-Hazari room can never start a HaazariGame', () => {
-    for (const gameId of ['KITTI', 'TEEN_PATTI'] as const) {
-      expect(() => createGameSession(gameId, 'R1', ['a', 'b', 'c'])).toThrow(
-        GameNotAvailableError
-      );
-    }
+  it('builds Kitti without ever constructing Hazari, and still refuses unavailable Teen Patti', () => {
+    const kitti = createGameSession('KITTI', 'KIT1', ['a', 'b', 'c']);
+    expect(kitti).toBeInstanceOf(KittiSession);
+    expect(kitti.gameId).toBe('KITTI');
+    expect(asKitti(kitti)).not.toBeNull();
+    expect(asHazari(kitti)).toBeNull();
+
+    expect(() => createGameSession('TEEN_PATTI', 'TPT1', ['a', 'b', 'c'])).toThrow(
+      GameNotAvailableError
+    );
   });
 
   it('asHazari refuses to narrow a session of another game', () => {
@@ -294,5 +302,42 @@ describe('private card state stays private', () => {
     for (const p of room.players.values()) {
       expect(serialised).not.toContain(p.token);
     }
+  });
+});
+
+// ============================================================================
+// 7. Game-agnostic active-seat release for open-ended game controllers.
+// ============================================================================
+
+describe('active-seat release boundary', () => {
+  it('permanently releases an active seat and transfers host without knowing game rules', () => {
+    const rooms = new RoomManager();
+    const { room, playerId: hostId, token: hostToken } = rooms.createRoom('Host', 'KITTI');
+    const second = rooms.joinRoom(room.roomCode, 'B');
+    rooms.joinRoom(room.roomCode, 'C');
+    for (const player of room.players.values()) player.ready = true;
+    rooms.startGame(room.roomCode, hostId);
+    room.game = createGameSession('KITTI', room.roomCode, [...room.players.keys()]);
+
+    const remaining = rooms.releaseActiveSeat(room.roomCode, hostId)!;
+    expect(remaining.players.has(hostId)).toBe(false);
+    expect(remaining.hostId).toBe(second.playerId);
+    expect(() => rooms.reconnect(hostToken, 'stale-socket')).toThrow(/invalid|expired/i);
+  });
+
+  it('can reopen an open-ended active session as a lobby after its game controller ends it', () => {
+    const rooms = new RoomManager();
+    const { room, playerId: hostId } = rooms.createRoom('Host', 'KITTI');
+    rooms.joinRoom(room.roomCode, 'B');
+    for (const player of room.players.values()) player.ready = true;
+    rooms.startGame(room.roomCode, hostId);
+    room.game = createGameSession('KITTI', room.roomCode, [...room.players.keys()]);
+    room.gameSetup = { opaque: true };
+
+    const reopened = rooms.returnActiveSessionToLobby(room.roomCode);
+    expect(reopened.status).toBe('LOBBY');
+    expect(reopened.game).toBeUndefined();
+    expect(reopened.gameSetup).toBeUndefined();
+    expect([...reopened.players.values()].every((player) => player.ready === player.isBot)).toBe(true);
   });
 });

@@ -1,57 +1,230 @@
 .tutorial-modal {
-  max-width: 340px;
+  max-width: 520px;
+  padding-bottom: 16px;
+}
+
+.rules-panel__eyebrow {
+  margin: 0 0 3px;
+  color: var(--brass-400);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+}
+
+.tutorial-modal__gamebar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 2px 14px;
+  border-bottom: 1px solid rgba(200, 164, 92, 0.16);
+}
+
+.tutorial-modal__game,
+.tutorial-modal__subtitle {
+  margin: 0;
+}
+
+.tutorial-modal__game {
+  color: var(--ink-100);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tutorial-modal__subtitle {
+  margin-top: 3px;
+  color: var(--ink-400);
+  font-size: 0.73rem;
+}
+
+.tutorial-modal__count {
+  flex: 0 0 auto;
+  color: var(--brass-300);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.12em;
 }
 
 .tutorial-modal__slide {
-  text-align: center;
-  padding: 12px 4px 20px;
-  min-height: 160px;
+  min-height: 286px;
+  padding: 18px 4px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  text-align: center;
 }
 
-.tutorial-modal__emoji {
-  font-size: 2.4rem;
+.tutorial-modal__medallion {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
   margin-bottom: 10px;
+  border: 1px solid rgba(220, 192, 134, 0.5);
+  border-radius: 50%;
+  color: var(--brass-300);
+  background:
+    radial-gradient(circle at 50% 35%, rgba(220, 192, 134, 0.12), transparent 64%),
+    rgba(6, 33, 24, 0.64);
+  box-shadow: inset 0 0 0 4px rgba(140, 109, 52, 0.08);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+}
+
+.tutorial-modal__eyebrow {
+  margin: 0 0 5px;
+  color: var(--brass-400);
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
 }
 
 .tutorial-modal__title {
+  max-width: 26rem;
+  margin: 0 0 9px;
+  color: var(--ink-100);
   font-family: var(--font-display);
-  color: var(--gold-300);
-  font-size: 1.1rem;
-  margin: 0 0 8px;
+  font-size: clamp(1.08rem, 4vw, 1.35rem);
+  line-height: 1.22;
 }
 
 .tutorial-modal__body {
-  font-size: 0.88rem;
-  line-height: 1.5;
-  color: var(--ivory-100);
+  max-width: 28rem;
   margin: 0;
+  color: var(--ink-300);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.tutorial-modal__points {
+  width: min(28rem, 100%);
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.tutorial-modal__points li {
+  position: relative;
+  padding: 7px 8px 7px 22px;
+  border-top: 1px solid rgba(200, 164, 92, 0.11);
+  color: var(--ink-200);
+  font-size: 0.79rem;
+  line-height: 1.42;
+}
+
+.tutorial-modal__points li::before {
+  content: '◆';
+  position: absolute;
+  left: 5px;
+  top: 8px;
+  color: var(--brass-500);
+  font-size: 0.5rem;
 }
 
 .tutorial-modal__dots {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 16px;
+  margin: 2px auto 14px;
+  padding-inline: 10px;
 }
 
 .tutorial-modal__dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: rgba(230, 221, 192, 0.25);
-  transition: background var(--dur-fast) var(--ease-out);
+  background: rgba(196, 182, 153, 0.22);
+  transition: transform var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
 }
 
 .tutorial-modal__dot--active {
-  background: var(--gold-300);
+  transform: scale(1.35);
+  background: var(--brass-400);
 }
 
 .tutorial-modal__actions {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid rgba(200, 164, 92, 0.14);
+  padding-top: 12px;
+}
+
+.tutorial-modal__nav {
+  display: flex;
   justify-content: flex-end;
   gap: 8px;
+  margin-left: auto;
+}
+
+.tutorial-modal__skip {
+  color: var(--ink-400);
+  border-color: transparent;
+  background: transparent;
+}
+
+@media (max-width: 380px) {
+  .tutorial-modal__slide {
+    min-height: 260px;
+    padding-top: 14px;
+  }
+
+  .tutorial-modal__points li {
+    font-size: 0.76rem;
+  }
+
+  .tutorial-modal__actions {
+    align-items: stretch;
+  }
+
+  .tutorial-modal__skip {
+    padding-inline: 10px;
+  }
+
+  .tutorial-modal__nav .btn {
+    padding-inline: 15px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .tutorial-modal__slide {
+    min-height: 0;
+    padding-block: 9px;
+  }
+
+  .tutorial-modal__medallion {
+    width: 34px;
+    height: 34px;
+    margin-bottom: 5px;
+  }
+
+  .tutorial-modal__title {
+    margin-bottom: 5px;
+    font-size: 1rem;
+  }
+
+  .tutorial-modal__body {
+    font-size: 0.78rem;
+  }
+
+  .tutorial-modal__points {
+    margin-top: 7px;
+  }
+
+  .tutorial-modal__points li {
+    padding-block: 4px;
+    font-size: 0.72rem;
+  }
+
+  .tutorial-modal__dots {
+    margin-bottom: 7px;
+  }
 }

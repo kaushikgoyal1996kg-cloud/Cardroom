@@ -86,13 +86,15 @@ export const PlayingCard = memo(function PlayingCard({
     .filter(Boolean)
     .join(' ');
 
-  const transform = tilt ? `rotate(${tilt}deg)` : undefined;
+  const cardStyle = tilt
+    ? ({ ...style, '--pcard-tilt': `${tilt}deg` } as React.CSSProperties)
+    : style;
 
   if (faceDown || !card) {
     return (
       <div
         className={classes}
-        style={{ ...style, transform }}
+        style={cardStyle}
         aria-hidden="true"
       >
         <div className="pcard__back-pattern" />
@@ -125,7 +127,7 @@ export const PlayingCard = memo(function PlayingCard({
       <button
         type="button"
         className={`${classes} ${red ? 'is-red' : 'is-black'}`}
-        style={{ ...style, transform }}
+        style={cardStyle}
         onClick={onClick}
         disabled={disabled}
         aria-pressed={selected}
@@ -139,7 +141,7 @@ export const PlayingCard = memo(function PlayingCard({
   return (
     <div
       className={`${classes} ${red ? 'is-red' : 'is-black'}`}
-      style={{ ...style, transform }}
+      style={cardStyle}
       role="img"
       aria-label={label}
     >

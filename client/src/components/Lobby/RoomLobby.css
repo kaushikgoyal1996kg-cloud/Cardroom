@@ -222,6 +222,7 @@
     grid-template-areas:
       'title   title'
       'code    players'
+      'money   money'
       'actions actions'
       'hint    hint';
     align-content: start;
@@ -258,6 +259,10 @@
     grid-area: actions;
   }
 
+  .play-money-board {
+    grid-area: money;
+  }
+
   .room-lobby__hint {
     grid-area: hint;
   }
@@ -279,7 +284,7 @@
   }
 
   .room-lobby__actions .btn {
-    min-height: 38px;
+    min-height: var(--touch-min);
     font-size: var(--text-sm);
   }
 }
@@ -291,5 +296,180 @@
   .room-lobby__players,
   .room-lobby__actions {
     max-width: 30rem;
+  }
+}
+
+.room-lobby__eyebrow {
+  margin: 0;
+  font: 600 .7rem/1.2 'Work Sans', sans-serif;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--brass-300);
+  opacity: .82;
+}
+
+.room-lobby__game-meta {
+  margin: -.25rem 0 .5rem;
+  color: var(--ink-400);
+  font-size: .82rem;
+  letter-spacing: .04em;
+}
+
+.room-lobby__player.is-empty {
+  opacity: .68;
+  border-style: dashed;
+}
+
+.room-lobby__empty-seat {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px dashed color-mix(in srgb, var(--brass-400) 55%, transparent);
+  color: var(--ink-400);
+  font-variant-numeric: tabular-nums;
+}
+
+.room-lobby__you-tag {
+  margin-left: .35rem;
+  color: var(--brass-300);
+  font-size: .68rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+/* ==========================================================================
+   Premium release pass — the waiting room should feel like the antechamber
+   to the same physical table, not a settings page.
+   ========================================================================== */
+.room-lobby {
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse 78% 44% at 50% -5%, rgba(104,74,45,.52), transparent 69%),
+    linear-gradient(180deg, #15120f 0%, var(--room-950) 56%, #070605 100%);
+}
+.room-lobby::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: -31vh;
+  left: 50%;
+  width: min(140vw, 900px);
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, rgba(239,211,156,.12), rgba(200,164,92,.045) 38%, transparent 67%);
+  pointer-events: none;
+}
+.room-lobby__eyebrow {
+  letter-spacing: .3em;
+  color: var(--brass-400);
+}
+.room-lobby__title {
+  font-size: clamp(1.9rem, 8vw, 2.65rem);
+  text-shadow: 0 3px 18px rgba(0,0,0,.42);
+}
+.room-lobby__game-meta {
+  margin-top: -.45rem;
+  color: var(--ink-400);
+}
+.room-lobby__code {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(168,132,63,.38);
+  background:
+    radial-gradient(circle at 88% 5%, rgba(40,84,66,.34), transparent 37%),
+    linear-gradient(145deg, rgba(78,52,36,.92), rgba(32,21,16,.98) 65%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.05),
+    inset 0 -12px 30px rgba(0,0,0,.18),
+    0 13px 34px rgba(0,0,0,.3);
+}
+.room-lobby__code::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border: 1px solid rgba(220,192,134,.1);
+  border-radius: calc(var(--radius-lg) - 4px);
+  pointer-events: none;
+}
+.room-lobby__code-value {
+  position: relative;
+  font-size: clamp(1.75rem, 8vw, 2.35rem);
+  color: var(--brass-300);
+  text-shadow: 0 2px 16px rgba(0,0,0,.45);
+}
+.room-lobby__share-btn {
+  position: relative;
+  max-width: 19rem;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 7px 20px rgba(0,0,0,.24);
+}
+.room-lobby__players {
+  padding: .4rem .7rem;
+  border-color: rgba(168,132,63,.2);
+  background:
+    linear-gradient(180deg, rgba(12,11,9,.62), rgba(25,21,17,.5));
+  box-shadow:
+    inset 0 1px 8px rgba(0,0,0,.32),
+    0 8px 24px rgba(0,0,0,.16);
+}
+.room-lobby__player {
+  padding: .55rem .35rem;
+  border-bottom-color: rgba(168,132,63,.11);
+}
+.room-lobby__player:not(.is-empty) {
+  border-radius: 8px;
+  transition: background var(--dur-fast) var(--ease-smooth);
+}
+.room-lobby__player:not(.is-empty):has(.room-lobby__you-tag) {
+  background: linear-gradient(90deg, rgba(200,164,92,.07), transparent 74%);
+}
+.room-lobby__dot {
+  box-shadow: 0 0 0 3px rgba(255,255,255,.025);
+}
+.room-lobby__dot--ready {
+  box-shadow: 0 0 0 3px rgba(91,158,114,.1), 0 0 8px rgba(91,158,114,.22);
+}
+.room-lobby__empty-seat {
+  background: radial-gradient(circle, rgba(200,164,92,.04), transparent 68%);
+  border-color: rgba(200,164,92,.32);
+}
+.room-lobby__actions {
+  padding: .65rem;
+  border: 1px solid rgba(168,132,63,.12);
+  border-radius: 13px;
+  background: rgba(8,7,6,.34);
+}
+.room-lobby__actions .btn-primary {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 7px 20px rgba(0,0,0,.24);
+}
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .room-lobby::before { display: none; }
+  .room-lobby__title { font-size: 1.35rem; }
+  .room-lobby__code::after { inset: 3px; }
+  .room-lobby__actions { padding: .3rem; }
+}
+
+/* Host-only lobby control for freeing a computer seat. Kept quiet so it does
+   not compete with Ready/Start, but remains a real 44px phone target. */
+.room-lobby__remove-bot {
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  padding: 0 var(--space-2);
+  border: 1px solid rgba(200, 164, 92, .22);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, .12);
+  color: var(--ink-400);
+  font: 650 var(--text-xs)/1 var(--font-body);
+}
+.room-lobby__remove-bot:active {
+  border-color: var(--brass-500);
+  color: var(--ink-100);
+}
+@media (hover: hover) {
+  .room-lobby__remove-bot:hover {
+    border-color: var(--brass-500);
+    color: var(--ink-100);
   }
 }

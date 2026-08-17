@@ -5,6 +5,28 @@ export type PlayerId = string;
 
 import type { GameSession } from '../games/session.js';
 
+export interface PlayMoneyProposal {
+  amount: number;
+  proposedBy: PlayerId;
+  /** Host acceptance is implicit in proposing; bots are auto-accepted. */
+  acceptedBy: Set<PlayerId>;
+}
+
+export interface ActivePlayMoneyMatch {
+  amount: number;
+  pot: number;
+  participantIds: PlayerId[];
+  settled: boolean;
+  winnerId?: PlayerId;
+}
+
+export interface RoomPlayMoneyState {
+  proposal?: PlayMoneyProposal;
+  activeMatch?: ActivePlayMoneyMatch;
+  /** Cumulative virtual P/L for this room session only. No cash value. */
+  tableProfitLoss: Record<PlayerId, number>;
+}
+
 export interface PlayerSlot {
   playerId: PlayerId;
   /** Secret token the client stores (e.g. in localStorage) and presents to
@@ -35,11 +57,16 @@ export interface RoomState {
   /** The running game, once started. Typed as the shared session boundary,
    *  never as any one game's engine. */
   game?: GameSession;
+  /** Opaque, game-owned lobby setup. The room layer stores but never interprets it. */
+  gameSetup?: unknown;
   createdAt: number;
   /** PlayerIds currently in the live voice call for this room (WebRTC
    *  mesh) - the server never touches audio itself, this is purely so it
    *  can tell everyone who's in the call and relay signaling messages. */
   voiceCallParticipants: Set<PlayerId>;
+  /** Optional Hazari/Kitti virtual board. This is room-session play money only;
+   *  there are no deposits, withdrawals or real-money conversion. */
+  playMoney: RoomPlayMoneyState;
 }
 
 /** Safe-to-broadcast player info - never includes the token. */
@@ -53,6 +80,22 @@ export interface PublicPlayerInfo {
   isBot: boolean;
 }
 
+export interface PublicPlayMoneyState {
+  proposal: {
+    amount: number;
+    proposedBy: PlayerId;
+    acceptedBy: PlayerId[];
+  } | null;
+  activeMatch: {
+    amount: number;
+    pot: number;
+    participantIds: PlayerId[];
+    settled: boolean;
+    winnerId?: PlayerId;
+  } | null;
+  tableProfitLoss: Record<PlayerId, number>;
+}
+
 export interface PublicRoomInfo {
   roomCode: string;
   gameId: GameId;
@@ -64,6 +107,8 @@ export interface PublicRoomInfo {
    *  string: the values differ per game, and no client should assume
    *  Hazari's state machine. */
   gameState?: string;
+  /** Optional room-session virtual board/pot for Hazari and Kitti. */
+  playMoney: PublicPlayMoneyState;
 }
 
 /** Summary shown in the "Browse Tables" list. */

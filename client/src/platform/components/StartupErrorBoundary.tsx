@@ -45,25 +45,28 @@ export class StartupErrorBoundary extends Component<Props, State> {
     // A configuration problem has a specific, actionable explanation. Anything
     // else gets a generic message rather than a raw stack trace.
     const isConfigProblem = !SERVER_CONFIG.ok;
+    const isLocalhostProblem =
+      isConfigProblem && /localhost/i.test(SERVER_CONFIG.error ?? '');
 
     return (
       <div className="startup-error" role="alert">
         <div className="startup-error__sheet">
           <p className="startup-error__eyebrow">The Card Room</p>
           <h1 className="startup-error__title">
-            {isConfigProblem ? "This table isn't set up yet" : 'Something went wrong'}
+            {isConfigProblem ? "The Card Room can't connect yet" : 'The Card Room needs a moment'}
           </h1>
 
           <p className="startup-error__message">
             {isConfigProblem
-              ? SERVER_CONFIG.error
-              : 'The game could not start. Reloading the page will usually fix it.'}
+              ? isLocalhostProblem
+                ? 'This version points at a local game server and cannot reach the Card Room online. Ask the host to update the build.'
+                : 'This version is missing its game-server connection. Use the latest Card Room build or ask the host to update it.'
+              : 'The app could not finish starting. Try again; if it persists, the Card Room host may need to check the deployment.'}
           </p>
 
           {isConfigProblem && (
             <p className="startup-error__hint">
-              Nothing is wrong with your phone or your connection — the game
-              itself needs configuring by whoever set it up.
+              This is a Card Room setup issue, not a problem with your phone or internet connection.
             </p>
           )}
 

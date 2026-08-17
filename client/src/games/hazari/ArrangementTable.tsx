@@ -34,7 +34,7 @@ type SortMode = 'dealt' | 'rank' | 'suit';
 
 const SET_SIZES = [3, 3, 3, 4];
 const SET_NAMES = ['Set 1', 'Set 2', 'Set 3', 'Set 4'];
-const SET_RANK_HINT = ['Strongest', '', '', 'Weakest'];
+const SET_RANK_HINT = ['Strongest', 'Second', 'Third', 'Weakest'];
 const SET_LABELS_SHORT = ['S1', 'S2', 'S3', 'S4'];
 const SUIT_ORDER: Record<Card['suit'], number> = { SPADES: 0, HEARTS: 1, DIAMONDS: 2, CLUBS: 3 };
 
@@ -302,14 +302,17 @@ export function ArrangementTable({
   return (
     <div className="arr">
       <header className="arr__bar">
-        <h1 className="arr__title">Arrange your hand</h1>
+        <div className="arr__heading">
+          <p className="arr__eyebrow">Hazari · 13 cards · 3 / 3 / 3 / 4</p>
+          <h1 className="arr__title">Build your four sets</h1>
+        </div>
         <p className="arr__hint">
           {selected
-            ? 'Tap a card to swap, or an empty space to place it'
-            : 'Tap a card to pick it up'}
+            ? 'Selected — tap another card to swap, or an empty place to move it'
+            : 'Tap a card, then choose where it belongs'}
         </p>
-        <span className="arr__remaining" aria-live="polite">
-          {pool.length > 0 ? `${pool.length} left` : 'All placed'}
+        <span className={`arr__remaining${validation.valid ? ' is-ready' : ''}`} aria-live="polite">
+          {pool.length > 0 ? `${pool.length} card${pool.length === 1 ? '' : 's'} left` : validation.valid ? 'Ready' : 'All placed'}
         </span>
       </header>
 
@@ -337,7 +340,7 @@ export function ArrangementTable({
                 ]
                   .filter(Boolean)
                   .join(' ')}
-                aria-label={`${SET_NAMES[idx]}, ${setCards.length} of ${size} cards`}
+                aria-label={`${SET_NAMES[idx]}, ${SET_RANK_HINT[idx]}, ${setCards.length} of ${size} cards`}
               >
                 <div className="tray__plate">
                   <span className="tray__name">{SET_NAMES[idx]}</span>
@@ -430,7 +433,12 @@ export function ArrangementTable({
                   onClick={() => handleCardTap('pool', c)}
                   aria-pressed={selected?.cardId === c.id}
                 >
-                  <PlayingCard card={c} size="sm" selected={selected?.cardId === c.id} />
+                  <PlayingCard
+                    card={c}
+                    size="sm"
+                    selected={selected?.cardId === c.id}
+                    tilt={(i - (displayedPool.length - 1) / 2) * 0.16}
+                  />
                 </button>
               ))}
             </div>
@@ -467,7 +475,7 @@ export function ArrangementTable({
           {canUseAssist && requestSuggestions && (
             <button
               type="button"
-              className="btn btn--ghost"
+              className="btn btn--ghost arr__btn-suggest"
               onClick={handleAutoArrange}
               disabled={computingOptions}
             >

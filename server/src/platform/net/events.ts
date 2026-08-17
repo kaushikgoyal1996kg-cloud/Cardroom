@@ -1,4 +1,9 @@
 import type { Card, DismissalReason, PlayerId, RoundResult, SubRoundResult } from '../../games/hazari/types.js';
+import type { Card as PlatformCard } from '../cards/index.js';
+import type { KittiRoundResult } from '../../games/kitti/engine.js';
+import type { PlayerSettlement as TeenPattiPlayerSettlement, RoundOutcome as TeenPattiRoundOutcome, TeenPattiAction } from '../../games/teenpatti/engine.js';
+import type { TeenPattiLobbySetupPublic } from '../../games/teenpatti/lobbySetup.js';
+import type { TeenPattiRoundVariantConfig, TeenPattiTableConfig } from '../../games/teenpatti/rules.js';
 import type { PublicRoomInfo, TableSummary } from '../rooms/types.js';
 import type { GameId } from '../games/registry.js';
 
@@ -14,40 +19,61 @@ export interface ClientToServerEvents {
   'room:start': () => void;
   'room:listTables': (payload: { gameId?: GameId } | undefined, ack: (res: TablesAck) => void) => void;
   'room:addBot': () => void;
+  'room:removeBot': (payload: { playerId: PlayerId }) => void;
   'room:playAgain': () => void;
+  'room:playMoneyPropose': (payload: { amount: number }) => void;
+  'room:playMoneyAccept': () => void;
+  'room:playMoneyDecline': () => void;
+  'room:playMoneyCancel': () => void;
   'room:chat': (payload: { message: string; kind: 'text' | 'emoji' | 'voice'; durationSec?: number }) => void;
+  'room:leave': () => void;
+  'room:leaveTable': () => void;
 
+  // Hazari
   'hazari:confirmArrangement': (payload: { cardIdSets: [string[], string[], string[], string[]] }) => void;
   'hazari:requestSuggestion': (ack: (res: SuggestionAck) => void) => void;
   'hazari:requestSuggestionOptions': (ack: (res: SuggestionOptionsAck) => void) => void;
   'hazari:playSet': () => void;
   'hazari:requestDismissal': (payload: {
     reason: DismissalReason;
-    /** For a NO_SEQUENCE claim made before the player has formally
-     *  confirmed their arrangement (e.g. clicking "Dismiss Hand" directly
-     *  from the arrangement screen) - lets the server evaluate eligibility
-     *  against this draft without a separate prior confirm step, avoiding
-     *  a race where confirming could move the game straight into play
-     *  before the dismiss request arrives. */
     proposedCardIdSets?: [string[], string[], string[], string[]];
   }) => void;
   'hazari:startNextRound': () => void;
-  'room:leaveTable': () => void;
 
-  // -------------------------------------------------------------------
-  // VOICE CALL (WebRTC signaling relay only - the server never touches
-  // actual audio; it just introduces peers to each other and forwards
-  // opaque SDP/ICE payloads between them).
-  // -------------------------------------------------------------------
-  /** Announces intent to join the room's live voice call. */
+  // Kitti
+  'kitti:confirmArrangement': (payload: { cardIdGroups: [string[], string[], string[]] }) => void;
+  'kitti:requestSuggestion': (ack: (res: KittiSuggestionAck) => void) => void;
+  'kitti:playHand': () => void;
+  'kitti:playDecider': () => void;
+  'kitti:startNextRound': () => void;
+
+  // Teen Patti
+  'teenpatti:proposeSetup': (payload: { tableConfig: TeenPattiTableConfig; roundVariant: TeenPattiRoundVariantConfig }, ack: (res: TeenPattiSetupAck) => void) => void;
+  'teenpatti:acceptSetup': (payload: { revision: number }, ack: (res: TeenPattiSetupAck) => void) => void;
+  'teenpatti:action': (payload: { action: TeenPattiAction; expectedSeq?: number }) => void;
+  'teenpatti:topUp': (payload: { amount: number }) => void;
+  'teenpatti:startNextRound': () => void;
+  'teenpatti:leaveTable': (ack: (res: TeenPattiLeaveAck) => void) => void;
+
+  // Voice/WebRTC signaling
+  'voice:getIceServers': (ack: (res: VoiceIceServersAck) => void) => void;
   'voice:join': () => void;
-  /** Leaves the voice call (distinct from leaving the table/game). */
   'voice:leave': () => void;
-  /** Relays an opaque WebRTC signaling payload (SDP offer/answer or ICE
-   *  candidate) to one specific peer, identified by their playerId. */
   'voice:signal': (payload: { toPlayerId: PlayerId; data: unknown }) => void;
-  /** Announces this player's own mute state, for others' UI indicators. */
   'voice:mute': (payload: { muted: boolean }) => void;
+}
+
+export interface VoiceIceServerConfig {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+}
+
+export interface VoiceIceServersAck {
+  ok: boolean;
+  iceServers: VoiceIceServerConfig[];
+  relayAvailable: boolean;
+  error?: string;
 }
 
 export interface RoomAck {
@@ -77,10 +103,29 @@ export interface SuggestionOptionsAck {
   options?: SuggestionOptionAck[];
 }
 
+export interface KittiSuggestionAck {
+  ok: boolean;
+  error?: string;
+  cardIdGroups?: [string[], string[], string[]];
+}
+
 export interface TablesAck {
   ok: boolean;
   error?: string;
   tables?: TableSummary[];
+}
+
+export interface TeenPattiSetupAck {
+  ok: boolean;
+  error?: string;
+  setup?: TeenPattiLobbySetupPublic;
+}
+
+export interface TeenPattiLeaveAck {
+  ok: boolean;
+  error?: string;
+  settlement?: TeenPattiPlayerSettlement;
+  tableEnded?: boolean;
 }
 
 // ============================================================================
@@ -90,33 +135,38 @@ export interface ServerToClientEvents {
   'room:update': (room: PublicRoomInfo) => void;
   'room:error': (payload: { message: string }) => void;
   'room:chatMessage': (payload: ChatMessage) => void;
+  'game:error': (payload: { message: string }) => void;
 
-  /** Sent ONLY to the individual player's own socket - never broadcast. */
+  // Hazari private/public state
   'hazari:yourHand': (payload: { hand: Card[] }) => void;
   'hazari:yourArrangement': (payload: { sets: [Card[], Card[], Card[], Card[]] }) => void;
   'hazari:state': (publicState: HaazariPublicStatePayload) => void;
-  'game:error': (payload: { message: string }) => void;
   'hazari:roundComplete': (payload: { result: RoundResult }) => void;
   'hazari:over': (payload: { winnerId: PlayerId; finalScores: Record<PlayerId, number> }) => void;
 
-  // -------------------------------------------------------------------
-  // VOICE CALL
-  // -------------------------------------------------------------------
-  /** Sent ONLY to a newly-joining client: who's already in the call, so
-   *  the UI can show it immediately (actual connections are initiated by
-   *  the existing members via 'voice:peerJoined' below, not by the new
-   *  joiner, to avoid duplicate/glare offers between the same pair). */
+  // Kitti private/public state
+  'kitti:yourHand': (payload: { hand: PlatformCard[] }) => void;
+  'kitti:yourArrangement': (payload: { groups: [PlatformCard[], PlatformCard[], PlatformCard[]] }) => void;
+  'kitti:yourDeciderHand': (payload: { hand: PlatformCard[] }) => void;
+  'kitti:state': (publicState: KittiPublicStatePayload) => void;
+  'kitti:roundComplete': (payload: { result: KittiRoundResult }) => void;
+  'kitti:over': (payload: { winnerId: PlayerId; roundsWon: Record<PlayerId, number> }) => void;
+
+  // Teen Patti private/public state
+  'teenpatti:setup': (payload: { setup: TeenPattiLobbySetupPublic | null }) => void;
+  'teenpatti:private': (payload: TeenPattiPrivateStatePayload) => void;
+  'teenpatti:state': (publicState: TeenPattiPublicStatePayload) => void;
+  'teenpatti:roundComplete': (payload: { result: TeenPattiRoundOutcome }) => void;
+  'teenpatti:tableEnded': (payload: {
+    reason: 'NOT_ENOUGH_PLAYERS';
+    settlements: TeenPattiPlayerSettlement[];
+  }) => void;
+
+  // Voice
   'voice:participants': (payload: { playerIds: PlayerId[] }) => void;
-  /** Broadcast to existing call members when someone new joins - each
-   *  existing member should create a peer connection and send an SDP
-   *  offer to the new peer via 'voice:signal'. */
   'voice:peerJoined': (payload: { playerId: PlayerId }) => void;
-  /** Broadcast when someone leaves the call (voluntarily or via
-   *  disconnect) - other members should tear down that peer connection. */
   'voice:peerLeft': (payload: { playerId: PlayerId }) => void;
-  /** An opaque SDP/ICE payload relayed from another peer. */
   'voice:signal': (payload: { fromPlayerId: PlayerId; data: unknown }) => void;
-  /** Another player's mute state changed. */
   'voice:muteChanged': (payload: { playerId: PlayerId; muted: boolean }) => void;
 }
 
@@ -140,12 +190,86 @@ export interface HaazariPublicStatePayload {
   currentLeader: PlayerId | null;
   currentPlayOrder: PlayerId[] | null;
   playersPlayedThisSubRound: PlayerId[];
-  /** Who has confirmed their hand arrangement so far this round - never
-   *  includes the actual cards, only the fact of confirmation. */
   playersConfirmedArrangement: PlayerId[];
-  /** Actual cards played so far in the current sub-round - once thrown,
-   *  a set is committed and visible to everyone immediately. */
   playedSetsThisSubRound: { playerId: PlayerId; cards: Card[] }[];
   subRoundResultsThisRound: SubRoundResult[];
+  initialDealerDraws: {
+    contenders: PlayerId[];
+    draws: { playerId: PlayerId; card: Card }[];
+  }[];
   winnerId: PlayerId | null;
+}
+
+export interface KittiPublicStatePayload {
+  roomCode: string;
+  game: 'KITTI';
+  state: string;
+  dealerId: PlayerId;
+  roundDealerId: PlayerId;
+  roundNumber: number;
+  scheduledRoundsComplete: number;
+  suddenDeath: boolean;
+  activePlayerIds: PlayerId[];
+  spectatorIds: PlayerId[];
+  playersConfirmed: PlayerId[];
+  currentHandIndex: 0 | 1 | 2;
+  currentLeader: PlayerId | null;
+  currentPlayOrder: PlayerId[] | null;
+  playersPlayedThisHand: PlayerId[];
+  playedThisHand: { playerId: PlayerId; cards: PlatformCard[]; throwOrder: number }[];
+  handResultsThisRound: {
+    handIndex: 0 | 1 | 2;
+    played: { playerId: PlayerId; cards: PlatformCard[]; throwOrder: number }[];
+    winnerId: PlayerId;
+    wasTie: boolean;
+    tiedPlayerIds: PlayerId[];
+  }[];
+  handWinsThisRound: Record<PlayerId, number>;
+  deciderPlayerIds: PlayerId[];
+  roundWinnerId: PlayerId | null;
+  roundsWon: Record<PlayerId, number>;
+  matchWinnerId: PlayerId | null;
+  initialDealerDraws: {
+    contenders: PlayerId[];
+    draws: { playerId: PlayerId; card: PlatformCard }[];
+  }[];
+}
+
+
+export interface TeenPattiPrivateStatePayload {
+  cards: PlatformCard[];
+  cardCount: number;
+  cardsViewed: boolean;
+  seen: boolean;
+}
+
+export interface TeenPattiPublicStatePayload {
+  roomCode: string;
+  game: 'TEEN_PATTI';
+  state: string;
+  dealerId: PlayerId;
+  roundNumber: number;
+  pot: number;
+  currentBlind: number;
+  seenAmount: number;
+  currentTurn: PlayerId | null;
+  sequence: number;
+  tableConfig: TeenPattiTableConfig;
+  variant: TeenPattiRoundVariantConfig;
+  variantHelp: string;
+  initialDealerDraws: { contenders: PlayerId[]; draws: { playerId: PlayerId; card: PlatformCard }[] }[];
+  lastSideshow: { initiatorId: PlayerId; opponentId: PlayerId; packedPlayerId: PlayerId; tied: boolean } | null;
+  openShowRequestFrom: PlayerId | null;
+  players: {
+    playerId: PlayerId;
+    chips: number;
+    seen: boolean;
+    cardsViewed: boolean;
+    packed: boolean;
+    committed: number;
+    blindTurns: number;
+    topUps: number;
+    profitLoss: number;
+  }[];
+  lastOutcome: TeenPattiRoundOutcome | null;
 }

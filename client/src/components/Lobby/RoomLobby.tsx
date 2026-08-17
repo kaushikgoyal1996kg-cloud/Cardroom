@@ -1,110 +1,162 @@
 import { useState } from 'react';
 import { useGame } from '../../lib/GameStore';
+import { catalogEntry } from '../../platform/games/catalog';
+import { buildInviteUrl } from '../../platform/lib/inviteUrl';
 import { AvatarBadge } from './AvatarPicker';
 import { LoadingSpinner } from '../LoadingSpinner';
+import { TeenPattiLobbySetup } from '../../games/teenpatti/TeenPattiLobbySetup';
+import { PlayMoneyBoard } from '../../platform/components/PlayMoneyBoard';
 import './RoomLobby.css';
 
 export function RoomLobby() {
-  const { room, myPlayerId, setReady, startGame, addBot, leaveSession } = useGame();
+  const { room, myPlayerId, setReady, startGame, addBot, removeBot, leaveSession, teenPattiSetup } = useGame();
   const [shareCopied, setShareCopied] = useState(false);
-  // Defensive fallback, not the primary guard - App.tsx's routing already
-  // only selects this screen once `room` is set. Kept here too so this
-  // component can never itself return a blank page if some future change
-  // (or a not-yet-found edge case) ever asks it to render without one -
-  // see the confirmed "blank black screen after Leave" bug and
-  // ARCHITECTURE.md's note on this invariant.
   if (!room) {
     return (
       <div className="waiting-screen">
-        <LoadingSpinner message="Returning to Cardroom…" />
+        <LoadingSpinner message="Returning to the Card Room…" />
       </div>
     );
   }
 
+  const game = catalogEntry(room.gameId);
   const me = room.players.find((p) => p.playerId === myPlayerId);
   const isHost = me?.isHost ?? false;
-  const openSeats = 4 - room.players.length;
-  const allReady = room.players.length === 4 && room.players.every((p) => p.ready);
+  const openSeats = room.maxPlayers - room.players.length;
+  const enoughPlayers = game.requiredPlayers !== undefined
+    ? room.players.length === game.requiredPlayers
+    : room.players.length >= game.minPlayers && room.players.length <= game.maxPlayers;
+  const allHumansOnline = room.players.every((p) => p.isBot || p.connected);
+  const allReady = enoughPlayers && allHumansOnline && room.players.every((p) => p.ready);
+  const teenPattiSetupReady = room.gameId !== 'TEEN_PATTI' || (!!teenPattiSetup && room.players.every((p) => teenPattiSetup.acceptedBy.includes(p.playerId)));
+  const playMoneyReady = !room.playMoney.proposal || room.players.every(
+    (p) => p.isBot || room.playMoney.proposal!.acceptedBy.includes(p.playerId)
+  );
+  const canStart = allReady && teenPattiSetupReady && playMoneyReady;
+  // Release 1 supports optional computer seats in Hazari and Kitti. Bots are
+  // auto-ready and auto-accept the optional virtual board; Teen Patti remains
+  // Coming Soon and deliberately has no bot controller.
+  const canAddBot = (room.gameId === 'HAZARI' || room.gameId === 'KITTI') && openSeats > 0;
+  const needed = Math.max(0, game.minPlayers - room.players.length);
+
+  const roomCode = room.roomCode;
+  const gameName = game.name;
 
   async function handleShare() {
-    const url = `${window.location.origin}${window.location.pathname}?join=${room!.roomCode}`;
-    const text = `Play Haazari with me! Join room ${room!.roomCode}`;
+    const url = buildInviteUrl(roomCode);
+    const text = `Play ${gameName} with me in The Card Room — room ${roomCode}`;
     if (navigator.share) {
       try {
-        await navigator.share({ title: 'Haazari', text, url });
+        await navigator.share({
+          title: `The Card Room — ${gameName}`,
+          text,
+          ...(url ? { url } : {}),
+        });
       } catch {
-        // User cancelled the share sheet - not an error, do nothing.
+        // User cancelled the share sheet.
       }
       return;
     }
     try {
-      await navigator.clipboard.writeText(`${text} — ${url}`);
+      await navigator.clipboard.writeText(url ? `${text} — ${url}` : text);
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2500);
     } catch {
-      // Clipboard unavailable - the room code is already visible on screen either way.
+      // The room code remains visible even when clipboard access is denied.
     }
   }
 
   return (
     <div className="room-lobby">
-      <h1 className="wordmark room-lobby__title">Haazari Room</h1>
+      <p className="room-lobby__eyebrow">The Card Room</p>
+      <h1 className="wordmark room-lobby__title">{game.name}</h1>
+      <p className="room-lobby__game-meta">{game.players} · {game.cards}</p>
 
       <div className="room-lobby__code">
-        <span className="text-muted">Room Code</span>
+        <span className="text-muted">Private table</span>
         <div className="room-lobby__code-value">{room.roomCode}</div>
-        <span className="text-muted">Share this code with 3 friends</span>
+        <span className="text-muted">
+          {openSeats > 0 ? `${openSeats} seat${openSeats === 1 ? '' : 's'} open` : 'Table full'}
+        </span>
         <button className="btn btn-primary room-lobby__share-btn" onClick={handleShare}>
-          📤 Share Invite
+          Share invite
         </button>
-        {shareCopied && <span className="room-lobby__share-copied text-muted">Link copied!</span>}
+        {shareCopied && <span className="room-lobby__share-copied text-muted">Invite copied</span>}
       </div>
 
-      <div className="room-lobby__players">
-        {[0, 1, 2, 3].map((i) => {
+      <div className="room-lobby__players" aria-label={`${game.name} seats`}>
+        {Array.from({ length: room.maxPlayers }, (_, i) => {
           const p = room.players[i];
           return (
-            <div key={i} className="room-lobby__player">
+            <div key={i} className={`room-lobby__player${p ? '' : ' is-empty'}`}>
               {p ? (
                 <>
                   <span className={p.ready ? 'room-lobby__dot room-lobby__dot--ready' : 'room-lobby__dot'} />
                   <AvatarBadge avatar={p.avatar} size="md" />
                   <span className="room-lobby__name">
                     {p.name} {p.isHost && <span className="room-lobby__host-tag">Host</span>}
-                    {p.isBot && <span className="room-lobby__host-tag room-lobby__host-tag--bot">🤖 Bot</span>}
-                    {p.playerId === myPlayerId && ' (you)'}
+                    {p.isBot && <span className="room-lobby__host-tag room-lobby__host-tag--bot">Bot</span>}
+                    {p.playerId === myPlayerId && <span className="room-lobby__you-tag">You</span>}
                   </span>
                   <span className="text-muted">
-                    {p.isBot ? 'Ready' : !p.connected ? 'Disconnected' : p.ready ? 'Ready' : 'Waiting'}
+                    {p.isBot ? 'Ready' : !p.connected ? 'Disconnected' : p.ready ? 'Ready' : 'Online'}
                   </span>
+                  {isHost && p.isBot && (
+                    <button
+                      type="button"
+                      className="room-lobby__remove-bot"
+                      onClick={() => removeBot(p.playerId)}
+                      aria-label={`Remove computer player ${p.name}`}
+                    >
+                      Remove
+                    </button>
+                  )}
                 </>
               ) : (
-                <span className="text-muted">Waiting for player...</span>
+                <>
+                  <span className="room-lobby__empty-seat" aria-hidden="true">{i + 1}</span>
+                  <span className="text-muted">Open seat</span>
+                </>
               )}
             </div>
           );
         })}
       </div>
 
+      {room.gameId === 'TEEN_PATTI' && <TeenPattiLobbySetup />}
+      {(room.gameId === 'HAZARI' || room.gameId === 'KITTI') && <PlayMoneyBoard />}
+
       <div className="room-lobby__actions">
         {me && (
           <button className="btn" onClick={() => setReady(!me.ready)}>
-            {me.ready ? 'Not Ready' : "I'm Ready"}
+            {me.ready ? 'Not ready' : "I'm ready"}
           </button>
         )}
-        {isHost && openSeats > 0 && (
+        {isHost && canAddBot && (
           <button className="btn btn-ghost" onClick={addBot}>
-            🤖 Add Computer Player {openSeats > 0 && `(${openSeats} open seat${openSeats > 1 ? 's' : ''})`}
+            Add computer player ({openSeats} open)
           </button>
         )}
         {isHost && (
-          <button className="btn btn-primary" disabled={!allReady} onClick={startGame}>
-            Start Game
+          <button className="btn btn-primary" disabled={!canStart} onClick={startGame}>
+            Start {game.name}
           </button>
         )}
-        <button className="btn btn-ghost" onClick={leaveSession}>Leave</button>
+        <button className="btn btn-ghost" onClick={leaveSession}>Leave room</button>
       </div>
-      {isHost && !allReady && <p className="text-muted room-lobby__hint">Waiting for all 4 players to be ready…</p>}
+      {isHost && !canStart && (
+        <p className="text-muted room-lobby__hint">
+          {needed > 0
+            ? `Waiting for ${needed} more player${needed === 1 ? '' : 's'}…`
+            : !allHumansOnline
+              ? 'Waiting for every human player to be back online before Start.'
+              : !teenPattiSetupReady
+                ? 'Every player must accept the current Teen Patti table setup before Start.'
+              : !playMoneyReady
+                ? 'Every human player must accept the optional play-money board, or the host can withdraw it.'
+                : 'Everyone at the table must be ready before the host can start.'}
+        </p>
+      )}
     </div>
   );
 }

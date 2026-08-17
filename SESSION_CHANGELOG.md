@@ -25,6 +25,314 @@ why, without any conversation context.
 
 ---
 
+## 2026-08-17 — Release 1.5 source-integrity gate
+
+- **Source parse:** 173 TypeScript/TSX/MTS source and test files parse with zero syntax diagnostics.
+- **CSS:** 41 client source stylesheets pass structural brace validation.
+- **Imports:** 566 actual relative import/export/require edges resolve; comments and example strings are excluded from the scan.
+- **Kitti solver:** dependency-light compiled harness found valid strict strongest→weakest arrangements for 200 random nine-card deals with zero failures.
+- **Kitti max bot table:** dependency-light compiled 1-human + 4-bot round reached `ROUND_COMPLETE` with one authoritative round history entry and without the bot controller touching the human arrangement.
+- **Rule-engine safety:** Release 1.5 `server/src/games/hazari/gameEngine.ts`, Hazari `rules.ts`, Kitti `engine.ts` and Kitti `rules.ts` are byte-for-byte identical to Release 1.4. Bot/suggestion/play-money/TURN changes are outside those authoritative rule files.
+- **Not claimed:** full Vitest/package typecheck/Vite/Capacitor/Gradle verification still cannot run in this environment because the complete npm dependency tree is unavailable. The historical server 310 / client 377 run remains the last fully-run accepted baseline.
+
+---
+
+## 2026-08-17 — Release 1.5 play money, secure TURN, Kitti computers and fairness
+
+- **Model:** GPT-5.6 Sol.
+- **Baseline before:** last fully-run accepted suite remains server 310 / client 377;
+  current environment still cannot restore the complete npm dependency tree.
+- **Play money:** added the optional consensual room-session virtual board/pot to
+  both Hazari and Kitti. Host proposes; every human must accept; computer seats
+  auto-accept; contributions lock only after Start succeeds; authoritative match
+  winner receives the pot exactly once; cumulative virtual P/L survives Play Again.
+  It has no cash value and no deposit/withdrawal/conversion path.
+- **Kitti computer seats:** Kitti now supports optional bots within its 2–5 player
+  cap. Host can add and remove computer seats before Start. Bots auto-ready, use
+  only their own cards, build a valid strongest→weakest 3–3–3 arrangement, play
+  only on their authoritative turn, participate in the three-winner decider, and
+  never join voice. A one-human + four-bot compiled round completed successfully.
+- **Kitti bot-only Suggest:** added a server-authoritative arrangement suggestion
+  path. It is available only when every opponent is a bot; any real human opponent
+  disables the UI and the real Socket.IO endpoint independently refuses a forged
+  request. Suggested card IDs are limited to the requester's own nine-card hand.
+- **Bot lifecycle:** voluntary host Leave Table may still convert that engine seat
+  to a bot, but room-level host authority transfers to the first remaining human so
+  Next Round / Play Again cannot deadlock behind a bot host. Temporary disconnects
+  still do NOT transfer host rights. Disconnected humans are not allowed to remain
+  Ready for lobby Start.
+- **TURN:** added backend-issued short-lived Metered TURN configuration using only
+  `METERED_DOMAIN` and `METERED_SECRET_KEY` on the server. No long-lived TURN
+  credential is compiled into browser/APK code. Direct/STUN remains the normal
+  first path and STUN-only fallback is retained if Metered is unavailable. One
+  temporary ~4-hour credential is cached per table until shortly before expiry to
+  minimise credential churn on the free Metered plan.
+- **Voice/multi-game isolation:** added/expanded real Socket.IO coverage with a live
+  Hazari room and live Kitti room concurrently: room/game state, optional virtual
+  boards and voice signalling stay table-scoped; Hazari voice remains usable after
+  Play Again.
+- **Avatars:** expanded the allow-list/picker with a premium Card Room set (panther,
+  eagle, wolf, dragon, owl, stallion, bull, fox, diamond, shield, spade and others)
+  and medallion-style seat/picker presentation while retaining the existing choices.
+- **Smoke-test maintenance:** updated stale command-line socket smoke scripts from
+  pre-migration event/list-table protocols so they remain useful after deployment.
+- **Manual/dependency-light verification:** Kitti suggestion solver found a valid
+  strict arrangement for 200 random nine-card deals; a compiled max-table scenario
+  with one human + four bots completed a round. Full Vitest/Vite/Android verification
+  is still required before this becomes an accepted baseline.
+- **Production:** unchanged. The old live `haazari` Render service/repository must
+  remain untouched; Release 1.5 belongs in the separate existing `Cardroom` repo and
+  its staging/new backend after verification.
+
+---
+
+## 2026-08-17 — Release 1.4 full premium product audit
+
+- **Scope:** audited the routed Release 1 experience from cold launch through
+  profile, game selection, invitation, lobby, arrangement, dealing, live table,
+  results, Settings/Rules/Stats/History, voice/chat, reconnect, deliberate exit,
+  offline/update/install states and the native Android wrapper. **No Hazari or
+  Kitti game rule was changed.**
+- **Multi-game identity:** removed Hazari as the default/pre-selected game. The
+  selector now opens neutral, gives Hazari and Kitti equal playable weight, and
+  presents Teen Patti/Poker as contextual Coming Soon entries without dead fake
+  Play/Create controls.
+- **Navigation hierarchy:** a true cold launch still starts at Welcome. Deliberate
+  Leave/Return from a room sets a one-shot `sessionStorage` marker and returns
+  directly to **The Card Room** selector; the active-seat home peek has its own
+  premium return pass rather than reusing the old landing screen.
+- **Shared invitations:** replaced the legacy Hazari-looking invite entry with a
+  Card Room invitation screen that identifies the game and reuses saved player
+  identity. Native invite generation now uses `VITE_PUBLIC_APP_URL` and refuses
+  localhost/loopback URLs, preventing Capacitor's internal `https://localhost`
+  origin from being shared to another player.
+- **Identity/profile:** upgraded PlayerProfile to the same entrance language and
+  brought Back to the 44px touch minimum.
+- **Support/transient UI:** migrated loading/reconnect, Settings, Rules, Stats,
+  History, Hazari confirmed-hand waiting and Kitti waiting/spectator states into
+  the same opaque wood/brass/felt language. Removed browser alerts and legacy
+  green/glass utility styling from routed Release 1 flows.
+- **Stats/history correctness:** local stats are now game-scoped; legacy Hazari
+  stats migrate into the Hazari bucket. Kitti records its own match wins/scores
+  and has Kitti-specific round history instead of opening Hazari data.
+- **Hazari result presentation:** RoundSummary no longer arbitrarily names the
+  first player as sole leader when multiple players share the top round score;
+  tied top scores are presented as shared. Scoring itself is unchanged.
+- **Celebration:** Hazari/Kitti winner presentation now shares restrained
+  brass/ivory/wood/felt confetti rather than the old ruby/sapphire palette.
+- **Voice/chat/chrome:** expanded the shared vector icon language; retained emoji
+  only where it is actual reaction content. Voice/reconnect behavior from the
+  previous release line is preserved.
+- **PWA/native shell:** standardized visible branding to **The Card Room**;
+  removed `maximum-scale=1` from the viewport; bumped service-worker shell cache
+  to `cardroom-v2`; service-worker update UI is hidden while a room is live and
+  suppressed entirely in native builds; install prompts are also native-aware.
+- **Android branding:** added `@capacitor/assets` workflow support and
+  `client/assets/icon.png`; `android:init` now generates Android launcher/splash
+  resources after creating/configuring the native project.
+- **Native release QA:** Android release instructions now explicitly test branded
+  launcher/splash, public invite sharing, single-seat reconnect, direct return to
+  Card Room and suppression of PWA UI during live native play.
+- **Regression coverage added in this audit line:** one-shot Card Room return,
+  per-game stats + legacy migration, public/native-safe invite URL generation,
+  and updated entry-flow expectations, in addition to the earlier single-seat
+  reconnect coverage.
+- **Source-level verification:** 159 TS/TSX source/test files transpile with zero
+  syntax diagnostics; all 40 CSS files pass structural brace validation.
+- **Not claimed:** the current environment still cannot restore the complete npm
+  dependency tree, so the new/full Vitest suites, package typechecks, Vite build,
+  Capacitor resource generation and Gradle APK build have **not** been run here.
+  The historical 310 server / 377 client pass counts remain the last fully-run
+  accepted suite, not a verification of Release 1.4.
+- **Production:** unchanged and blocked. The old live family app remains the
+  rollback path.
+
+---
+
+## 2026-08-17 — Premium Release 1 hardening; Kitti edge audit and visual unification
+
+- **Model:** GPT-5.6 Sol.
+- **Baseline before:** current checkpoint only; full npm suite still unavailable in this environment because dependencies cannot be restored from the registry. No new pass count is claimed.
+- **Task:** harden the Hazari + Kitti first-APK working copy, unify the premium private-card-room presentation, and close static/type/release-gating gaps before packaging source. Game rules remain locked.
+- **Premium presentation:** redesigned Welcome and four-game selector; Hazari/Kitti are live and Teen Patti/Poker are polished Coming Soon. Refined shared wood/brass/felt table, ivory cards/card backs, dealing motion, RoomLobby, Kitti arrangement/table/results, chat/voice materials, and Hazari shell styling while preserving fragile Hazari mobile geometry/reserve contracts.
+- **Kitti ceremony + edge flow:** first Kitti deal now visibly presents the authoritative initial high-card dealer draw (including redraw-tie note) before the normal dealer-first deal. A deterministic harness revalidated ten scheduled rounds, 5–5 tie, leaders-only sudden death Round 11, and final winner. Permanent regression coverage was added for that match path.
+- **Kitti correctness fixes:** a 2–0 round ends competitively after Hand 2; completed round number/dealer remain frozen until the next deal starts; reveal-key null narrowing was corrected; privacy tests keep confirmed/unplayed groups hidden and reveal only thrown cards.
+- **Room/voice hardening:** Lobby share now captures stable room/game values; TURN build variables are declared in `vite-env.d.ts`; prior stale-leave and voice reconnect hardening remains intact.
+- **Bug 6:** server real-Socket.IO dismissal regression + client dismissed-summary/Next Round regression remain in the Release 1 working copy. No Hazari dismissal rule changed.
+- **Release gating:** authoritative server registry has Hazari/Kitti `networkPlayable: true`, Teen Patti `false`; Poker is not a server GameId. Home buttons additionally refuse Play/Create for Coming Soon entries.
+- **Static verification:** 39 changed TS/TSX files pass TypeScript syntax/transpile parsing; 16 changed CSS files have balanced structure; Kitti dependency-light engine compiles standalone; deterministic Kitti harness passes; credential scan found only empty/example TURN variable declarations.
+- **Environment limitation:** Chromium now exists, but the client has no usable React/Vite dependency tree and no `dist`, so the redesigned UI still cannot be honestly rendered from this working copy here. `npm install` has timed out; no APK has been generated.
+- **Real-device gate:** still required for Bug 5 physical reveal scrolling, Bug 6 dismissal, Kitti 2–5 player layout/full match, voice/microphone permission, Back, reconnect, portrait/landscape and upgrade-over-existing APK.
+- **Baseline status:** **release-source candidate only, not a verified APK baseline.** Production remains blocked.
+
+---
+
+## 2026-08-17 — Hazari + Kitti Android test-track checkpoint; Kitti online core, Bug 6 coverage, native scaffolding
+
+- **Model:** GPT-5.6 Sol.
+- **Baseline before:** repository documentation recorded server 310 / client 377.
+  This session could **not independently rerun that baseline**: the extracted ZIP
+  does not contain usable installed dependencies, npm registry access times out
+  in this environment, and no Android SDK/Gradle tooling is installed. Treat the
+  old counts as the last documented baseline, not as a newly verified result.
+- **Release decision:** first Android test track is deliberately **Hazari + Kitti
+  playable**. Teen Patti and Poker are **Coming Soon**. Teen Patti remains a real
+  but disabled registry game; Poker is client-catalogue presentation only and is
+  deliberately not a server `GameId`.
+- **Kitti:** replaced the old incomplete/contradictory engine path with the
+  agreed authoritative rules: 2–5 players, 9 cards, Ace-high dealer draw with
+  redraw ties, dealer-first clockwise deal, player clockwise from dealer leads
+  hand 1, strict strongest→weakest arrangement, later thrower wins exact hand
+  ties, previous hand winner leads, first player to two hands wins immediately,
+  three-different-winners fresh 3-card decider, ten scheduled rounds and sudden
+  death among tied leaders. Round/dealer state now stays visually on the
+  completed round until the next deal actually begins. Added `KittiSession`,
+  `kitti:*` protocol/private-public state, online room wiring and the Kitti
+  arrangement/dealing/table/result/winner client flow. Reconnect/result restore
+  is wired; sudden-death spectators no longer retain/render stale prior-round
+  private cards.
+- **Hazari Bug 6:** added a deterministic real-Socket.IO regression path for
+  dismissal: force a dismissible six-pair hand only inside the test, emit the
+  real dismissal event, assert zero points, same room/seat retained, and next
+  deal succeeds. No dismissal rule was changed.
+- **Cross-game lifecycle/reconnect:** result/winner payloads are restored to a
+  reconnecting socket without replaying celebration side effects. Lobby Leave
+  now removes the server seat/subscriptions rather than only clearing client
+  state, closing a stale-room resurrection path.
+- **Voice:** tightened signalling to actual in-call participants and bounded
+  payloads; disconnect/leave cleanup avoids stale buffered leave events;
+  speaking indicators are explicitly cleared when a peer is torn down.
+- **Teen Patti groundwork (still disabled):** Classic engine rewritten toward
+  the agreed rules: capped blind progression, three blind turns then forced
+  seen-betting status without auto-revealing cards, seen = 2× current blind,
+  compulsory anticlockwise sideshow with initiator losing exact ties, final-two
+  mutual no-cost open show, and winner→next-dealer timing. Added data-driven
+  variant descriptors, lobby setup proposal/acceptance model, session/protocol
+  groundwork. Non-Classic runtime variants and the release-ready client table
+  are still pending; registry remains `networkPlayable: false`.
+- **Premium/client presentation:** opening experience, game selector, card/table
+  styling and dealing presentation have been refined. The selector is compact
+  for four titles: Hazari/Kitti live, Teen Patti/Poker Coming Soon. User has
+  explicitly allowed redesign of all presentation/UX while game rules remain
+  locked.
+- **Android scaffolding:** added Capacitor configuration, Android scripts,
+  microphone-manifest patcher, native Back bridge into the existing history
+  guard, `ANDROID_RELEASE.md`, and a manual-only GitHub Actions workflow that
+  runs server/client tests + builds before producing a debug APK artifact.
+  Bundled content uses `https://localhost`, so
+  staging Render must explicitly include that origin alongside Netlify in
+  `ALLOWED_ORIGINS`; do not use `*`. Actual APK generation is **not possible in
+  this environment** because npm registry access and the Android SDK are absent.
+- **Verification performed here:** targeted TypeScript transpile/syntax checks on
+  modified TS/TSX; pure Kitti and Teen Patti engine smoke checks were run during
+  implementation for critical flows. This is **not equivalent** to the full
+  Vitest/typecheck/build baseline and must not be reported as such.
+- **Real-device gate:** Hazari full flow, Kitti 2/3-player + decider, voice and
+  voice notes, native Back, portrait/landscape, reconnect, Bug 5 physical reveal
+  scrolling and Bug 6 dismissal must be checked on the first APK before wider
+  sharing.
+- **New debt / deliberately pending:** Kitti optional bots and consensual virtual
+  board; Hazari virtual board; Teen Patti full client/variants/P&L/mobile QA;
+  Poker implementation/spec. `package-lock.json` cannot be regenerated until
+  npm access is available.
+- **Baseline status:** **checkpoint only, not a verified release baseline.** Do
+  not deploy production from this state until dependencies are installed, the
+  full suites/builds are green, and real-device APK QA passes.
+
+---
+
+## 2026-08-16 (later) — Bug 5 diagnosis corrected: the per-set reveal sheet, not RoundSummary, was the actually-broken screen
+
+- **Model:** Sonnet
+- **Context:** Real-device feedback clarified that the prior TWO rounds of
+  "end-of-hand scroll" fixes had been applied to the wrong component.
+  Hazari plays 4 SETS per round. After EACH set (1, 2, 3, and 4 - the
+  SAME component every time, not a different one for the last set), a
+  per-set result sheet appears showing that set's four hands, the winner,
+  and the points awarded. RoundSummary (the screen both prior rounds
+  actually fixed) is a SEPARATE component, shown once, only after the
+  round's 4th set AND the round itself resolve - and was, per this
+  round's own real-device confirmation, never actually broken.
+- **Investigation (as required, before editing):** traced the runtime
+  flow for all four `REVEALING_SET_N` game states (`types.ts`,
+  server-side) through to the client. `App.tsx` places all four
+  `REVEALING_SET_N` states inside `PLAYING_STATES`, meaning `HazariTable`
+  stays mounted through every one of them - RoundSummary is only reached
+  once `gameState.state` becomes `ROUND_COMPLETE`/`DISMISSED_ROUND`,
+  which happens strictly after `REVEALING_SET_4`. The per-set result
+  itself is rendered INLINE by `HazariTable.tsx` as `.reveal` - a
+  `position: fixed` bottom sheet (`role="dialog"`), driven by
+  `gameState.subRoundResultsThisRound`'s latest entry, auto-dismissing
+  after 3.2s or on a "Continue" tap. This is genuinely ONE shared
+  component for all four sets - there is no separate "set 4" variant.
+- **Root cause:** `.reveal__sheet` had no height bound and no scroll
+  mechanism at all - not a wrong one, none. `height: auto` with nothing
+  capping it against the available viewport meant content taller than
+  the visible space simply extended past the top of a `position: fixed`
+  overlay with nothing to scroll it back into view. `.reveal` itself
+  (the fixed backdrop, `inset: 0`) was already fine - it pins directly to
+  the true viewport without depending on any `dvh` calculation, unlike
+  its child.
+- **Fix:** restructured `.reveal__sheet` into the same bounded-shell +
+  JS-measured-height pattern proven for RoundSummary/WinnerScreen earlier
+  today: `display: flex; flex-direction: column`, `max-height:
+  calc(var(--js-vh, 100dvh) - 64px)` (the `-64px` keeps it reading as a
+  rising sheet with headroom, not a full-screen takeover), `overflow:
+  hidden`. Added a new `.reveal__body` wrapper around the content that
+  actually grows with player count (the tie note, the hand-by-hand
+  breakdown, the points line) - `flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overflow-x: hidden; touch-action: pan-y`. The title
+  (header) and Continue button (footer) stay outside `.reveal__body` as
+  fixed-size flex rows, always visible regardless of scroll position.
+  `HazariTable.tsx` now also calls `useVisualViewport()` (the same
+  existing hook reused for RoundSummary/WinnerScreen) and passes
+  `--js-vh` inline on `.reveal`, inherited down to `.reveal__sheet`.
+- **RoundSummary/WinnerScreen were NOT touched this round** - confirmed
+  by hash diff. Their own bounded-shell fix from earlier today is
+  preserved exactly as it was.
+- **Tests:** new `reveal.test.tsx` (9 tests) - genuine component-level
+  coverage rendering `HazariTable` with a mocked game store at each of
+  `REVEALING_SET_1` through `REVEALING_SET_4`, confirming: the same
+  `.reveal`/`.reveal__sheet`/`.reveal__body` structure renders for every
+  set (not four different implementations); the DOM order is header →
+  scrollable body → footer button; `--js-vh` is correctly wired; the
+  Continue button dismisses independent of scroll position; and,
+  explicitly, that `HazariTable` never renders `.rsum` itself (RoundSummary
+  is App.tsx's job once the screen swaps, not something `.reveal`
+  rendering could trigger) - the specific regression guard for the
+  confusion this bug's diagnosis went through twice. Added parallel
+  CSS-level checks to `mobileSafety.test.ts` (4 new tests) for the same
+  structural invariants, matching the established pattern for
+  RoundSummary/WinnerScreen. Every new/changed assertion proven
+  meaningful by reverting the corresponding code and confirming failure,
+  then restoring it - including deliberately removing the `.reveal__body`
+  wrapper and confirming two tests catch its absence.
+- **Files changed:** `client/src/games/hazari/HazariTable.css` (`.reveal`
+  restructure), `client/src/games/hazari/HazariTable.tsx` (`.reveal__body`
+  wrapper + `useVisualViewport()` wiring), `client/src/games/hazari/
+  reveal.test.tsx` (new), `client/src/platform/styles/mobileSafety.test.ts`
+  (4 new tests). Nothing else - confirmed by hash diff: RoundSummary,
+  WinnerScreen, and every Bug 1-4 file from earlier today are untouched.
+- **Decisions:**
+  - Recorded explicitly, for both `SESSION_CHANGELOG.md` and
+    `HANDOFF.md`, that the correct mental model is "one shared per-set
+    reveal component for all 4 sets" rather than "a different screen for
+    set 4" - the framing that led to two rounds of fixing the wrong
+    component.
+  - Not deployed. Staging/production untouched, per standing instruction.
+- **Tests after:** server 310/310 (unchanged). Client 377/377 (364
+  baseline + 9 new `reveal.test.tsx` + 4 new `mobileSafety.test.ts`
+  checks). All four remaining commands clean.
+- **New debt:** none knowingly introduced. **Bug 5 (the per-set reveal
+  fix) is NOT real-device verified** by this session. Given this bug's
+  history (two prior fixes to the wrong component, each confirmed clean
+  by a full test suite at the time), do not mark it passed until the
+  owner has specifically scrolled the Set 1, 2, or 3 result sheet in a
+  short landscape viewport and confirmed the lower hands are reachable.
+- **Baseline status:** accepted, pending real-device retest.
+
+---
+
 ## 2026-08-16 — Third real-device retest: Bugs 1-3 confirmed PASS; Bug 4 (side-seat names) and Bug 5 (result-screen scroll) genuinely fixed
 
 - **Model:** Sonnet
@@ -922,3 +1230,36 @@ animation, and migrations of RoundSummary and WinnerScreen.
 typecheck, build; client tests, typecheck, build) are run before any baseline
 is accepted, and several tests have been **mutation-verified** by
 reintroducing the bug and confirming failure.
+
+## 2026-08-17 — Per-game rules guides
+
+- Removed the global Hazari tutorial-on-app-launch behaviour. The Card Room now opens as a neutral multi-game shell.
+- Added authoritative, game-specific slide guides for Hazari and Kitti. The first entry into each game on a device opens that game's guide; viewed state is stored independently per game.
+- Settings now exposes one `Rules & How to Play` entry, which reopens the active game's slide deck instead of showing a hard-coded Hazari rule sheet.
+- Expanded the guides from short tutorial copy into detailed rule slides sourced from `RULES_HAZARI.md` / `RULES_KITTI.md`.
+- Corrected the old Hazari help text that inaccurately described Set 4 as “best 3 of 4”; the engine uses the dedicated four-card ranking in `fourCardRanking.ts`.
+
+## 2026-08-17 — Single-seat reconnect / duplicate lobby identity fix
+
+- Fixed the lobby/session lifecycle so a recoverable player session always reclaims the existing `playerId` instead of creating a second lobby row with the same display name.
+- Client entry remains gated while a stored room token is being authoritatively restored; Play/Create/Join cannot overwrite that recoverable session.
+- Server now records the current socket id for seats from initial create/join/quick-match as well as reconnect.
+- Reconnect returns and detaches any superseded live socket (bfcache/duplicate tab/suspended PWA) while preserving the same PlayerSlot.
+- A late disconnect from a superseded socket is ignored and cannot flip the newly restored player back to Waiting/Disconnected.
+- Server independently refuses a second create/join/quick-match from a socket that is already seated.
+- Added `reconnectSingleSeat.integration.test.ts`, RoomManager regression coverage, and client background-reconnect coverage for the no-second-seat invariant.
+- Display name is deliberately NOT used as identity; the secret room session token restores the exact seat, allowing two unrelated people to use the same display name without unsafe seat takeover.
+- Lobby presence wording now distinguishes connectivity from readiness: a connected human who has not pressed Ready is shown as **Online**, not “Waiting”; only a dropped seat is **Disconnected**, and Ready remains **Ready**.
+
+## 2026-08-17 — Release 1.5.1 Hazari/Kitti bot-quality hardening
+
+- Audited Hazari computer play against the newer Kitti bot path without changing either game's rules or authoritative engine/ranking code.
+- Fixed a shared scheduler race: multiple near-simultaneous human events could previously queue more than one bot timer for the same table. Each room now has at most one pending bot tick per game session; a replaced Play Again session cancels/supersedes the old schedule safely.
+- Replaced metronomic 700ms bot pacing with deterministic action-aware pauses: arrangement takes slightly longer, ordinary throws are brisker, and Kitti deciders get a little extra pause. Variation is deterministic, so tests/replays are not made random.
+- Hazari/Kitti live tables now show `Thinking…` on the active computer seat and use `<name> is thinking…` at the table centre while the server action is genuinely pending.
+- New computer seats use the newer premium Card Room animal medallions. Bot identity allocation now chooses an unused name/avatar pair, so removing and re-adding a computer cannot duplicate a still-seated bot identity.
+- Added Hazari bot regression coverage proving the bot's confirmed 3/3/3/4 arrangement contains only that bot's own 13 dealt cards and never arranges the human seat.
+- Extended bot identity tests and lengthened the leave-table real-socket observation window to match the more natural arrangement pacing.
+- Corrected a stale comment in `hazari/arrangement.ts`: Set 4 uses Hazari's dedicated four-card classifier, not a best-3-of-4 rule. No executable arrangement logic changed in that edit.
+- Dependency-light audit: 1,000 random Hazari 13-card hands all produced valid suggestions; 0 invalid arrangements. With a score of 900, all 1,000 samples used the intended concentrated endgame strategy. A 250-hand timing sample measured ~20ms average suggestion time (p95 ~33ms) in this environment, comfortably below the visible bot pacing delay.
+- Full Vitest/Vite/Android verification is still pending because the current environment does not contain the complete npm dependency tree.

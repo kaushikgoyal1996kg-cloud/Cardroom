@@ -248,6 +248,6 @@ describe('manual arranging works normally when assistance is blocked', () => {
     // Place it into Set 1.
     const target = screen.getAllByRole('button', { name: /place selected card into Set 1/i })[0];
     fireEvent.click(target);
-    expect(screen.getByText(/12 left/i)).toBeTruthy();
+    expect(screen.getByText(/12 cards left/i)).toBeTruthy();
   });
 });

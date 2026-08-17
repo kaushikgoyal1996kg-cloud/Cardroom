@@ -1,37 +1,14 @@
 import type { HaazariSocket } from './socket';
 
 /**
- * ICE server config: Google's free public STUN servers (NAT discovery,
- * works for most direct connections) plus a TURN relay fallback (for
- * networks where a direct connection can't be established - common on
- * some mobile carriers and stricter networks). The TURN credentials come
- * from a free Open Relay Project / Metered.ca account and are injected at
- * build time via Vite env vars - see .env.example. Voice calling degrades
- * gracefully to STUN-only if no TURN credentials are configured (some
- * players on restrictive networks just won't be able to connect, but it
- * won't break for everyone else).
+ * Safe direct-connect fallback. TURN credentials are requested from the
+ * authoritative Card Room backend at call-join time; the Metered account
+ * Secret Key never enters the browser/APK bundle.
  */
-function buildIceServers(): RTCIceServer[] {
-  const servers: RTCIceServer[] = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun.relay.metered.ca:80' },
-  ];
-  const turnUsername = import.meta.env.VITE_TURN_USERNAME as string | undefined;
-  const turnCredential = import.meta.env.VITE_TURN_CREDENTIAL as string | undefined;
-  if (turnUsername && turnCredential) {
-    servers.push(
-      { urls: 'turn:standard.relay.metered.ca:80', username: turnUsername, credential: turnCredential },
-      { urls: 'turn:standard.relay.metered.ca:80?transport=tcp', username: turnUsername, credential: turnCredential },
-      { urls: 'turn:standard.relay.metered.ca:443', username: turnUsername, credential: turnCredential },
-      {
-        urls: 'turns:standard.relay.metered.ca:443?transport=tcp',
-        username: turnUsername,
-        credential: turnCredential,
-      }
-    );
-  }
-  return servers;
-}
+const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun.relay.metered.ca:80' },
+];
 
 export function isVoiceCallSupported(): boolean {
   return typeof RTCPeerConnection !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
@@ -51,8 +28,9 @@ export interface VoiceCallCallbacks {
 
 /**
  * Manages the local mic + a mesh of RTCPeerConnections, one per other
- * participant. Small group sizes (up to 4 players, so up to 3 simultaneous
- * connections per person) work fine as a pure mesh without needing a
+ * participant. The first native release tops out at Kitti's 5 players (up to
+ * 4 simultaneous peer connections per person), which remains small enough
+ * for a pure mesh without needing a
  * media-routing server (an SFU) - the server here only ever relays small
  * signaling messages, never audio itself.
  */
@@ -66,6 +44,7 @@ export class VoiceCallManager {
   private speakingCheckTimer: ReturnType<typeof setInterval> | null = null;
   private callbacks: VoiceCallCallbacks;
   private joined = false;
+  private iceServers: RTCIceServer[] = FALLBACK_ICE_SERVERS;
 
   constructor(socket: HaazariSocket, myPlayerId: string, callbacks: VoiceCallCallbacks) {
     this.socket = socket;
@@ -98,6 +77,11 @@ export class VoiceCallManager {
       return;
     }
 
+    // Request short-lived TURN credentials only after the user has actually
+    // granted microphone access. If the relay service is unavailable, direct
+    // STUN voice is still attempted instead of blocking the call entirely.
+    this.iceServers = await this.requestIceServers();
+
     this.socket.on('voice:participants', this.handleParticipants);
     this.socket.on('voice:peerJoined', this.handlePeerJoined);
     this.socket.on('voice:peerLeft', this.handlePeerLeft);
@@ -107,10 +91,15 @@ export class VoiceCallManager {
     this.socket.emit('voice:join');
   }
 
-  leave(): void {
+  leave(notifyServer = true): void {
     if (!this.joined) return;
     this.joined = false;
-    this.socket.emit('voice:leave');
+    // Socket.IO buffers emits while disconnected. A voice:leave queued during
+    // transport loss can replay on the next connection before room:reconnect
+    // has rebound the socket, producing a stale room error and fighting the
+    // intended restore flow. The server already removes call membership on
+    // disconnect/room leave, so callers can tear down locally without sending.
+    if (notifyServer && this.socket.connected) this.socket.emit('voice:leave');
     this.socket.off('voice:participants', this.handleParticipants);
     this.socket.off('voice:peerJoined', this.handlePeerJoined);
     this.socket.off('voice:peerLeft', this.handlePeerLeft);
@@ -177,7 +166,7 @@ export class VoiceCallManager {
   };
 
   private createPeerConnection(peerId: string): RTCPeerConnection {
-    const conn = new RTCPeerConnection({ iceServers: buildIceServers() });
+    const conn = new RTCPeerConnection({ iceServers: this.iceServers });
     const audioEl = new Audio();
     audioEl.autoplay = true;
     this.peers.set(peerId, { connection: conn, audioEl, analyser: null });
@@ -213,6 +202,23 @@ export class VoiceCallManager {
     return conn;
   }
 
+  private requestIceServers(): Promise<RTCIceServer[]> {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (servers: RTCIceServer[]) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        resolve(servers.length ? servers : FALLBACK_ICE_SERVERS);
+      };
+      const timeout = setTimeout(() => finish(FALLBACK_ICE_SERVERS), 5_000);
+      this.socket.emit('voice:getIceServers', (res) => {
+        const safe = Array.isArray(res?.iceServers) ? res.iceServers : [];
+        finish(safe);
+      });
+    });
+  }
+
   private setupSpeakingDetection(peerId: string, stream: MediaStream): void {
     try {
       if (!this.audioCtx) this.audioCtx = new AudioContext();
@@ -246,5 +252,9 @@ export class VoiceCallManager {
     entry.connection.close();
     entry.audioEl.srcObject = null;
     this.peers.delete(peerId);
+    // A peer may disappear while the last analyser sample still marked them
+    // as speaking. Clear it explicitly so the seat never keeps a stale voice
+    // ring after leave/disconnect/ICE failure.
+    this.callbacks.onSpeakingChanged(peerId, false);
   }
 }

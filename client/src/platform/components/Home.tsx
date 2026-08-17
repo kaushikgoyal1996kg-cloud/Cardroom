@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GAME_CATALOG, catalogEntry } from '../games/catalog';
+import { GAME_CATALOG, catalogEntry, isRuntimeGameId, type CatalogGameId } from '../games/catalog';
 import { AvatarBadge } from '../../components/Lobby/AvatarPicker';
 import type { GameId } from '../../game/types';
 import './Home.css';
@@ -37,12 +37,12 @@ export function Home({
   busy = false,
   error = null,
 }: HomeProps) {
-  const [selected, setSelected] = useState<GameId>('HAZARI');
+  const [selected, setSelected] = useState<CatalogGameId | null>(null);
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState<string | null>(null);
 
-  const active = catalogEntry(selected);
-  const canPlay = active.networkPlayable && !busy;
+  const active = selected ? catalogEntry(selected) : null;
+  const canPlay = !!active?.networkPlayable && !busy;
 
   function handleJoin() {
     const code = joinCode.trim().toUpperCase();
@@ -61,6 +61,7 @@ export function Home({
       <header className="home__header">
         <p className="home__eyebrow">The</p>
         <h1 className="home__brand">Card Room</h1>
+        <p className="home__subtitle">Choose a table. The room remembers the rest.</p>
         <button type="button" className="home__identity" onClick={onEditName}>
           {playerAvatar && (
             <span className="home__identity-avatar">
@@ -78,6 +79,7 @@ export function Home({
         <ul className="home__games" role="list">
           {GAME_CATALOG.map((game) => {
             const isActive = game.id === selected;
+            const number = String(GAME_CATALOG.indexOf(game) + 1).padStart(2, '0');
             return (
               <li key={game.id}>
                 <button
@@ -85,7 +87,6 @@ export function Home({
                   className={[
                     'gamecard',
                     isActive && 'is-active',
-                    game.flagship && 'is-flagship',
                     !game.networkPlayable && 'is-limited',
                   ]
                     .filter(Boolean)
@@ -94,7 +95,12 @@ export function Home({
                   aria-pressed={isActive}
                 >
                   <span className="gamecard__felt" aria-hidden="true" />
-                  {game.flagship && <span className="gamecard__mark">Flagship</span>}
+                  <span className="gamecard__topline">
+                    <span className="gamecard__index" aria-hidden="true">{number}</span>
+                    <span className={`gamecard__availability ${game.networkPlayable ? 'is-open' : 'is-soon'}`}>
+                      {game.networkPlayable ? 'Table open' : 'Coming soon'}
+                    </span>
+                  </span>
                   <span className="gamecard__name">{game.name}</span>
                   <span className="gamecard__meta">
                     <span>{game.players}</span>
@@ -102,39 +108,49 @@ export function Home({
                     <span>{game.cards}</span>
                   </span>
                   <span className="gamecard__blurb">{game.blurb}</span>
-                  {!game.networkPlayable && (
-                    <span className="gamecard__note">{game.unavailableReason}</span>
-                  )}
                 </button>
               </li>
             );
           })}
         </ul>
 
-        <div className="home__actions">
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={() => onPlay(active.id)}
-            disabled={!canPlay}
-          >
-            {busy ? 'Just a moment…' : `Play ${active.name}`}
-          </button>
-          <button
-            type="button"
-            className="btn btn--secondary"
-            onClick={() => onCreateTable(active.id)}
-            disabled={!canPlay}
-          >
-            Create table
-          </button>
+        <div className={`home__actions${active ? '' : ' is-idle'}`} aria-live="polite">
+          {!active ? (
+            <div className="home__selection-prompt">
+              <span className="home__selection-mark" aria-hidden="true">CR</span>
+              <p>Select a game to open its table options.</p>
+            </div>
+          ) : active.networkPlayable ? (
+            <>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => {
+                  if (isRuntimeGameId(active.id)) onPlay(active.id);
+                }}
+                disabled={!canPlay}
+              >
+                {busy ? 'Just a moment…' : `Play ${active.name}`}
+              </button>
+              <button
+                type="button"
+                className="btn btn--secondary"
+                onClick={() => {
+                  if (isRuntimeGameId(active.id)) onCreateTable(active.id);
+                }}
+                disabled={!canPlay}
+              >
+                Create table
+              </button>
+            </>
+          ) : (
+            <div className="home__coming-soon">
+              <span>Coming soon</span>
+              <strong>{active.name}</strong>
+              <p>This table is being prepared for a later Card Room update.</p>
+            </div>
+          )}
         </div>
-
-        {!active.networkPlayable && (
-          <p className="home__unavailable" role="status">
-            {active.name} is not playable online yet — {active.unavailableReason}.
-          </p>
-        )}
 
         {error && (
           <p className="home__join-error" role="alert">
@@ -155,7 +171,7 @@ export function Home({
                 setJoinCode(e.target.value.toUpperCase());
                 setJoinError(null);
               }}
-              placeholder="HZR482"
+              placeholder="Enter code"
               autoComplete="off"
               autoCapitalize="characters"
               spellCheck={false}

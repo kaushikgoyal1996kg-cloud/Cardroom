@@ -18,9 +18,10 @@ import { render, screen, cleanup } from '@testing-library/react';
  * Render free-tier cold-start window documented in DEPLOYMENT.md, or simply
  * by reopening their own share link.
  *
- * This does not touch reconnect semantics, session handling, or the socket
- * protocol - it only stops the UI from offering a redundant Join when a
- * reconnect for the exact same room is already underway.
+ * The guard is intentionally broader now: if ANY stored seat is recoverable,
+ * the entry UI waits for its authoritative reconnect result before exposing
+ * Play/Create/Join. This closes the normal Back/reload race as well as the
+ * original invite-link race.
  */
 
 const useGameMock = vi.fn();
@@ -69,7 +70,7 @@ describe('HomeScreen invite-link handling', () => {
     // The Join flow (which would call room:join and create a second player)
     // must not be offered here.
     expect(screen.queryByText(/join room/i)).toBeNull();
-    expect(screen.queryByText(/you've been invited/i)).toBeNull();
+    expect(screen.queryByText(/private table invitation/i)).toBeNull();
     // Instead, a neutral waiting state defers to the reconnect already in flight.
     expect(screen.queryByText(/rejoining your table/i)).toBeTruthy();
   });
@@ -82,21 +83,39 @@ describe('HomeScreen invite-link handling', () => {
     const HomeScreen = await loadHomeScreen();
     render(<HomeScreen />);
 
-    expect(screen.queryByText(/you've been invited to room/i)).toBeTruthy();
+    expect(screen.queryByText(/private table invitation/i)).toBeTruthy();
+    expect(screen.queryByText(/hzr999/i)).toBeTruthy();
   });
 
-  it('still shows the normal invite flow when the stored session is for a different room', async () => {
+  it('restores the existing seat before allowing an invite for a different room', async () => {
     window.history.replaceState({}, '', '/?join=HZR999');
-    getStoredSessionRoomCodeMock.mockReturnValue('HZR482'); // a different room entirely
+    getStoredSessionRoomCodeMock.mockReturnValue('HZR482'); // a different active session
     useGameMock.mockReturnValue(baseGameValue());
 
     const HomeScreen = await loadHomeScreen();
     render(<HomeScreen />);
 
-    expect(screen.queryByText(/you've been invited to room/i)).toBeTruthy();
+    // One device/session cannot safely join a second room while its old seat
+    // is still recoverable. Restore HZR482 first; if that token is expired,
+    // GameStore clears it and this screen will then expose the invite flow.
+    expect(screen.queryByText(/private table invitation/i)).toBeNull();
+    expect(screen.queryByText(/rejoining your table hzr482/i)).toBeTruthy();
   });
 
-  it('is unaffected when there is no invite link at all', async () => {
+  it('blocks normal Play/Create/Join entry while any stored seat is being restored', async () => {
+    window.history.replaceState({}, '', '/');
+    getStoredSessionRoomCodeMock.mockReturnValue('KTI731');
+    useGameMock.mockReturnValue(baseGameValue());
+
+    const HomeScreen = await loadHomeScreen();
+    render(<HomeScreen />);
+
+    expect(screen.queryByText(/rejoining your table kti731/i)).toBeTruthy();
+    expect(screen.queryByText(/enter (?:the )?card room/i)).toBeNull();
+    expect(screen.queryByText(/choose a game/i)).toBeNull();
+  });
+
+  it('is unaffected when there is no invite link and no stored session', async () => {
     window.history.replaceState({}, '', '/');
     getStoredSessionRoomCodeMock.mockReturnValue(null);
     useGameMock.mockReturnValue(baseGameValue());
@@ -110,7 +129,7 @@ describe('HomeScreen invite-link handling', () => {
     // regression of the invite/reconnect behaviour above, which is what
     // this describe block actually guards. Dedicated Welcome/Profile/
     // CardRoom coverage lives in HomeScreen.entryFlow.test.tsx.
-    expect(screen.queryByText(/enter cardroom/i)).toBeTruthy();
+    expect(screen.queryByText(/enter (?:the )?card room/i)).toBeTruthy();
     expect(screen.queryByText(/choose an avatar/i)).toBeNull();
   });
 });

@@ -96,6 +96,55 @@ interface SuggestionOptionsAck {
   options?: { label: string; description: string; cardIdSets: [string[], string[], string[], string[]] }[];
 }
 
+interface KittiSuggestionAck {
+  ok: boolean;
+  error?: string;
+  cardIdGroups?: [string[], string[], string[]];
+}
+
+/**
+ * Builds a started Kitti table over real sockets. `humanOpponents` real
+ * opponents join normally; `botOpponents` are added through room:addBot.
+ * This deliberately exercises the same production room/controller path the
+ * Android/web clients use.
+ */
+async function startKittiGameOverSockets(humanOpponents: number, botOpponents: number) {
+  const host = await connect();
+  const created = await emitWithAck<RoomAck>(host, 'room:create', {
+    playerName: 'KittiHost',
+    gameId: 'KITTI',
+  });
+  expect(created.ok).toBe(true);
+  const roomCode = created.roomCode!;
+
+  const humans: ClientSocket[] = [];
+  for (let i = 0; i < humanOpponents; i++) {
+    const guest = await connect();
+    const joined = await emitWithAck<RoomAck>(guest, 'room:join', {
+      roomCode,
+      playerName: `KittiGuest${i + 1}`,
+    });
+    expect(joined.ok).toBe(true);
+    humans.push(guest);
+  }
+
+  for (let i = 0; i < botOpponents; i++) {
+    const update = once(host, 'room:update');
+    host.emit('room:addBot');
+    await update;
+  }
+
+  host.emit('room:ready', { ready: true });
+  for (const guest of humans) guest.emit('room:ready', { ready: true });
+  await new Promise((resolve) => setTimeout(resolve, 120));
+
+  const dealt = once(host, 'kitti:yourHand');
+  host.emit('room:start');
+  await dealt;
+
+  return { host, humans, roomCode, playerId: created.playerId! };
+}
+
 /**
  * Builds a started 4-seat Hazari game over real sockets.
  * `humanOpponents` is how many of the three opponents are real connected
@@ -233,5 +282,44 @@ describe('hazari:requestSuggestionOptions over a real socket', () => {
 
     expect(res.ok).toBe(false);
     expect(res.cardIdSets).toBeUndefined();
+  }, 20000);
+});
+
+
+describe('kitti:requestSuggestion over a real socket', () => {
+  it('SUCCEEDS when every opponent is a bot and returns only the player\'s nine cards', async () => {
+    const { host, roomCode, playerId } = await startKittiGameOverSockets(0, 2);
+
+    const res = await emitWithAck<KittiSuggestionAck>(host, 'kitti:requestSuggestion');
+    expect(res.ok, res.error).toBe(true);
+    expect(res.cardIdGroups?.map((group) => group.length)).toEqual([3, 3, 3]);
+
+    const flat = res.cardIdGroups!.flat();
+    expect(flat).toHaveLength(9);
+    expect(new Set(flat).size).toBe(9);
+
+    const room = rooms.getRoomOrThrow(roomCode);
+    const session = room.game;
+    expect(session?.gameId).toBe('KITTI');
+    const privateState = session!.getPrivateState(playerId) as { hand: { id: string }[] };
+    const ownIds = new Set(privateState.hand.map((card) => card.id));
+    for (const id of flat) expect(ownIds.has(id), `${id} is not in the requesting player's hand`).toBe(true);
+  }, 20000);
+
+  it('REFUSES a Kitti player when even one real human opponent is seated', async () => {
+    const { host } = await startKittiGameOverSockets(1, 1);
+
+    const res = await emitWithAck<KittiSuggestionAck>(host, 'kitti:requestSuggestion');
+    expect(res.ok).toBe(false);
+    expect(res.cardIdGroups).toBeUndefined();
+    expect(res.error).toMatch(/only available when you are playing against the computer/i);
+  }, 20000);
+
+  it('REFUSES the human guest too in a mixed Kitti room', async () => {
+    const { humans } = await startKittiGameOverSockets(1, 1);
+
+    const res = await emitWithAck<KittiSuggestionAck>(humans[0], 'kitti:requestSuggestion');
+    expect(res.ok).toBe(false);
+    expect(res.cardIdGroups).toBeUndefined();
   }, 20000);
 });

@@ -4,7 +4,7 @@ import type { Card, HaazariPublicStatePayload } from '../src/game/types';
 
 const URL = process.env.SMOKE_TEST_URL ?? 'http://localhost:3001';
 
-/** Tracks the latest 'game:state' push and lets callers wait for a
+/** Tracks the latest 'hazari:state' push and lets callers wait for a
  *  predicate to become true, without racing rapid back-to-back broadcasts
  *  (a naive one-shot .once() listener can miss events that fire before the
  *  next listener is registered). */
@@ -13,7 +13,7 @@ class StateTracker {
   private waiters: { predicate: (s: HaazariPublicStatePayload) => boolean; resolve: (s: HaazariPublicStatePayload) => void }[] = [];
 
   constructor(socket: Socket) {
-    socket.on('game:state', (s: HaazariPublicStatePayload) => {
+    socket.on('hazari:state', (s: HaazariPublicStatePayload) => {
       this.latest = s;
       this.waiters = this.waiters.filter((w) => {
         if (w.predicate(s)) {
@@ -41,7 +41,7 @@ function ack<T>(socket: Socket, event: string, payload: any = {}): Promise<T> {
   return new Promise((resolve) => socket.emit(event, payload, (res: T) => resolve(res)));
 }
 function nextHand(socket: Socket): Promise<Card[]> {
-  return new Promise((resolve) => socket.once('game:yourHand', ({ hand }: { hand: Card[] }) => resolve(hand)));
+  return new Promise((resolve) => socket.once('hazari:yourHand', ({ hand }: { hand: Card[] }) => resolve(hand)));
 }
 
 const TERMINAL_ROUND_STATES = new Set(['ROUND_COMPLETE', 'GAME_COMPLETE', 'DISMISSED_ROUND']);
@@ -93,7 +93,7 @@ async function main() {
       const sets = autoArrange(hands[i]);
       if (!sets) throw new Error(`autoArrange found no valid arrangement for player ${i} (hand: ${hands[i].map((c) => c.id).join(',')})`);
       const cardIdSets = sets.map((s) => s.map((c) => c.id)) as [string[], string[], string[], string[]];
-      sockets[i].emit('game:confirmArrangement', { cardIdSets });
+      sockets[i].emit('hazari:confirmArrangement', { cardIdSets });
     }
     console.log('  All 4 hands arranged via real autoArrange() and confirmed.');
 
@@ -108,7 +108,7 @@ async function main() {
       if (socketIdx === -1) throw new Error(`Unknown player id in play order: ${nextPlayerId}`);
       const playedCount = state.playersPlayedThisSubRound.length;
       const setIdx = state.currentSetIndex;
-      sockets[socketIdx].emit('game:playSet');
+      sockets[socketIdx].emit('hazari:playSet');
       state = await tracker.waitUntil(
         (s) =>
           TERMINAL_ROUND_STATES.has(s.state) ||
@@ -121,12 +121,12 @@ async function main() {
 
     if (state.state === 'GAME_COMPLETE') {
       gameOver = true;
-      winnerPayload = await new Promise((resolve) => sockets[0].once('game:over', resolve));
+      winnerPayload = await new Promise((resolve) => sockets[0].once('hazari:over', resolve));
       break;
     }
 
     const nextHandPromises = sockets.map((s) => nextHand(s));
-    sockets[0].emit('game:startNextRound');
+    sockets[0].emit('hazari:startNextRound');
     hands = await Promise.all(nextHandPromises);
   }
 

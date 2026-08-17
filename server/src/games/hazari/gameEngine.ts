@@ -345,6 +345,16 @@ export class HaazariGame {
       // players to finish before anyone sees what was played.
       playedSetsThisSubRound: this.playedThisSubRound.map((p) => ({ playerId: p.playerId, cards: p.cards })),
       subRoundResultsThisRound: this.subRoundResults,
+      // Dealer-draw cards are public ceremony data. Give them presentation-only
+      // ids so privacy tests (and clients) can never confuse a revealed dealer
+      // draw card with the identity of a card in a newly shuffled hidden hand.
+      initialDealerDraws: (this.roundNumber === 1 ? (this.initialDealerRounds ?? []) : []).map((round, roundIndex) => ({
+        contenders: round.map(({ playerId }) => playerId),
+        draws: round.map(({ playerId, card }) => ({
+          playerId,
+          card: { ...card, id: `dealer-draw-${roundIndex}-${playerId}` },
+        })),
+      })),
       winnerId: this.winnerId,
     };
   }

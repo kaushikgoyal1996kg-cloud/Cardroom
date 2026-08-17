@@ -7,6 +7,7 @@ import { Landing } from '../../components/Lobby/Landing';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { getSavedIdentity, type SavedIdentity } from '../../lib/identity';
 import { useBackGuard } from '../../lib/useBackGuard';
+import { consumeReturnToCardRoom } from '../../lib/navigation';
 import type { GameId } from '../../game/types';
 
 function inviteCodeFromUrl(): string | null {
@@ -23,11 +24,9 @@ type EntryStage = 'welcome' | 'profile' | 'cardroom';
  * Two families of screen, kept deliberately separate:
  *
  * 1. Invite-link arrivals (`?join=...`) and the "reconnect already in
- *    flight" wait state - delegated to the existing Landing flow / a
- *    waiting spinner exactly as before this change. Not part of the
- *    Welcome/Profile redesign and not touched by it - see
- *    HomeScreen.test.tsx for why this must stay untouched (the invite/
- *    reconnect race regression coverage).
+ *    flight" wait state - a dedicated Card Room invitation flow plus the
+ *    authoritative reconnect wait. They bypass Welcome so a shared table link
+ *    still takes the player straight to the invited room.
  * 2. A normal (non-invite) launch: Welcome (the true root) -> Player
  *    Profile (first-time setup, or editing) -> THE CARD ROOM. This is the
  *    Welcome/Profile shell described in DESIGN_SYSTEM.md.
@@ -39,7 +38,9 @@ type EntryStage = 'welcome' | 'profile' | 'cardroom';
 export function HomeScreen() {
   const { createRoom, joinRoom, quickMatch, roomError } = useGame();
   const [identity, setIdentity] = useState(() => getSavedIdentity());
-  const [entryStage, setEntryStage] = useState<EntryStage>('welcome');
+  const [entryStage, setEntryStage] = useState<EntryStage>(() =>
+    consumeReturnToCardRoom() && getSavedIdentity() ? 'cardroom' : 'welcome'
+  );
   const [busy, setBusy] = useState(false);
 
   // Where "profile" was opened FROM, so Back/Cancel returns there rather
@@ -51,24 +52,27 @@ export function HomeScreen() {
   const inviteCode = inviteCodeFromUrl();
   const arrivedViaInvite = inviteCode !== null;
 
-  // A person can already hold a valid reconnect token for the exact room an
-  // invite link points at - most commonly by opening their own share link,
-  // or reopening a link they'd already used, while GameStore's own
-  // reconnect-on-connect is still in flight (this component is only
-  // rendered at all while `room` is still null - see App.tsx). If the Join
-  // flow below ran anyway, it would create a brand-new player rather than
-  // resuming the existing one, leaving a stale duplicate seat behind once
-  // the real reconnect also lands. Detect that case and wait for the
-  // already-in-flight reconnect instead of offering a redundant Join.
-  const alreadyHoldsInvitedRoom = arrivedViaInvite && getStoredSessionRoomCode() === inviteCode;
+  // If this device already owns a reconnect token, restoring that seat takes
+  // priority over EVERY new-room path - not only an invite for the same room.
+  // Otherwise a normal Back/reload/cold-start can briefly render Home while
+  // `room:reconnect` is still in flight; tapping Play/Create/Join in that
+  // window creates a second seat and overwrites the only token that could
+  // reclaim the first one. The orphan then sits in the lobby as Waiting /
+  // Disconnected until somebody explicitly removes it.
+  //
+  // Wait for the authoritative reconnect result first. A definitive failure
+  // clears the stored token in GameStore, after which this component re-renders
+  // and the normal Welcome / invite flow becomes available again.
+  const storedSessionRoomCode = getStoredSessionRoomCode();
+  const restoringStoredSession = storedSessionRoomCode !== null;
 
   // One key per distinct screen this component can show, for both the
   // back-guard and (matching App.tsx's existing pattern) as a potential
   // future `data-screen` value. Invite-related keys are intentionally
   // treated as root-like below - they have no in-app screen before them to
   // return to, since Welcome is skipped entirely for an invite arrival.
-  const screenKey: string = alreadyHoldsInvitedRoom
-    ? 'invite-wait'
+  const screenKey: string = restoringStoredSession
+    ? 'session-restore-wait'
     : arrivedViaInvite
       ? 'invite-landing'
       : entryStage;
@@ -77,7 +81,7 @@ export function HomeScreen() {
     screenKey,
     onBack: () => {
       switch (screenKey) {
-        case 'invite-wait':
+        case 'session-restore-wait':
         case 'invite-landing':
         case 'welcome':
           return 'root';
@@ -110,16 +114,15 @@ export function HomeScreen() {
 
   let screen: React.ReactNode;
 
-  if (alreadyHoldsInvitedRoom) {
+  if (restoringStoredSession) {
     screen = (
       <div className="waiting-screen">
-        <LoadingSpinner message="Rejoining your table…" />
+        <LoadingSpinner message={`Rejoining your table ${storedSessionRoomCode}…`} />
       </div>
     );
   } else if (arrivedViaInvite) {
-    // A genuinely new invite link: the existing Landing flow already covers
-    // name/avatar entry, the invite note, and the join itself. Untouched by
-    // this change - see HomeScreen.test.tsx.
+    // A genuinely new invite link: dedicated Card Room invitation arrival,
+    // with saved-identity reuse when possible.
     screen = (
       <Landing
         onIdentitySaved={() => {

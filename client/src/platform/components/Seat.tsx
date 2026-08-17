@@ -1,5 +1,7 @@
 import { memo } from 'react';
 import type { SeatPosition } from '../table/seatLayout';
+import { avatarToneClass } from '../../game/avatars';
+import { ChromeIcon } from './ChromeIcon';
 import './Seat.css';
 
 export type ConnectionStatus = 'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED';
@@ -19,6 +21,8 @@ export interface SeatPlayer {
   inVoiceCall?: boolean;
   /** Currently talking, for a subtle live indicator on the seat. */
   speaking?: boolean;
+  /** Optional game-specific public status, e.g. Seen / Blind / Packed. */
+  statusLabel?: string;
 }
 
 export interface SeatProps {
@@ -56,7 +60,8 @@ export const Seat = memo(function Seat({ player, position, isDealer, isActive }:
     .filter(Boolean)
     .join(' ');
 
-  const statusText = CONNECTION_TEXT[player.connection];
+  const connectionText = CONNECTION_TEXT[player.connection];
+  const statusText = connectionText || player.statusLabel || '';
 
   // How far this seat's identity block may safely grow toward the table
   // centre before it would start crossing the felt's own visual
@@ -83,7 +88,7 @@ export const Seat = memo(function Seat({ player, position, isDealer, isActive }:
       } as React.CSSProperties}
     >
       <div className="seat__avatar-wrap">
-        <div className="seat__avatar" aria-hidden="true">
+        <div className={`seat__avatar ${avatarToneClass(player.avatar ?? '')}`} aria-hidden="true">
           {player.avatar ?? player.name.charAt(0).toUpperCase()}
         </div>
         {isActive && <span className="seat__ring" aria-hidden="true" />}
@@ -93,7 +98,7 @@ export const Seat = memo(function Seat({ player, position, isDealer, isActive }:
             className={`seat__mic${player.speaking ? ' is-speaking' : ''}`}
             aria-hidden="true"
           >
-            🎙
+            <ChromeIcon name="mic" />
           </span>
         )}
       </div>

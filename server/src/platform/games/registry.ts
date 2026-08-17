@@ -61,8 +61,7 @@ export const GAMES: Record<GameId, GameDefinition> = {
     minPlayers: 2,
     maxPlayers: 5,
     cardsPerPlayer: 9,
-    networkPlayable: false,
-    unavailableReason: 'Scoring rules still to be confirmed',
+    networkPlayable: true,
   },
   TEEN_PATTI: {
     id: 'TEEN_PATTI',

@@ -48,6 +48,7 @@ beforeEach(() => {
   useGameMock.mockReturnValue(baseGameValue());
   getStoredSessionRoomCodeMock.mockReturnValue(null);
   localStorage.clear();
+  sessionStorage.clear();
   window.history.replaceState({}, '', '/');
 });
 
@@ -61,20 +62,19 @@ describe('first-time visitor (no saved profile)', () => {
     const HomeScreen = await loadHomeScreen();
     render(<HomeScreen />);
 
-    expect(screen.queryByText(/^the$/i)).toBeTruthy();
-    expect(screen.getByText(/card room/i)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /enter cardroom/i })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /the card room/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /enter (?:the )?card room/i })).toBeTruthy();
     // No "continue as" for a first-timer.
     expect(screen.queryByText(/continue as/i)).toBeNull();
   });
 
-  it('Enter Cardroom leads to the compact profile sheet, not a full registration form', async () => {
+  it('Enter the Card Room leads to the compact profile sheet, not a full registration form', async () => {
     const HomeScreen = await loadHomeScreen();
     render(<HomeScreen />);
 
-    fireEvent.click(screen.getByRole('button', { name: /enter cardroom/i }));
+    fireEvent.click(screen.getByRole('button', { name: /enter (?:the )?card room/i }));
 
-    expect(screen.getByText(/your cardroom identity/i)).toBeTruthy();
+    expect(screen.getByText(/your player profile/i)).toBeTruthy();
     expect(screen.getByPlaceholderText(/enter your name/i)).toBeTruthy();
     expect(screen.queryByPlaceholderText(/email/i)).toBeNull();
     expect(screen.queryByPlaceholderText(/password/i)).toBeNull();
@@ -84,7 +84,7 @@ describe('first-time visitor (no saved profile)', () => {
     const HomeScreen = await loadHomeScreen();
     render(<HomeScreen />);
 
-    fireEvent.click(screen.getByRole('button', { name: /enter cardroom/i }));
+    fireEvent.click(screen.getByRole('button', { name: /enter (?:the )?card room/i }));
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
 
     expect(screen.getByText(/enter a name to continue/i)).toBeTruthy();
@@ -96,7 +96,7 @@ describe('first-time visitor (no saved profile)', () => {
     const HomeScreen = await loadHomeScreen();
     render(<HomeScreen />);
 
-    fireEvent.click(screen.getByRole('button', { name: /enter cardroom/i }));
+    fireEvent.click(screen.getByRole('button', { name: /enter (?:the )?card room/i }));
     fireEvent.change(screen.getByPlaceholderText(/enter your name/i), { target: { value: 'Kaushik' } });
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
 
@@ -118,7 +118,20 @@ describe('returning visitor (saved profile)', () => {
 
     expect(screen.getByText('Kaushik')).toBeTruthy();
     expect(screen.getByRole('button', { name: /continue as kaushik/i })).toBeTruthy();
-    expect(screen.queryByText(/your cardroom identity/i)).toBeNull();
+    expect(screen.queryByText(/your player profile/i)).toBeNull();
+  });
+
+
+  it('a deliberate table exit returns directly to THE CARD ROOM once, then cold launch returns to Welcome', async () => {
+    sessionStorage.setItem('cardroom_return_once_v1', '1');
+    const HomeScreen = await loadHomeScreen();
+    const first = render(<HomeScreen />);
+
+    expect(screen.getByText(/choose a game/i)).toBeTruthy();
+    first.unmount();
+
+    render(<HomeScreen />);
+    expect(screen.getByRole('button', { name: /continue as kaushik/i })).toBeTruthy();
   });
 
   it('Continue as <name> enters THE CARD ROOM in one tap', async () => {
@@ -176,12 +189,12 @@ describe('Android/PWA Back navigation across the entry flow', () => {
     const HomeScreen = await loadHomeScreen();
     render(<HomeScreen />);
 
-    fireEvent.click(screen.getByRole('button', { name: /enter cardroom/i }));
-    expect(screen.getByText(/your cardroom identity/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /enter (?:the )?card room/i }));
+    expect(screen.getByText(/your player profile/i)).toBeTruthy();
 
     fireBack();
 
-    expect(screen.getByRole('button', { name: /enter cardroom/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /enter (?:the )?card room/i })).toBeTruthy();
   });
 
   it('Back from the profile sheet (opened from THE CARD ROOM) returns to THE CARD ROOM, not Welcome', async () => {
@@ -201,7 +214,7 @@ describe('Android/PWA Back navigation across the entry flow', () => {
   it('does not push a history entry per keystroke while typing a name', async () => {
     const HomeScreen = await loadHomeScreen();
     render(<HomeScreen />);
-    fireEvent.click(screen.getByRole('button', { name: /enter cardroom/i }));
+    fireEvent.click(screen.getByRole('button', { name: /enter (?:the )?card room/i }));
 
     const lengthBefore = window.history.length;
     fireEvent.change(screen.getByPlaceholderText(/enter your name/i), { target: { value: 'K' } });

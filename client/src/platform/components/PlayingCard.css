@@ -17,7 +17,9 @@
   padding: 0;
   border: none;
   border-radius: var(--radius-card);
-  background: var(--card-face);
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.7), transparent 38%),
+    linear-gradient(180deg, #fbf8ef, var(--card-face));
   box-shadow: var(--shadow-card);
   font-family: var(--font-body);
   /* Cards are manipulated by touch - never let the page scroll underneath. */
@@ -27,7 +29,22 @@
   transition:
     transform var(--dur-fast) var(--ease-settle),
     box-shadow var(--dur-fast) var(--ease-smooth);
+  transform: rotate(var(--pcard-tilt, 0deg));
   will-change: transform;
+}
+
+/* Very fine paper tooth. It keeps large cards from looking like flat white
+   browser rectangles, while remaining invisible enough at small sizes that
+   ranks stay dominant. */
+.pcard--face::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: calc(var(--radius-card) - 1px);
+  background:
+    repeating-linear-gradient(25deg, rgba(85,65,42,.018) 0 1px, transparent 1px 4px),
+    radial-gradient(circle at 28% 18%, rgba(255,255,255,.34), transparent 34%);
+  pointer-events: none;
 }
 
 .pcard--sm { --pcard-w: 2.375rem; }
@@ -40,7 +57,8 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  border: 1px solid var(--card-face-edge);
+  border: 1px solid #d6cbb4;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.35);
   pointer-events: none;
 }
 
@@ -88,27 +106,64 @@
   left: 50%;
   transform: translate(-50%, -50%);
   font-size: calc(var(--pcard-w) * 0.46);
-  opacity: 0.9;
+  opacity: 0.88;
+  filter: drop-shadow(0 1px 0 rgba(255,255,255,.55));
 }
 
 /* ---- Back ------------------------------------------------------------- */
 
 .pcard--back {
-  background: var(--card-back);
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.075), transparent 33%),
+    linear-gradient(180deg, #792b39, #541924);
+  box-shadow:
+    0 2px 6px rgba(8, 5, 3, 0.42),
+    0 8px 20px rgba(8, 5, 3, 0.28),
+    inset 0 1px 0 rgba(255,255,255,.055);
 }
 
 .pcard__back-pattern {
   position: absolute;
-  inset: 8%;
+  inset: 7%;
   border-radius: calc(var(--radius-card) - 2px);
-  border: 1px solid var(--brass-600);
+  border: 1px solid rgba(220,192,134,.72);
   background-image:
-    repeating-linear-gradient(
-      45deg,
-      transparent 0 3px,
-      var(--card-back-pattern) 3px 6px
-    );
-  opacity: 0.85;
+    linear-gradient(45deg, transparent 46%, rgba(230,202,151,.12) 47% 53%, transparent 54%),
+    linear-gradient(-45deg, transparent 46%, rgba(230,202,151,.12) 47% 53%, transparent 54%),
+    repeating-linear-gradient(45deg, transparent 0 4px, rgba(35,8,14,.22) 4px 7px);
+  background-size: 11px 11px, 11px 11px, auto;
+  box-shadow:
+    inset 0 0 0 2px rgba(83,24,36,.9),
+    inset 0 0 0 3px rgba(220,192,134,.18);
+  opacity: 0.96;
+}
+
+.pcard__back-pattern::before {
+  content: 'CR';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 44%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%) rotate(45deg);
+  border: 1px solid rgba(220,192,134,.58);
+  background: rgba(82,24,36,.92);
+  color: rgba(239,217,170,.8);
+  font-family: var(--font-display);
+  font-size: calc(var(--pcard-w) * .16);
+  letter-spacing: .06em;
+  text-indent: .06em;
+  box-shadow: 0 0 0 2px rgba(82,24,36,.9), 0 0 0 3px rgba(220,192,134,.14);
+}
+
+.pcard__back-pattern::after {
+  content: '';
+  position: absolute;
+  inset: 11%;
+  border: 1px solid rgba(220,192,134,.2);
+  border-radius: calc(var(--radius-card) - 4px);
 }
 
 /* ---- States -----------------------------------------------------------
@@ -120,14 +175,14 @@
 }
 
 .pcard.is-interactive:hover:not(.is-disabled) {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lift);
+  transform: translateY(-4px) rotate(var(--pcard-tilt, 0deg));
+  box-shadow: 0 13px 28px rgba(8,5,3,.5), 0 2px 5px rgba(8,5,3,.35);
 }
 
 .pcard.is-selected {
   /* Lift is the primary signal; the brass frame is the secondary one. */
-  transform: translateY(-14px);
-  box-shadow: var(--shadow-lift);
+  transform: translateY(-14px) rotate(var(--pcard-tilt, 0deg));
+  box-shadow: 0 14px 30px rgba(8,5,3,.52), 0 0 16px rgba(200,164,92,.1);
   outline: 2px solid var(--brass-400);
   outline-offset: -2px;
 }
@@ -135,7 +190,7 @@
 .pcard.is-highlighted {
   outline: 2px solid var(--brass-300);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px var(--brass-glow), var(--shadow-lift);
+  box-shadow: 0 0 0 4px rgba(200,164,92,.16), 0 0 22px var(--brass-glow), var(--shadow-lift);
 }
 
 .pcard.is-disabled {
@@ -178,6 +233,6 @@
   }
   .pcard.is-selected {
     /* Keep the positional signal even with motion reduced. */
-    transform: translateY(-14px);
+    transform: translateY(-14px) rotate(var(--pcard-tilt, 0deg));
   }
 }

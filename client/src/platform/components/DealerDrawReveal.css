@@ -1,0 +1,125 @@
+/* Shared first-dealer ceremony for Hazari/Kitti. It is presentation only:
+   the server already chose the dealer authoritatively before this appears. */
+.dealer-draw {
+  position: absolute;
+  z-index: 24;
+  top: calc(var(--safe-top) + var(--space-3));
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: max-content;
+  max-width: min(92vw, 34rem);
+  padding: .62rem .82rem;
+  border: 1px solid color-mix(in srgb, var(--brass-500) 46%, transparent);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 28% 0%, rgba(223,190,124,.08), transparent 38%),
+    linear-gradient(180deg, rgba(37,29,21,.97), rgba(13,10,9,.96));
+  box-shadow:
+    0 14px 34px rgba(0,0,0,.42),
+    inset 0 1px rgba(255,238,193,.1),
+    inset 0 0 0 1px rgba(76,51,31,.36);
+  pointer-events: none;
+  animation: dealer-draw-enter 420ms var(--ease-settle) both;
+}
+
+.dealer-draw__copy {
+  display: grid;
+  gap: .06rem;
+  min-width: 7.5rem;
+}
+
+.dealer-draw__copy > span,
+.dealer-draw__copy > small {
+  color: var(--ink-500);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+}
+
+.dealer-draw__copy > span { text-transform: uppercase; }
+.dealer-draw__copy > strong {
+  color: var(--brass-300);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-shadow: 0 1px 9px rgba(0,0,0,.45);
+}
+
+.dealer-draw__cards {
+  display: flex;
+  align-items: flex-end;
+  gap: .35rem;
+  min-width: 0;
+}
+
+.dealer-draw__card {
+  display: grid;
+  justify-items: center;
+  gap: .16rem;
+  opacity: .66;
+  transform: translateY(3px);
+  animation: dealer-card-reveal 360ms var(--ease-settle) both;
+  animation-delay: calc(var(--dealer-card-index, 0) * 75ms + 110ms);
+}
+
+.dealer-draw__card.is-dealer {
+  opacity: 1;
+  transform: translateY(-3px);
+}
+
+.dealer-draw__card > span {
+  max-width: 4.6rem;
+  overflow: hidden;
+  color: var(--ink-300);
+  font-size: .62rem;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes dealer-draw-enter {
+  from { opacity: 0; transform: translateY(-9px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes dealer-card-reveal {
+  from { opacity: 0; transform: translateY(-12px) rotate(-3deg) scale(.94); }
+  to { opacity: .66; transform: translateY(3px) rotate(0) scale(1); }
+}
+
+.dealer-draw__card.is-dealer {
+  animation-name: dealer-card-reveal-winner;
+}
+
+@keyframes dealer-card-reveal-winner {
+  from { opacity: 0; transform: translateY(-12px) rotate(-3deg) scale(.94); }
+  to { opacity: 1; transform: translateY(-3px) rotate(0) scale(1); }
+}
+
+@media (max-width: 28rem) {
+  .dealer-draw {
+    gap: .5rem;
+    max-width: calc(100vw - var(--safe-left) - var(--safe-right) - .75rem);
+    padding: .45rem .56rem;
+    border-radius: var(--radius-lg);
+  }
+  .dealer-draw__copy { min-width: 6.1rem; }
+  .dealer-draw__copy > strong { font-size: var(--text-xs); }
+  .dealer-draw__cards { gap: .12rem; }
+  .dealer-draw__card > span { max-width: 3.75rem; font-size: .56rem; }
+}
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .dealer-draw {
+    top: calc(var(--safe-top) + .25rem);
+    padding-block: .32rem;
+  }
+  .dealer-draw__copy > small { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dealer-draw,
+  .dealer-draw__card { animation: none; }
+}

@@ -11,6 +11,18 @@ export const AVATAR_OPTIONS = [
   '🎭', // mask
   '🌙', // moon
   '⭐', // star
+  '🐆', // panther
+  '🦅', // eagle
+  '🐺', // wolf
+  '🐉', // dragon
+  '🦉', // owl
+  '🐎', // stallion
+  '🐂', // bull
+  '🦊', // fox
+  '💎', // diamond
+  '⚜️', // fleur-de-lis
+  '🛡️', // shield
+  '♠️', // spade
   '🤴', // prince
   '👸', // princess
   '🧞', // genie
@@ -25,7 +37,7 @@ export const AVATAR_OPTIONS = [
 
 export const DEFAULT_AVATAR = AVATAR_OPTIONS[0];
 
-/** Human-readable names for accessibility (screen readers) - matches the comments above 1:1. */
+/** Human-readable names for accessibility (screen readers) - matches the options above 1:1. */
 export const AVATAR_NAMES: Record<string, string> = {
   '🦚': 'Peacock',
   '👑': 'Crown',
@@ -39,6 +51,18 @@ export const AVATAR_NAMES: Record<string, string> = {
   '🎭': 'Mask',
   '🌙': 'Moon',
   '⭐': 'Star',
+  '🐆': 'Panther',
+  '🦅': 'Eagle',
+  '🐺': 'Wolf',
+  '🐉': 'Dragon',
+  '🦉': 'Owl',
+  '🐎': 'Stallion',
+  '🐂': 'Bull',
+  '🦊': 'Fox',
+  '💎': 'Diamond',
+  '⚜️': 'Fleur-de-lis',
+  '🛡️': 'Shield',
+  '♠️': 'Spade',
   '🤴': 'Prince',
   '👸': 'Princess',
   '🧞': 'Genie',
@@ -50,3 +74,11 @@ export const AVATAR_NAMES: Record<string, string> = {
   '🤠': 'Cowboy',
   '🥸': 'Disguise face',
 };
+
+/** Presentation-only medallion tone. The server stores/validates only the
+ * avatar symbol; tone is derived locally so identity stays portable across
+ * web, Android and iPhone without extra image assets. */
+export function avatarToneClass(avatar: string): string {
+  const index = (AVATAR_OPTIONS as readonly string[]).indexOf(avatar);
+  return `avatar-tone-${index < 0 ? 0 : index % 6}`;
+}

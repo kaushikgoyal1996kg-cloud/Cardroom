@@ -9,12 +9,20 @@
     "preview": "vite preview",
     "full-flow-test": "tsx scripts/full-flow-test.mts",
     "avatars-tables-test": "tsx scripts/avatars-tables-test.mts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "android:sync": "npm run build && npx cap sync android && node scripts/configure-android.mjs",
+    "android:open": "npx cap open android",
+    "android:debug": "npm run android:sync && cd android && ./gradlew assembleDebug",
+    "android:init": "npx cap add android && node scripts/configure-android.mjs && npm run android:assets",
+    "android:assets": "npx @capacitor/assets generate --android --assetPath assets --iconBackgroundColor '#0a0908' --iconBackgroundColorDark '#0a0908' --splashBackgroundColor '#0a0908' --splashBackgroundColorDark '#0a0908'"
   },
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "socket.io-client": "^4.7.5"
+    "socket.io-client": "^4.7.5",
+    "@capacitor/core": "8.5.0",
+    "@capacitor/android": "8.5.0",
+    "@capacitor/app": "8.1.1"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",
@@ -26,6 +34,8 @@
     "tsx": "^4.23.12",
     "typescript": "^5.5.4",
     "vite": "^5.4.0",
-    "vitest": "^2.0.5"
+    "vitest": "^2.0.5",
+    "@capacitor/cli": "8.5.0",
+    "@capacitor/assets": "3.0.5"
   }
 }

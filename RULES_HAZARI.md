@@ -26,8 +26,9 @@ Source: `server/src/games/hazari/` — `rules.ts`, `hands.ts`,
 - **Initial dealer** is chosen by a one-card highest draw
   (`determineInitialDealer` in `deck.ts`). Ace high. Tied highest players
   redraw, repeatedly if necessary — it never falls back to a suit ranking.
-  *This draw is computed server-side and is **not** shown to players; the
-  result is not currently in the wire protocol.*
+  The authoritative draw rounds are now included in the public game state and
+  shown as a presentation ceremony before the first 13-card deal; this changes
+  no dealer-selection rule and exposes no hidden hand cards.
 - **Dealer rotates clockwise** each round, including after a dismissed round.
 - Cards are dealt **one at a time clockwise, starting at the dealer**
   (`seatingOrderFromDealer` uses `slice(idx)`, i.e. the dealer receives the
@@ -157,7 +158,15 @@ Rules:
 
 - Hazari supports bots, always labelled **`Bot`**. They are never presented as
   human.
+- Bots arrange from **their own 13 cards only** using the server arrangement
+  solver; they never receive or inspect an opponent's hidden hand.
 - Bot actions verify current game state before acting.
+- At most **one bot action timer per table/session** is pending at a time, so
+  near-simultaneous human confirmations cannot make computer actions burst
+  together.
+- Bot timing is deliberately paced for presentation (arrangement slightly
+  slower than an ordinary throw) with deterministic variation; this changes no
+  legal move or scoring rule.
 - Scheduled ticks are bound to the **session** they were scheduled for, so a
   stale tick cannot mutate a later game.
 
@@ -180,27 +189,14 @@ A **game-integrity product rule**, not a card rule.
 
 ---
 
-## Play money
+## Play money ✅
 
-> ### PLANNED PRODUCT FEATURE — NOT CURRENTLY IMPLEMENTED
->
-> Nothing in this section exists in code. It is recorded here so the intended
-> behaviour is unambiguous when it is built. Do not treat it as a current
-> rule, and do not write tests asserting it until it is implemented.
+The optional room-session play-money board is implemented for Hazari. It does
+**not** replace or alter Hazari's point scoring: the match is still won at
+1,000 points exactly as above. The board is an optional virtual side ledger
+for the match and has no cash value.
 
-### Current state
-
-There is **no play-money system in Hazari today**. No wallet, no board, no
-stakes, no pot, no balances. Scores are points only, and the match ends at
-1,000 points with no other consequence.
-
-### Confirmed plan
-
-Hazari **is** planned to receive the same optional play-money board / pot
-concept as Kitti. This is a settled product decision, not an open question —
-only the implementation is outstanding.
-
-The planned rule:
+The implemented rule:
 
 - The **host proposes** a virtual play-money board amount.
 - **All participating human players must unanimously accept** the proposed
@@ -217,7 +213,8 @@ The planned rule:
 - **No payment processing.**
 - **No conversion of virtual balances into real currency.**
 
-These are absolute and apply to every game in this project. See
+These are absolute and apply to every game in this project. The current
+implementation keeps only room-session P/L; there is no persistent wallet. See
 `RULES_KITTI.md` for the equivalent Kitti specification, which this mirrors.
 
 **No real money, ever.**

@@ -3,6 +3,7 @@ import { AvatarBadge } from '../../components/Lobby/AvatarPicker';
 import { Confetti } from '../../components/Confetti';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useVisualViewport } from '../../platform/lib/useVisualViewport';
+import { PlayMoneySettlement } from '../../platform/components/PlayMoneyBoard';
 // Shares .score-list with the round summary, so the two screens read as a pair.
 import './RoundSummary.css';
 import './WinnerScreen.css';
@@ -12,7 +13,7 @@ import './WinnerScreen.css';
  *
  * Migration only: winner determination is untouched and comes straight from
  * the server's winnerInfo. Everything the legacy screen offered is preserved
- * - winner, final scores, Play Again (host), Return to Lobby, and the
+ * - winner, final scores, Play Again (host), Return to Card Room, and the
  * non-host waiting message. Confetti is kept but restrained.
  */
 export function WinnerScreen() {
@@ -26,7 +27,7 @@ export function WinnerScreen() {
   if (!room || !winnerInfo) {
     return (
       <div className="waiting-screen">
-        <LoadingSpinner message="Returning to Cardroom…" />
+        <LoadingSpinner message="Returning to the Card Room…" />
       </div>
     );
   }
@@ -96,6 +97,7 @@ export function WinnerScreen() {
             ))}
           </ul>
         </section>
+        <PlayMoneySettlement />
       </div>
 
       <div className="winner__actions">
@@ -105,7 +107,7 @@ export function WinnerScreen() {
           </button>
         )}
         <button type="button" className="btn btn--ghost" onClick={leaveSession}>
-          Return to lobby
+          Return to Card Room
         </button>
         {!isHost && (
           <p className="winner__waiting" role="status">

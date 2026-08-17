@@ -8,13 +8,15 @@ conversation context resets and the repository must be the source of truth.
 ## What this project is
 
 A private card room for roughly ten friends and family. No real money
-anywhere, by design. Three games are planned; one is built.
+anywhere, by design. Hazari and Kitti are the current playable games; Teen
+Patti is in development and Poker is a presentation-only Coming Soon title.
 
 | Game | Status |
 |---|---|
-| **Hazari** | Playable flagship. Feature-complete enough for staging. |
-| **Kitti** | Engine partially built. Full spec now agreed. **Next to implement.** |
-| **Teen Patti** | Engine partially built. Full spec agreed. After Kitti. |
+| **Hazari** | Playable core with premium shell, optional virtual board, bots and table-scoped voice. Release 1.5 still needs full suite/device QA. |
+| **Kitti** | Playable online with optional computer seats, bot-only arrangement suggestions, virtual board and reconnect. Release 1.5 still needs full suite/device QA. |
+| **Teen Patti** | Core rewrite/lobby groundwork in progress. **Coming Soon** in the first Android test release. |
+| **Poker** | Presentation-only **Coming Soon** card. Not a server `GameId`; no engine/spec exists. |
 
 **Production deployment is BLOCKED.** The old, previously-deployed Hazari app
 remains the working version for the family and is untouched and unaffected by
@@ -38,16 +40,24 @@ no full match) — most of `STAGING-CHECKLIST.md` is still unverified.
 
 ---
 
-## Verified baseline at the time this file was written
+## Last fully-run accepted baseline
+
+This is the newest repository baseline for which all six normal verification
+commands were actually green (see the 2026-08-16 Bug 5 correction entry). It
+**predates** the Release 1 premium/Kitti working-copy changes below.
 
 | Check | Result |
 |---|---|
-| server `vitest run` | 307 passed |
+| server `vitest run` | 310 passed |
 | server `tsc -p . --noEmit` | clean |
 | server `npm run build` | success |
-| client `vitest run` | 236 passed |
+| client `vitest run` | 377 passed |
 | client `tsc -p tsconfig.app.json --noEmit` | clean |
 | client `npm run build` | success |
+
+### Current Release 1.5.1 working-copy checkpoint — 2026-08-17
+
+The historical table above is **not** a verification of the current Release 1.5.1 working copy. The current environment cannot restore the project's complete npm dependency tree, so full Vitest/typecheck/Vite/Android builds have not been rerun here. Release 1.5 adds optional Hazari/Kitti virtual boards, backend-issued Metered TURN, Kitti computer seats with bot-only server-authoritative suggestions, mixed-game/voice isolation coverage, expanded avatar medallions and lobby lifecycle hardening on top of the Release 1.4 premium shell. The current 1.5.1 working copy also hardens both bot controllers at the shared scheduler boundary: one pending bot timer per table/session, deterministic human-like pacing, active-bot `Thinking…` feedback, and unique premium computer identities after remove/re-add; Hazari's card-choice/arrangement rules remain unchanged. Dependency-light Kitti solver/max-table harnesses have passed during this line; the newest source/import/CSS sweep is recorded in `SESSION_CHANGELOG.md`. Teen Patti remains server-gated `networkPlayable: false`; Poker remains client-only Coming Soon.
 
 **Verify these yourself. Do not trust them blindly.**
 
@@ -126,33 +136,60 @@ Each of these was a deliberate choice, several after finding real bugs.
 
 ## Known technical debt
 
+- **Bug 5's real diagnosis, corrected 2026-08-16 (later): it was never
+  RoundSummary. It was the per-set reveal sheet.** Two full rounds of
+  "end-of-hand scroll" fixes were applied to `RoundSummary.css`/`.tsx` -
+  the screen shown once, after a round's 4th set AND the round itself
+  resolve. Real-device feedback eventually clarified the actual bug: on
+  Android PWA in short landscape, the screen that wouldn't scroll was
+  `.reveal` (`HazariTable.css`/`.tsx`) - the per-SET result sheet shown
+  after EVERY set (1, 2, 3, and 4 - one shared component, not a
+  different one for the last set). RoundSummary, per that same
+  feedback, was already working correctly. **The mental model to hold
+  onto:** Hazari plays 4 sets per round; after each set, `.reveal`
+  appears inline within `HazariTable` (it never unmounts `HazariTable` -
+  see `App.tsx`'s `PLAYING_STATES`, which includes all four
+  `REVEALING_SET_N` states); only after the 4th set's reveal AND the
+  round's own completion does the screen actually swap to RoundSummary.
+  If a future report describes "the result screen doesn't scroll" again,
+  identify WHICH of these two components it actually is before touching
+  either - don't assume based on which one was fixed last time.
+  `.reveal__sheet` now uses the identical bounded-shell + JS-measured-
+  height pattern as RoundSummary/WinnerScreen (`--js-vh` via
+  `useVisualViewport()`), for the same reliability reasons - see below.
 - **A clean local test suite has now THREE TIMES not been sufficient
   evidence that a mobile fix actually works — 2026-08-16, updated.** Three
-  rounds in a row for Bug 5 specifically: a fixed-height/nested-scroll
-  shell, then a normal-page-flow/sticky-footer redesign, both fully
+  rounds in a row for the end-of-hand/set scroll problem (RoundSummary
+  twice, chasing the wrong component; the actual culprit,
+  `.reveal`, only found on the fourth attempt): a fixed-height/nested-
+  scroll shell, then a normal-page-flow/sticky-footer redesign, both fully
   arithmetic/test-verified in this environment (no browser access) and
   both confirmed still failing on the next real-device retest -
   "physical vertical swiping does NOT scroll the result content" on both,
   a stronger symptom than either round's own theory (dvh inaccuracy,
-  nested-scroll-capture unreliability) fully explains on its own. **The
-  advice this note used to give - "prefer normal page scroll and
-  `position: sticky`, they have a long boring track record" - was itself
-  wrong, or at least insufficient; that exact pattern is what failed the
-  SECOND time.** Do not treat either "bounded shell with nested scroll"
-  or "page flow with sticky footer" as the safe, proven choice - both
-  have independently failed real-device testing once. The current
-  (third) structure additionally uses a JS-measured viewport height
+  nested-scroll-capture unreliability) fully explains on its own - and
+  which, with hindsight, was ALSO partly explained by simply fixing the
+  wrong screen. **The advice this note used to give - "prefer normal page
+  scroll and `position: sticky`, they have a long boring track record" -
+  was itself wrong, or at least insufficient; that exact pattern is what
+  failed the SECOND time.** Do not treat either "bounded shell with
+  nested scroll" or "page flow with sticky footer" as the safe, proven
+  choice - both have independently failed real-device testing once. The
+  current structure (both RoundSummary/WinnerScreen and now `.reveal`)
+  additionally uses a JS-measured viewport height
   (`useVisualViewport()`) rather than trusting CSS `dvh` alone, and has
   NOT yet been confirmed on a real device either - see
-  `SESSION_CHANGELOG.md`'s "Third real-device retest" entry. Treat "the
+  `SESSION_CHANGELOG.md`'s "Bug 5 diagnosis corrected" entry. Treat "the
   arithmetic checks out and the suite is green" as necessary, not
   sufficient, for anything involving viewport units, nested scroll
   regions, touch-gesture handling, or precise pixel geometry on a real
-  phone - this has now been true three times in a row for the same bug.
-- **No automated/in-environment browser or device verification is possible.**
-  Chromium download and apt are both blocked in this build environment, so no
-  session working from this repo can render or screenshot anything itself.
-  A **first-pass manual Android QA round** has now happened on real staging
+  phone - this has now been true three times in a row.
+- **Rendered browser/device verification is still incomplete.** A Chromium binary
+  is now present in this environment, unlike the older sessions recorded below,
+  but the frontend dependency tree is incomplete and cannot currently be restored
+  from npm. Therefore no full current Release 1.5.1 browser render or APK/device pass
+  has been completed here. A **first-pass manual Android QA round** happened on an
+  older staging build
   (see above), which found confirmed layout issues on Home, Lobby,
   Arrangement and Table (portrait and landscape) — but that pass was done by
   the owner, on one device, and did not cover iPhone/Safari, reconnection,
@@ -161,30 +198,33 @@ Each of these was a deliberate choice, several after finding real bugs.
   unverified. This remains the single largest open risk.
 - Dealing and play-travel **timing** needs human judgement on a device.
   Constants live in `client/src/platform/table/seatLayout.ts`.
-- **RoundSummary/WinnerScreen: THIRD structure as of 2026-08-16 - a
-  bounded shell again, but governed by a JS-measured height, not CSS
-  `dvh` alone.** History, in order: (1) fixed `height:100dvh` +
-  `overflow:hidden` shell with a nested `overflow-y:auto` scroll region -
-  failed real-device testing. (2) normal page flow (`min-height`) with a
-  `position:sticky` action bar - ALSO failed real-device testing
-  ("swiping does NOT scroll" - a stronger symptom than either round's own
-  theory fully explains). (3) current: back to a bounded shell
+- **RoundSummary/WinnerScreen: bounded shell, governed by a JS-measured
+  height, not CSS `dvh` alone - confirmed NOT the real Bug 5, kept as
+  precautionary hardening.** History, in order: (1) fixed `height:100dvh`
+  + `overflow:hidden` shell with a nested `overflow-y:auto` scroll region
+  - failed real-device testing. (2) normal page flow (`min-height`) with
+  a `position:sticky` action bar - ALSO failed real-device testing
+  ("swiping does NOT scroll"). (3) current: back to a bounded shell
   (`height: var(--js-vh, 100dvh)`, `overflow:hidden`, ONE
   `flex:1 1 auto; min-height:0; overflow-y:auto; touch-action:pan-y`
   scroll child, action row a plain sibling AFTER it, not nested inside
-  and not sticky) - but `--js-vh` is set inline by
-  `RoundSummary.tsx`/`WinnerScreen.tsx` from `useVisualViewport()` (an
-  existing hook, `platform/lib/useVisualViewport.ts`, previously used
-  only for keyboard avoidance), a JS measurement of the real viewport,
-  not a CSS unit. If a future session is tempted to simplify this back to
-  either of the two prior approaches: don't, without a real device in
-  hand - both have independently, provably failed already. If structure
-  (3) ALSO turns out to fail, the next thing to suspect is NOT the
-  scroll-region CSS (extensively covered by three attempts now) but
-  something upstream of it entirely - `index.html`'s viewport meta tag
-  carries `maximum-scale=1`, a documented source of Android WebView
-  touch-handling side effects, flagged but not confirmed causal this
-  round; that would be the next thing to test removing.
+  and not sticky) - `--js-vh` set inline by `RoundSummary.tsx`/
+  `WinnerScreen.tsx` from `useVisualViewport()` (an existing hook,
+  `platform/lib/useVisualViewport.ts`, previously used only for keyboard
+  avoidance). **Later clarified: RoundSummary was never actually the
+  broken screen** - the real Bug 5 was `.reveal` (see the entry above).
+  This structure is kept anyway (not reverted) since (a) it's a
+  strictly more robust pattern than what it replaced regardless, and
+  (b) reverting untested work for its own sake adds risk for no benefit.
+  If a future session is tempted to simplify RoundSummary/WinnerScreen
+  back to either of the two prior approaches: don't, without a real
+  device in hand - both have independently, provably failed already.
+  `.reveal` (`HazariTable.css`) now shares the identical
+  `--js-vh`/bounded-shell pattern, for the same reasons. Release 1.4 also
+  removes the old `maximum-scale=1` viewport restriction that had been
+  flagged as an upstream touch/scroll risk. That change is **not claimed
+  as the Bug 5 fix** until the reveal sheet is physically swiped on the
+  new Android APK; preserve the bounded-shell hardening until that test.
 - **`DealerToken`'s felt-relative positioning is a real architectural
   tension, not fully resolved — 2026-08-15.** The token (and every seat)
   is positioned as a percentage of the felt, but the felt's pixel size
@@ -300,10 +340,28 @@ lifecycle.
 | `ROADMAP.md` | Completed work, next steps, session-sized phases |
 | `DESIGN_SYSTEM.md` | Approved visual direction |
 | `RULES_HAZARI.md` | Implemented Hazari rules, extracted from the engine |
-| `RULES_KITTI.md` | Agreed Kitti spec + mismatches with current code |
+| `RULES_KITTI.md` | Agreed/implemented Kitti rules; authoritative for playable Kitti |
 | `RULES_TEEN_PATTI.md` | Agreed Teen Patti spec + mismatches with current code |
 | `SESSION_CHANGELOG.md` | Append-only record of each session |
 | `DEPLOYMENT.md` | How to deploy, written for a non-developer |
 | `STAGING-CHECKLIST.md` | What to test on real phones |
 | `MIGRATION.md` | When it is safe to retire the old version |
 | `README.md` | Local setup and quick orientation |
+
+### Multi-game rules-guide behaviour — 2026-08-17
+
+The app must never open with Hazari rules before a game is chosen. `App.tsx` opens a game-specific slide guide only after the player actually enters Hazari or Kitti, remembered independently per game via `lib/tutorial.ts`. Settings has one `Rules & How to Play` action that opens the active game's deck. The detailed slide content lives in `client/src/platform/games/gameGuides.ts`. Do not revert to a single global `haazari_tutorial_seen_v1` gate or a hard-coded Hazari `RulesModal`.
+
+### 2026-08-17 reconnect identity invariant
+
+A human with a valid stored room session must never create a second seat merely because they backed out, reloaded, resumed the PWA, or reopened the app. The token reclaims the same `playerId`; that single public lobby row becomes connected/Online again. New room actions are gated while restoration is pending, and the server also refuses fresh room entry from an already-bound socket. If a stale prior socket is still alive, reconnect detaches it and a later stale disconnect must not mark the restored seat offline. Do not replace this with display-name matching: names are presentation, not identity.
+
+### 2026-08-17 Release 1.4 premium shell invariants
+
+- The game selector is neutral: **no game is pre-selected**. Hazari and Kitti are equal playable tables; Teen Patti and Poker are Coming Soon with no fake action buttons.
+- A true cold launch starts at Welcome. A deliberate Leave/Return from a live room goes directly to The Card Room **once** via `lib/navigation.ts`; do not make players re-enter through Welcome after every table exit.
+- Shared invites use the Card Room invitation screen, not legacy Hazari branding. In native builds invite URLs must come from `VITE_PUBLIC_APP_URL`; never share Capacitor's internal `https://localhost`.
+- PWA install/update UI is web-only. Service-worker updates must not be offered while `room` is non-null, and native APK builds must not show web install/update prompts.
+- Shared transient/support screens (loading, reconnect, Settings, Rules, Stats, History, confirmed-hand waiting, active-seat return pass) use the same premium wood/brass/felt language. Do not reintroduce the old green/glass utility theme.
+- Hazari and Kitti local stats/history are game-scoped; legacy Hazari stats migrate into the Hazari bucket.
+- `index.html` intentionally omits `maximum-scale=1`; do not put it back without a real accessibility/mobile reason.

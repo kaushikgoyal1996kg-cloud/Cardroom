@@ -1,11 +1,10 @@
 # KITTI — agreed specification
 
-**Kitti is the next game to implement, after Hazari and before Teen Patti.**
+**Kitti is implemented as the second playable game, after Hazari and before Teen Patti.**
 
-This file is the agreed rule specification. Most of it is **not yet
-implemented**. The final section lists exactly where the existing engine
-conflicts with this spec — **those conflicts have been documented, not
-resolved. No code was changed.**
+This file is the agreed rule specification and remains the authority for Kitti.
+The core engine, multiplayer controller and client flow now implement the rules
+below. Optional bots remain pending; the consensual room-session play-money board is implemented.
 
 Status key: ✅ implemented · ⛔ not implemented
 
@@ -14,13 +13,13 @@ Status key: ✅ implemented · ⛔ not implemented
 ## Table
 
 - **2–5 players** ✅
-- Bots optional, not required ⛔
+- Bots optional, not required ✅
 - **9 cards** per player ✅
 - Arranged into **three groups of 3** ✅
 
 ---
 
-## Dealer and dealing ⛔
+## Dealer and dealing ✅
 
 - **Initial dealer** by one-card highest draw. Ace high. Tied highest players
   redraw.
@@ -31,7 +30,7 @@ Status key: ✅ implemented · ⛔ not implemented
 
 ---
 
-## Arrangement ⛔ (validation exists, ordering does not)
+## Arrangement ✅
 
 Three groups of three, ordered **strictly strongest → weakest**:
 
@@ -43,7 +42,7 @@ Any other ordering is **invalid**.
 
 ---
 
-## Reveal and play ⛔
+## Reveal and play ✅
 
 Groups are played in order: **Group 1, then Group 2, then Group 3.**
 
@@ -74,19 +73,18 @@ A-K-Q highest, then **A-2-3**, then K-Q-J, Q-J-10, and downward.
 
 **Colour / High Card:** highest card, then second, then third.
 
-**Exact tie:** the **later thrower wins**. ⛔ *(engine currently flags ties as
-unresolved rather than resolving them)*
+**Exact tie:** the **later thrower wins**. ✅
 
 ---
 
-## Round winner ⛔
+## Round winner ✅
 
 - **First player to win two hands wins the round.**
 - The third hand **may still be revealed** after the round is mathematically
   decided.
 - **No sweep bonus.**
 
-### Three-different-winners decider ⛔
+### Three-different-winners decider ✅
 
 If Hands 1, 2 and 3 are won by three different players:
 
@@ -100,7 +98,7 @@ If Hands 1, 2 and 3 are won by three different players:
 
 ---
 
-## Match ⛔
+## Match ✅
 
 - **10 scheduled rounds.**
 - Standings count **rounds won**, not individual hands.
@@ -115,7 +113,7 @@ If Hands 1, 2 and 3 are won by three different players:
 
 ---
 
-## Play money ⛔
+## Play money ✅
 
 **No real money.** Optional play-money board:
 
@@ -124,78 +122,32 @@ If Hands 1, 2 and 3 are won by three different players:
 - Bots may auto-accept.
 - Each participant contributes the amount.
 - The **overall match winner** receives the full virtual pot.
-- A persistent play-money wallet across matches is **planned**.
+- The current implementation keeps room-session P/L only. A persistent play-money wallet across app sessions is **not implemented**.
 
 ---
 
-## Mismatches with the current engine
+## Current implementation status
 
-Found by inspecting `server/src/games/kitti/` against this spec. **Nothing has
-been changed.** Resolve these deliberately in phase K1 (see `ROADMAP.md`).
+Implemented and wired online:
 
-### 1. Group ordering is not enforced — **conflict**
+- 2–5 player rooms and 9-card dealing.
+- Initial one-card dealer draw with tied-high redraws.
+- Dealer-first clockwise dealing; player clockwise from dealer leads Hand 1.
+- Strict strongest → weakest arrangement validation.
+- Hand 1 → Hand 2 → Hand 3 flow; previous hand winner leads next.
+- Exact ties awarded to the later thrower.
+- Immediate round win once a player takes two hands.
+- Three-different-winner fresh-card decider.
+- 10 scheduled rounds, standings by rounds won, tied-leader sudden death.
+- `KittiSession`, `kitti:*` socket controller, private/public state split, reconnect restoration.
+- Mobile client arrangement, dealing, shared table, hand reveal, round summary and winner screens.
+- Optional Kitti computer seats: bots auto-ready, arrange/play only their own cards, obey normal turn/decider rules and never join voice. Shared scheduler hardening keeps at most one pending bot tick per table/session and uses deterministic presentation pacing; this changes no Kitti move/ranking rule.
+- Server-authoritative arrangement suggestion for a human only when every opponent at the table is a bot; any real human opponent disables/refuses assistance.
 
-`validateKittiArrangement` explicitly does **not** require strongest→weakest,
-and there is a passing test asserting a reversed arrangement is currently
-valid:
+Still pending:
 
-> *"does NOT enforce strongest-to-weakest ordering, because that rule is
-> unconfirmed"*
+- Any persistent play-money wallet across app sessions.
+- Full real-device QA across the supported Android/iPhone matrix.
 
-The spec now **requires** it. K1 must add enforcement **and update that test**,
-which currently asserts the opposite of the agreed rule.
-
-### 2. Dealing order starts after the dealer — **conflict**
-
-The spec says cards are dealt "starting from the dealer". Kitti uses
-`platform/cards/index.ts`, whose `seatingOrderFromDealer` returns
-`slice(idx + 1)` — starting with the player **after** the dealer.
-
-Hazari's own copy uses `slice(idx)` — starting **at** the dealer.
-
-The two helpers genuinely differ. K1 must decide which Kitti follows and make
-it explicit. Note the client mirror `dealingOrderFromDealer` follows the
-**Hazari** convention.
-
-### 3. Tie resolution not implemented — **gap**
-
-`compareGroup` reports `tied: true` and lists `topPlayerIds` rather than
-resolving. The spec resolves by later thrower, which requires throw order the
-engine does not currently track.
-
-### 4. Scoring, rounds and match — **gap**
-
-`scoreRound()` deliberately throws; `KITTI_SCORING_CONFIRMED` is `false`.
-None of first-to-two-hands, 10 rounds, standings by rounds won, the decider or
-sudden-death exists.
-
-### 5. `UNRESOLVED_RULES` is now stale — **housekeeping**
-
-It lists `GROUP_ORDERING`, `SCORING`, `WIN_CONDITION`, `TIE_RESOLUTION` and
-`STARTING_PLAYER` as unanswered. **All five are answered by this document.**
-K1 should implement them and then flip `KITTI_SCORING_CONFIRMED`.
-
-### 6. Turn order, leading, dealer draw, bots, play money — **gaps**
-
-None exist. The engine has no concept of a turn, a lead or a round.
-
-### 7. Not network-playable — **expected**
-
-`networkPlayable: false` in the registry; no controller, no UI, no `kitti:*`
-events. Rooms cannot be created. This is correct until K2.
-
----
-
-## What actually exists today
-
-| Piece | Status |
-|---|---|
-| 2–5 players, 9 cards, three groups of 3 | ✅ |
-| 2-3-5 not special | ✅ |
-| Sequence hierarchy incl. A-2-3 second | ✅ |
-| Arrangement validation (sizes, ownership, duplicates) | ✅ |
-| Per-group comparison and ranking | ✅ |
-| Dealer rotation helper | ✅ clockwise |
-| Everything else in this document | ⛔ |
-
-19 tests, covering only what exists.
+The server registry is now `networkPlayable: true` for Kitti. Do not revert it to
+false unless Kitti is intentionally being disabled for a release.

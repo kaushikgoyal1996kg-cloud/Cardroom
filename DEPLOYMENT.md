@@ -68,6 +68,16 @@ redo a step.
    |---|---|
    | `NODE_ENV` | `production` |
    | `ALLOWED_ORIGINS` | leave blank for now — you fill this in at Step 4 |
+   | `METERED_DOMAIN` | optional: your Metered app domain, e.g. `your-app.metered.live` |
+   | `METERED_SECRET_KEY` | optional: Metered account Secret Key — backend only |
+
+
+> **Voice/TURN security.** `METERED_SECRET_KEY` belongs only on the Render
+> backend. Never create a `VITE_*` copy of it and never commit it. When these
+> two Metered variables are configured, the server requests short-lived TURN
+> credentials for voice calls; website, Android APK and iPhone Safari all
+> receive only the temporary ICE configuration. If Metered is unset or
+> unavailable, voice still attempts direct/STUN connectivity.
 
 5. Click **Create Web Service** and wait for it to finish.
 
@@ -132,6 +142,17 @@ If you later add a staging site, list both, separated by a comma and no space:
 ```
 https://cardroom.netlify.app,https://cardroom-staging.netlify.app
 ```
+
+**Android test APK:** the Capacitor build serves its bundled frontend from the
+secure local origin `https://localhost`. The staging backend must therefore
+allow that origin too, while keeping the Netlify origin. For example:
+
+```
+https://cardroom-staging.netlify.app,https://localhost
+```
+
+Do not add a wildcard just to make the APK connect. Keep the explicit allow-list.
+See `ANDROID_RELEASE.md` for the native build/test procedure.
 
 ---
 

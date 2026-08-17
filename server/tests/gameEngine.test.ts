@@ -30,6 +30,25 @@ describe('HaazariGame construction', () => {
     const game = new HaazariGame('ROOM1', PLAYERS, 'P2');
     expect(game.dealerId).toBe('P2');
   });
+
+  it('publishes the first high-card dealer draw with presentation-only card ids', () => {
+    const game = new HaazariGame('ROOM1', PLAYERS);
+    const state = game.getPublicState();
+    expect(state.initialDealerDraws.length).toBeGreaterThan(0);
+
+    const finalDraw = state.initialDealerDraws[state.initialDealerDraws.length - 1];
+    expect(finalDraw.draws.some((draw) => draw.playerId === game.dealerId)).toBe(true);
+    for (const [index, draw] of finalDraw.draws.entries()) {
+      expect(draw.card.id).toMatch(/^dealer-draw-\d+-P[1-4]$/);
+      expect(draw.card.id).not.toContain(`${draw.card.suit}_${draw.card.rank}`);
+      expect(finalDraw.contenders[index]).toBe(draw.playerId);
+    }
+  });
+
+  it('publishes no dealer-draw ceremony when a deterministic dealer is supplied', () => {
+    const game = new HaazariGame('ROOM1', PLAYERS, 'P2');
+    expect(game.getPublicState().initialDealerDraws).toEqual([]);
+  });
 });
 
 describe('dealing', () => {

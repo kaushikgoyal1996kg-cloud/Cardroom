@@ -3,7 +3,7 @@ dist/
 *.tsbuildinfo
 *.log
 
-# Environment files — real secrets (e.g. VITE_TURN_CREDENTIAL) live in
+# Environment files — real deployment values live in
 # .env.local. Never commit it. Templates stay tracked.
 .env
 .env.local

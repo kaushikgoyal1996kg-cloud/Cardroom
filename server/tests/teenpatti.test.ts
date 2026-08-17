@@ -1,338 +1,360 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Card, Rank, Suit } from '../src/platform/cards/index.js';
-import { createDeck, shuffleDeck } from '../src/platform/cards/index.js';
-import { TeenPattiGame } from '../src/games/teenpatti/engine.js';
-import { TEEN_PATTI_RULES, TEEN_PATTI_VARIANTS } from '../src/games/teenpatti/rules.js';
+import { createDeck } from '../src/platform/cards/index.js';
+import {
+  TeenPattiGame,
+  drawInitialTeenPattiDealer,
+} from '../src/games/teenpatti/engine.js';
+import {
+  TEEN_PATTI_RULES,
+  TEEN_PATTI_VARIANTS,
+  nextBlindAmount,
+} from '../src/games/teenpatti/rules.js';
 
+const ids = (n: number) => Array.from({ length: n }, (_, i) => `p${i + 1}`);
 const c = (rank: Rank, suit: Suit): Card => ({ rank, suit, id: `${suit}_${rank}` });
 
-function players(n: number): string[] {
-  return Array.from({ length: n }, (_, i) => `p${i + 1}`);
+function deckBeginningWith(cards: Card[]): Card[] {
+  const used = new Set(cards.map((card) => card.id));
+  return [...cards, ...createDeck().filter((card) => !used.has(card.id))];
 }
 
-/** Builds a deck whose one-at-a-time deal gives the requested hands in seat order. */
-function stackedDeck(hands: Card[][]): Card[] {
-  const out: Card[] = [];
-  for (let i = 0; i < 3; i++) {
-    for (const h of hands) out.push(h[i]);
+/** Build a deck whose round-robin deal gives exactly these hands in order. */
+function deckForHands(order: string[], hands: Record<string, Card[]>): Card[] {
+  const count = hands[order[0]].length;
+  const beginning: Card[] = [];
+  for (let round = 0; round < count; round++) {
+    for (const playerId of order) beginning.push(hands[playerId][round]);
   }
-  const used = new Set(out.map((x) => x.id));
-  return [...out, ...createDeck().filter((x) => !used.has(x.id))];
+  return deckBeginningWith(beginning);
 }
 
-describe('Teen Patti table limits', () => {
-  it('supports up to 9 players', () => {
-    expect(TEEN_PATTI_RULES.MAX_PLAYERS).toBe(9);
-    expect(() => new TeenPattiGame('T1', players(9))).not.toThrow();
+const config = {
+  startingBalance: 1000,
+  bootAmount: 10,
+  baseBlind: 20,
+  maxBlind: 60,
+};
+
+describe('Teen Patti authoritative rules', () => {
+  it('supports 2-9 players and rejects duplicate/out-of-range tables', () => {
+    expect(() => new TeenPattiGame('T', ids(2))).not.toThrow();
+    expect(() => new TeenPattiGame('T', ids(9))).not.toThrow();
+    expect(() => new TeenPattiGame('T', ids(1))).toThrow(/2-9/);
+    expect(() => new TeenPattiGame('T', ids(10))).toThrow(/2-9/);
+    expect(() => new TeenPattiGame('T', ['p1', 'p1'])).toThrow(/duplicate/i);
   });
 
-  it('rejects 1 player and 10 players', () => {
-    expect(() => new TeenPattiGame('T1', players(1))).toThrow();
-    expect(() => new TeenPattiGame('T1', players(10))).toThrow();
+  it('locks the agreed blind and sideshow constants', () => {
+    expect(TEEN_PATTI_RULES.MAX_BLIND_TURNS).toBe(3);
+    expect(TEEN_PATTI_RULES.SEEN_MULTIPLIER).toBe(2);
+    expect(TEEN_PATTI_RULES.NEXT_DEALER).toBe('PREVIOUS_ROUND_WINNER');
+    expect(TEEN_PATTI_RULES.COMPULSORY_SIDESHOW).toBe(true);
+    expect(nextBlindAmount(20, 60)).toBe(40);
+    expect(nextBlindAmount(40, 60)).toBe(60);
+    expect(nextBlindAmount(60, 60)).toBe(60);
   });
 
-  it('is hard-coded to never involve real money', () => {
-    expect(TEEN_PATTI_RULES.REAL_MONEY).toBe(false);
+  it('rejects a table setup whose starting balance cannot cover the first boot', () => {
+    expect(() => new TeenPattiGame('T', ids(2), {
+      tableConfig: { startingBalance: 5, bootAmount: 10, baseBlind: 10, maxBlind: 20 },
+    })).toThrow(/first boot/i);
+  });
+
+  it('refuses an unimplemented variant instead of silently playing Classic', () => {
+    expect(TEEN_PATTI_VARIANTS.MUFLIS.runtimeImplemented).toBe(false);
+    expect(() => new TeenPattiGame('T', ids(3), { roundVariant: { variantId: 'MUFLIS' } }))
+      .toThrow(/not runtime-implemented/i);
   });
 });
 
-describe('Teen Patti dealing and boot', () => {
-  it('deals exactly 3 distinct cards each and collects the boot', () => {
-    const game = new TeenPattiGame('T1', players(4), 'p1');
-    game.dealNewRound();
-    const all: string[] = [];
-    for (const pid of players(4)) {
-      const h = game.getPlayerHand(pid);
-      expect(h).toHaveLength(3);
-      all.push(...h.map((x) => x.id));
-    }
-    expect(new Set(all).size).toBe(12);
-    expect(game.pot).toBe(TEEN_PATTI_VARIANTS.BOOT_AMOUNT * 4);
-    for (const pid of players(4)) {
-      expect(game.getPlayer(pid)!.chips).toBe(
-        TEEN_PATTI_VARIANTS.STARTING_CHIPS - TEEN_PATTI_VARIANTS.BOOT_AMOUNT
-      );
+describe('Teen Patti dealer and dealing', () => {
+  it('chooses the initial dealer by Ace-high draw and redraws tied leaders', () => {
+    const drawDeck = deckBeginningWith([
+      c('A', 'SPADES'), // p1
+      c('A', 'HEARTS'), // p2
+      c('K', 'CLUBS'),  // p3 -> eliminated
+      c('10', 'DIAMONDS'), // p1 redraw
+      c('Q', 'SPADES'),    // p2 redraw -> dealer
+    ]);
+    const result = drawInitialTeenPattiDealer(['p1', 'p2', 'p3'], drawDeck);
+    expect(result.dealerId).toBe('p2');
+    expect(result.rounds).toHaveLength(2);
+    expect(result.rounds[1].contenders).toEqual(['p1', 'p2']);
+  });
+
+  it('collects the boot from everyone and starts with player clockwise of dealer', () => {
+    const game = new TeenPattiGame('T', ids(4), { initialDealerId: 'p2', tableConfig: config });
+    game.dealNewRound(createDeck());
+    expect(game.pot).toBe(40);
+    expect(game.currentTurn).toBe('p3');
+    expect(game.currentBlind).toBe(20);
+    for (const id of ids(4)) {
+      expect(game.getPlayer(id)!.chips).toBe(990);
+      expect(game.getPlayerHand(id)).toHaveLength(3);
     }
   });
 
-  it('starts betting with the player left of the dealer', () => {
-    const game = new TeenPattiGame('T1', players(4), 'p1');
-    game.dealNewRound();
+  it('requires top-up rather than silently sitting an underfunded player out', () => {
+    const game = new TeenPattiGame('T', ids(3), { initialDealerId: 'p1', tableConfig: config });
+    game.getPlayer('p2')!.chips = 5;
+    expect(() => game.dealNewRound()).toThrow(/top-up required/i);
+    expect(game.getPlayer('p2')!.packed).toBe(false);
+  });
+});
+
+describe('Teen Patti privacy and betting', () => {
+  it('does not expose any dealt hand in public state', () => {
+    const game = new TeenPattiGame('T', ids(4), { initialDealerId: 'p1', tableConfig: config });
+    game.dealNewRound(createDeck());
+    const publicJson = JSON.stringify(game.getPublicState());
+    for (const id of ids(4)) {
+      for (const card of game.getPlayerHand(id)) expect(publicJson).not.toContain(card.id);
+    }
+  });
+
+  it('keeps own cards hidden until explicit See', () => {
+    const game = new TeenPattiGame('T', ids(3), { initialDealerId: 'p1', tableConfig: config });
+    game.dealNewRound(createDeck());
+    expect(game.getPrivateState('p2')!.cards).toEqual([]);
+    expect(game.act('p2', { type: 'SEE' }).ok).toBe(true);
+    expect(game.getPrivateState('p2')!.cards).toHaveLength(3);
+  });
+
+  it('uses fixed blind doubling and caps at max blind', () => {
+    const game = new TeenPattiGame('T', ids(3), { initialDealerId: 'p1', tableConfig: config });
+    game.dealNewRound(createDeck());
+    expect(game.act('p2', { type: 'BLIND' }).ok).toBe(true);
+    expect(game.currentBlind).toBe(40);
+    expect(game.act('p3', { type: 'BLIND' }).ok).toBe(true);
+    expect(game.currentBlind).toBe(60);
+    expect(game.act('p1', { type: 'BLIND' }).ok).toBe(true);
+    expect(game.currentBlind).toBe(60);
+  });
+
+  it('forces seen betting status after three blind chances without revealing cards', () => {
+    const game = new TeenPattiGame('T', ids(3), { initialDealerId: 'p1', tableConfig: config });
+    game.dealNewRound(createDeck());
+    for (let cycle = 0; cycle < 3; cycle++) {
+      expect(game.act('p2', { type: 'BLIND' }).ok).toBe(true);
+      expect(game.act('p3', { type: 'BLIND' }).ok).toBe(true);
+      expect(game.act('p1', { type: 'BLIND' }).ok).toBe(true);
+    }
     expect(game.currentTurn).toBe('p2');
-    expect(game.state).toBe('BETTING');
-  });
-});
-
-describe('Teen Patti server authority', () => {
-  it('rejects an action from a player whose turn it is not', () => {
-    const game = new TeenPattiGame('T1', players(3), 'p1');
-    game.dealNewRound();
-    const res = game.act('p3', { type: 'BLIND', multiplier: 1 });
-    expect(res.ok).toBe(false);
-    expect(res.error).toMatch(/not your turn/i);
+    expect(game.getPlayer('p2')!.seen).toBe(true);
+    expect(game.getPlayer('p2')!.cardsViewed).toBe(false);
+    expect(game.getPrivateState('p2')!.cards).toEqual([]);
+    expect(game.act('p2', { type: 'BLIND' }).ok).toBe(false);
+    expect(game.act('p2', { type: 'CHAAL' }).ok).toBe(true);
   });
 
-  it('rejects an action from someone not seated at the table', () => {
-    const game = new TeenPattiGame('T1', players(3), 'p1');
-    game.dealNewRound();
-    const res = game.act('intruder', { type: 'BLIND', multiplier: 1 });
-    expect(res.ok).toBe(false);
-    expect(res.error).toMatch(/not seated/i);
-  });
-
-  it('rejects a chaal from a player who has not looked at their cards', () => {
-    const game = new TeenPattiGame('T1', players(3), 'p1');
-    game.dealNewRound();
-    const res = game.act('p2', { type: 'CHAAL', multiplier: 2 });
-    expect(res.ok).toBe(false);
-    expect(res.error).toMatch(/look at your cards/i);
-  });
-
-  it('rejects a blind bet from a player who has already seen their cards', () => {
-    const game = new TeenPattiGame('T1', players(3), 'p1');
-    game.dealNewRound();
+  it('seen amount is always exactly 2x current blind', () => {
+    const game = new TeenPattiGame('T', ids(3), { initialDealerId: 'p1', tableConfig: config });
+    game.dealNewRound(createDeck());
     game.act('p2', { type: 'SEE' });
-    const res = game.act('p2', { type: 'BLIND', multiplier: 1 });
-    expect(res.ok).toBe(false);
-    expect(res.error).toMatch(/must play chaal/i);
+    const before = game.getPlayer('p2')!.chips;
+    expect(game.act('p2', { type: 'CHAAL' }).ok).toBe(true);
+    expect(before - game.getPlayer('p2')!.chips).toBe(40);
+    expect(game.currentBlind).toBe(20);
   });
 
-  it('rejects an off-schedule bet multiplier', () => {
-    const game = new TeenPattiGame('T1', players(3), 'p1');
-    game.dealNewRound();
-    const res = game.act('p2', { type: 'BLIND', multiplier: 7 });
-    expect(res.ok).toBe(false);
-    expect(res.error).toMatch(/must be/i);
-  });
-
-  it('rejects a bet larger than the player can afford', () => {
-    const game = new TeenPattiGame('T1', players(3), 'p1');
-    game.dealNewRound();
-    game.getPlayer('p2')!.chips = 1;
-    const res = game.act('p2', { type: 'BLIND', multiplier: 2 });
-    expect(res.ok).toBe(false);
-    expect(res.error).toMatch(/enough chips/i);
-  });
-
-  it('rejects any action from a player who has packed', () => {
-    const game = new TeenPattiGame('T1', players(4), 'p1');
-    game.dealNewRound();
-    game.act('p2', { type: 'PACK' });
-    const res = game.act('p2', { type: 'BLIND', multiplier: 1 });
-    expect(res.ok).toBe(false);
-    expect(res.error).toMatch(/packed/i);
-  });
-
-  it('never exposes another player\'s cards in the public state', () => {
-    const game = new TeenPattiGame('T1', players(4), 'p1');
-    game.dealNewRound();
-    const serialised = JSON.stringify(game.getPublicState());
-    for (const pid of players(4)) {
-      for (const card of game.getPlayerHand(pid)) {
-        expect(serialised).not.toContain(card.id);
-      }
-    }
+  it('rejects stale duplicate actions by sequence', () => {
+    const game = new TeenPattiGame('T', ids(3), { initialDealerId: 'p1', tableConfig: config });
+    game.dealNewRound(createDeck());
+    const seq = game.sequence;
+    expect(game.act('p2', { type: 'BLIND' }, seq).ok).toBe(true);
+    expect(game.act('p2', { type: 'BLIND' }, seq).error).toMatch(/already applied/i);
   });
 });
 
-describe('Teen Patti duplicate action protection', () => {
-  it('rejects a stale action whose sequence number is out of date', () => {
-    const game = new TeenPattiGame('T1', players(3), 'p1');
-    game.dealNewRound();
-    const seq = game.sequence;
-
-    const first = game.act('p2', { type: 'BLIND', multiplier: 1 }, seq);
-    expect(first.ok).toBe(true);
-
-    // A double-tap replays the same action with the now-stale sequence.
-    const replay = game.act('p2', { type: 'BLIND', multiplier: 1 }, seq);
-    expect(replay.ok).toBe(false);
-    expect(replay.error).toMatch(/already applied/i);
-  });
-
-  it('a double-tapped pack cannot remove two players', () => {
-    const game = new TeenPattiGame('T1', players(4), 'p1');
-    game.dealNewRound();
-    const before = game.activePlayers().length;
-    const seq = game.sequence;
-    game.act('p2', { type: 'PACK' }, seq);
-    game.act('p2', { type: 'PACK' }, seq);
-    expect(game.activePlayers().length).toBe(before - 1);
-  });
-});
-
-describe('Teen Patti round resolution', () => {
-  it('awards the pot to the last player standing when everyone else packs', () => {
-    const game = new TeenPattiGame('T1', players(3), 'p1');
-    game.dealNewRound();
-    const potBefore = game.pot;
-
-    game.act('p2', { type: 'PACK' });
-    game.act('p3', { type: 'PACK' });
-
-    expect(game.state).toBe('ROUND_COMPLETE');
-    expect(game.lastOutcome!.winnerIds).toEqual(['p1']);
-    expect(game.lastOutcome!.potAwarded).toBe(potBefore);
-    // No showdown happened, so no cards were revealed.
-    expect(game.lastOutcome!.showdown).toBeNull();
-  });
-
-  it('resolves a show in favour of the stronger hand', () => {
-    const game = new TeenPattiGame('T1', players(2), 'p1');
-    // Seat order left of dealer p1 is [p2, p1].
-    const deck = stackedDeck([
-      [c('K', 'SPADES'), c('K', 'HEARTS'), c('K', 'CLUBS')],   // p2 - trail
-      [c('A', 'SPADES'), c('K', 'DIAMONDS'), c('Q', 'CLUBS')], // p1 - sequence
-    ]);
+describe('Teen Patti compulsory sideshow', () => {
+  it('compares current player with nearest active player anticlockwise', () => {
+    const order = ['p2', 'p3', 'p4', 'p1']; // dealer p1 -> deal/first turn starts p2
+    const deck = deckForHands(order, {
+      p2: [c('9', 'SPADES'), c('7', 'HEARTS'), c('4', 'CLUBS')],
+      p3: [c('Q', 'SPADES'), c('J', 'HEARTS'), c('8', 'CLUBS')],
+      p4: [c('K', 'SPADES'), c('K', 'HEARTS'), c('2', 'CLUBS')],
+      p1: [c('A', 'SPADES'), c('A', 'HEARTS'), c('A', 'CLUBS')],
+    });
+    const game = new TeenPattiGame('T', ids(4), { initialDealerId: 'p1', tableConfig: config });
     game.dealNewRound(deck);
+    for (const id of ids(4)) game.getPlayer(id)!.seen = true;
 
-    game.act('p2', { type: 'SEE' });
-    game.act('p2', { type: 'SHOW' });
+    expect(game.currentTurn).toBe('p2');
+    expect(game.act('p2', { type: 'CHAAL' }).error).toMatch(/sideshow is compulsory/i);
+    expect(game.act('p2', { type: 'SIDESHOW' }).ok).toBe(true);
+    expect(game.lastSideshow).toMatchObject({ initiatorId: 'p2', opponentId: 'p1', packedPlayerId: 'p2' });
+  });
 
+  it('packs the initiator on an exact sideshow tie', () => {
+    const order = ['p2', 'p3', 'p1'];
+    const deck = deckForHands(order, {
+      p2: [c('K', 'SPADES'), c('9', 'HEARTS'), c('4', 'CLUBS')],
+      p3: [c('Q', 'SPADES'), c('8', 'HEARTS'), c('3', 'CLUBS')],
+      p1: [c('K', 'HEARTS'), c('9', 'CLUBS'), c('4', 'DIAMONDS')],
+    });
+    const game = new TeenPattiGame('T', ids(3), { initialDealerId: 'p1', tableConfig: config });
+    game.dealNewRound(deck);
+    for (const id of ids(3)) game.getPlayer(id)!.seen = true;
+    expect(game.act('p2', { type: 'SIDESHOW' }).ok).toBe(true);
+    expect(game.lastSideshow).toMatchObject({ packedPlayerId: 'p2', tied: true });
+  });
+});
+
+describe('Teen Patti final two', () => {
+  const finalDeck = () => deckForHands(['p2', 'p1'], {
+    p2: [c('K', 'SPADES'), c('K', 'HEARTS'), c('K', 'CLUBS')],
+    p1: [c('A', 'SPADES'), c('K', 'DIAMONDS'), c('Q', 'CLUBS')],
+  });
+
+  it('allows mutual open show with no extra payment', () => {
+    const game = new TeenPattiGame('T', ids(2), { initialDealerId: 'p1', tableConfig: config });
+    game.dealNewRound(finalDeck());
+    const pot = game.pot;
+    const p2Before = game.getPlayer('p2')!.chips;
+    expect(game.act('p2', { type: 'REQUEST_OPEN_SHOW' }).ok).toBe(true);
+    expect(game.act('p1', { type: 'ACCEPT_OPEN_SHOW' }).ok).toBe(true);
     expect(game.state).toBe('ROUND_COMPLETE');
+    expect(game.lastOutcome!.reason).toBe('MUTUAL_OPEN_SHOW');
     expect(game.lastOutcome!.winnerIds).toEqual(['p2']);
-    expect(game.lastOutcome!.showdown).toHaveLength(2);
-    expect(game.lastOutcome!.split).toBe(false);
+    expect(game.lastOutcome!.potAwarded).toBe(pot);
+    expect(game.getPlayer('p2')!.chips).toBe(p2Before + pot);
   });
 
-  it('splits the pot on an exact tie', () => {
-    const game = new TeenPattiGame('T1', players(2), 'p1');
-    const deck = stackedDeck([
-      [c('K', 'SPADES'), c('9', 'HEARTS'), c('4', 'CLUBS')],
-      [c('K', 'HEARTS'), c('9', 'CLUBS'), c('4', 'DIAMONDS')], // identical ranks
-    ]);
-    game.dealNewRound(deck);
+  it('paid showdown costs exactly the current seen amount', () => {
+    const game = new TeenPattiGame('T', ids(2), { initialDealerId: 'p1', tableConfig: config });
+    game.dealNewRound(finalDeck());
+    const before = game.getPlayer('p2')!.chips;
+    const initialPot = game.pot;
+    expect(game.act('p2', { type: 'SHOWDOWN' }).ok).toBe(true);
+    expect(game.lastOutcome!.potAwarded).toBe(initialPot + 40);
+    // p2 wins, so after paying 40 it receives the whole resulting pot.
+    expect(game.getPlayer('p2')!.chips).toBe(before - 40 + initialPot + 40);
+  });
 
-    game.act('p2', { type: 'SEE' });
-    game.act('p2', { type: 'SHOW' });
-
+  it('splits an exact equal final hand equally', () => {
+    const tieDeck = deckForHands(['p2', 'p1'], {
+      p2: [c('K', 'SPADES'), c('9', 'HEARTS'), c('4', 'CLUBS')],
+      p1: [c('K', 'HEARTS'), c('9', 'CLUBS'), c('4', 'DIAMONDS')],
+    });
+    const game = new TeenPattiGame('T', ids(2), { initialDealerId: 'p1', tableConfig: config });
+    game.dealNewRound(tieDeck);
+    expect(game.act('p2', { type: 'REQUEST_OPEN_SHOW' }).ok).toBe(true);
+    expect(game.act('p1', { type: 'ACCEPT_OPEN_SHOW' }).ok).toBe(true);
     expect(game.lastOutcome!.split).toBe(true);
     expect(game.lastOutcome!.winnerIds.sort()).toEqual(['p1', 'p2']);
+    expect(game.getPlayer('p1')!.chips).toBe(1000);
+    expect(game.getPlayer('p2')!.chips).toBe(1000);
   });
+});
 
-  it('does not allow a show while more than two players remain', () => {
-    const game = new TeenPattiGame('T1', players(4), 'p1');
-    game.dealNewRound();
-    game.act('p2', { type: 'SEE' });
-    const res = game.act('p2', { type: 'SHOW' });
-    expect(res.ok).toBe(false);
-    expect(res.error).toMatch(/two players/i);
-  });
-
-  it('conserves chips - total in play never changes across a round', () => {
-    const game = new TeenPattiGame('T1', players(4), 'p1');
-    const total = () =>
-      players(4).reduce((s, pid) => s + game.getPlayer(pid)!.chips, 0) + game.pot;
-
-    const before = total();
-    game.dealNewRound();
-    game.act('p2', { type: 'BLIND', multiplier: 1 });
-    game.act('p3', { type: 'SEE' });
-    game.act('p3', { type: 'CHAAL', multiplier: 2 });
-    game.act('p4', { type: 'PACK' });
-    game.act('p1', { type: 'PACK' });
-    game.act('p2', { type: 'PACK' });
-    expect(total()).toBe(before);
-  });
-
-  it('rotates the dealer clockwise between rounds', () => {
-    const game = new TeenPattiGame('T1', players(5), 'p1');
-    game.rotateDealer();
+describe('Teen Patti rounds, top-ups and P&L', () => {
+  it('makes the unique previous-round winner the next dealer', () => {
+    const game = new TeenPattiGame('T', ids(2), { initialDealerId: 'p1', tableConfig: config });
+    const deck = deckForHands(['p2', 'p1'], {
+      p2: [c('K', 'SPADES'), c('K', 'HEARTS'), c('K', 'CLUBS')],
+      p1: [c('A', 'SPADES'), c('K', 'DIAMONDS'), c('Q', 'CLUBS')],
+    });
+    game.dealNewRound(deck);
+    game.act('p2', { type: 'SHOWDOWN' });
+    expect(game.dealerId).toBe('p1'); // result screen stays on round's dealer
+    expect(game.roundNumber).toBe(1);
+    game.dealNewRound(createDeck());
     expect(game.dealerId).toBe('p2');
     expect(game.roundNumber).toBe(2);
   });
-});
 
-describe('Teen Patti multi-round stability', () => {
-  it('plays 30 randomised rounds at a 6-player table without corrupting state', () => {
-    const game = new TeenPattiGame('T1', players(6), 'p1');
-    const startingTotal = players(6).reduce(
-      (s, pid) => s + game.getPlayer(pid)!.chips, 0
-    );
+  it('does not advance round or dealer when the next boot is rejected for insufficient balance', () => {
+    const small = { startingBalance: 30, bootAmount: 10, baseBlind: 10, maxBlind: 20 };
+    const game = new TeenPattiGame('T', ids(2), { initialDealerId: 'p1', tableConfig: small });
+    const winningDeck = deckForHands(['p2', 'p1'], {
+      p2: [c('K', 'SPADES'), c('K', 'HEARTS'), c('K', 'CLUBS')],
+      p1: [c('A', 'SPADES'), c('K', 'DIAMONDS'), c('Q', 'CLUBS')],
+    });
+    game.dealNewRound(winningDeck);
+    game.act('p2', { type: 'SHOWDOWN' });
+    expect(game.state).toBe('ROUND_COMPLETE');
+    expect(game.roundNumber).toBe(1);
+    expect(game.dealerId).toBe('p1');
 
-    for (let round = 0; round < 30; round++) {
-      const withChips = players(6).filter(
-        (p) => game.getPlayer(p)!.chips >= TEEN_PATTI_VARIANTS.BOOT_AMOUNT
-      );
-      if (withChips.length < 2) break;
+    // Make p1 unable to pay the next boot. The rejected deal must leave the
+    // completed result exactly where it was so a later retry is safe.
+    game.getPlayer('p1')!.chips = 5;
+    expect(() => game.dealNewRound(createDeck())).toThrow(/top-up required/i);
+    expect(game.state).toBe('ROUND_COMPLETE');
+    expect(game.roundNumber).toBe(1);
+    expect(game.dealerId).toBe('p1');
 
-      game.dealNewRound(shuffleDeck(createDeck()));
-
-      let guard = 0;
-      // A playable round must finish well inside this. Before the pot limit
-      // and blind limit were enabled, an all-blind round took 599 turns.
-      const MAX_REASONABLE_TURNS = 120;
-      while (game.state === 'BETTING' && guard++ < MAX_REASONABLE_TURNS) {
-        const turn = game.currentTurn!;
-        const p = game.getPlayer(turn)!;
-        const active = game.activePlayers();
-
-        if (active.length === 2 && p.seen) {
-          if (!game.act(turn, { type: 'SHOW' }).ok) {
-            game.act(turn, { type: 'PACK' });
-          }
-        } else if (!p.seen && guard % 3 === 0) {
-          game.act(turn, { type: 'SEE' });
-        } else if (p.seen) {
-          if (!game.act(turn, { type: 'CHAAL', multiplier: 2 }).ok) {
-            game.act(turn, { type: 'PACK' });
-          }
-        } else if (!game.act(turn, { type: 'BLIND', multiplier: 1 }).ok) {
-          game.act(turn, { type: 'PACK' });
-        }
-      }
-
-      expect(game.state).toBe('ROUND_COMPLETE');
-      expect(game.pot).toBe(0);
-      // Chips are conserved and nobody ever goes negative.
-      for (const pid of players(6)) {
-        expect(game.getPlayer(pid)!.chips).toBeGreaterThanOrEqual(0);
-      }
-      const now = players(6).reduce((s, pid) => s + game.getPlayer(pid)!.chips, 0);
-      expect(now).toBe(startingTotal);
-
-      game.rotateDealer();
-    }
+    expect(game.topUp('p1', 10).ok).toBe(true);
+    game.dealNewRound(createDeck());
+    expect(game.roundNumber).toBe(2);
+    expect(game.dealerId).toBe('p2');
   });
 
-  it('an all-blind round still terminates quickly (regression: used to take 599 turns)', () => {
-    const game = new TeenPattiGame('T1', players(6), 'p1');
-    game.dealNewRound();
-
-    let turns = 0;
-    while (game.state === 'BETTING' && turns < 500) {
-      const t = game.currentTurn!;
-      if (!game.act(t, { type: 'BLIND', multiplier: 1 }).ok) {
-        // Forced to look once MAX_BLIND_ROUNDS is hit.
-        if (!game.act(t, { type: 'SEE' }).ok || !game.act(t, { type: 'CHAAL', multiplier: 2 }).ok) {
-          game.act(t, { type: 'PACK' });
-        }
-      }
-      turns++;
-    }
-
-    expect(game.state).toBe('ROUND_COMPLETE');
-    expect(turns).toBeLessThan(120);
+  it('supports unlimited positive top-ups without changing P&L at funding time', () => {
+    const game = new TeenPattiGame('T', ids(2), { initialDealerId: 'p1', tableConfig: config });
+    expect(game.getSettlement('p2')!.profitLoss).toBe(0);
+    expect(game.topUp('p2', 500_000).ok).toBe(true);
+    expect(game.getPlayer('p2')!.chips).toBe(501_000);
+    expect(game.getSettlement('p2')).toMatchObject({
+      totalFunding: 501_000,
+      topUps: 500_000,
+      profitLoss: 0,
+    });
   });
 
-  it('the pot limit forces a showdown even with more than two players left', () => {
-    const game = new TeenPattiGame('T1', players(5), 'p1');
-    game.dealNewRound();
+  it('settles and permanently removes a player who leaves mid-round', () => {
+    const game = new TeenPattiGame('T', ids(3), { initialDealerId: 'p1', tableConfig: config });
+    game.dealNewRound(createDeck());
+    expect(game.currentTurn).toBe('p2');
 
-    let guard = 0;
-    while (game.state === 'BETTING' && guard++ < 300) {
-      const t = game.currentTurn!;
-      if (!game.act(t, { type: 'BLIND', multiplier: 2 }).ok) {
-        if (!game.act(t, { type: 'SEE' }).ok || !game.act(t, { type: 'CHAAL', multiplier: 2 }).ok) {
-          game.act(t, { type: 'PACK' });
-        }
-      }
-    }
+    const result = game.leaveTable('p3');
+    expect(result.settlement).toMatchObject({ playerId: 'p3', currentBalance: 990, profitLoss: -10 });
+    expect(result.remainingPlayerIds).toEqual(['p1', 'p2']);
+    expect(game.getPlayer('p3')).toBeUndefined();
+    expect(game.playersClockwise).toEqual(['p1', 'p2']);
+    expect(game.currentTurn).toBe('p2');
+    expect(game.state).toBe('BETTING');
+  });
 
+  it('treats the current player leaving as a pack and awards a two-player pot to the survivor', () => {
+    const game = new TeenPattiGame('T', ids(2), { initialDealerId: 'p1', tableConfig: config });
+    game.dealNewRound(createDeck());
+    expect(game.currentTurn).toBe('p2');
+
+    const result = game.leaveTable('p2');
+    expect(result.roundEnded).toBe(true);
     expect(game.state).toBe('ROUND_COMPLETE');
-    // Nobody packed, so the showdown covered every seated player.
-    if (game.lastOutcome!.showdown) {
-      expect(game.lastOutcome!.showdown.length).toBeGreaterThanOrEqual(2);
-    }
+    expect(game.lastOutcome).toMatchObject({ winnerIds: ['p1'], reason: 'LAST_STANDING', potAwarded: 20 });
+    expect(game.getPlayer('p1')!.chips).toBe(1010);
+    expect(game.getPlayer('p2')).toBeUndefined();
+    expect(game.playersClockwise).toEqual(['p1']);
+    expect(() => game.dealNewRound(createDeck())).toThrow(/at least 2 seated players/i);
+  });
+
+  it('uses the next seated player as dealer fallback if the previous winner leaves before the next deal', () => {
+    const game = new TeenPattiGame('T', ids(3), { initialDealerId: 'p1', tableConfig: config });
+    game.dealNewRound(createDeck());
+    // p2 is first. p2 stays; p3 and p1 pack, so p2 is the unique winner.
+    expect(game.act('p2', { type: 'BLIND' }).ok).toBe(true);
+    expect(game.act('p3', { type: 'PACK' }).ok).toBe(true);
+    expect(game.act('p1', { type: 'PACK' }).ok).toBe(true);
+    expect(game.lastOutcome?.winnerIds).toEqual(['p2']);
+
+    game.leaveTable('p2');
+    expect(game.playersClockwise).toEqual(['p1', 'p3']);
+    game.dealNewRound(createDeck());
+    expect(game.dealerId).toBe('p3');
+  });
+
+  it('conserves play money across a completed non-top-up round', () => {
+    const game = new TeenPattiGame('T', ids(3), { initialDealerId: 'p1', tableConfig: config });
+    const total = () => ids(3).reduce((sum, id) => sum + game.getPlayer(id)!.chips, 0) + game.pot;
+    const before = total();
+    game.dealNewRound(createDeck());
+    game.act('p2', { type: 'PACK' });
+    game.act('p3', { type: 'PACK' });
+    expect(game.state).toBe('ROUND_COMPLETE');
+    expect(total()).toBe(before);
   });
 });

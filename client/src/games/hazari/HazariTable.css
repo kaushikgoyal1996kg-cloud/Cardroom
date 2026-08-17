@@ -173,7 +173,24 @@
 
 /* ---- Reveal -------------------------------------------------------------
    A sheet rather than a spreadsheet modal: it rises from the bottom, shows
-   the four hands with the winner framed in brass, and leaves.              */
+   the four hands with the winner framed in brass, and leaves.
+
+   Bug 5 CLARIFIED (2026-08-16): the previous investigation into "the
+   end-of-hand result screen isn't scrollable" was fixing the WRONG
+   component. RoundSummary (shown once, after all 4 sets/the whole round
+   completes) was never actually the broken screen - THIS one is: the
+   per-SET reveal shown after EACH of the 4 sets (Set 1, 2, 3, AND 4 -
+   the same component every time, not a different one for set 4).
+   Confirmed on real Android PWA staging: physical vertical swipe does
+   nothing, lower hands unreachable, in a short landscape viewport.
+
+   Root cause, once correctly identified, was simple: .reveal__sheet had
+   NO height bound and NO scroll mechanism at all - not a wrong one, none.
+   `.reveal` itself is `inset: 0` (not `height: 100dvh`), so it already
+   reliably spans the true viewport, but its child .reveal__sheet used
+   `height: auto` with nothing capping it - content taller than the
+   available space simply overflowed past the top of a `position: fixed`
+   overlay with no ancestor to scroll it back into view. */
 
 .reveal {
   position: fixed;
@@ -187,6 +204,21 @@
 }
 
 .reveal__sheet {
+  display: flex;
+  flex-direction: column;
+  /* Bounded, not auto: the sheet must never exceed the visible viewport.
+     `--js-vh` (set inline on .reveal by HazariTable.tsx via
+     `useVisualViewport()`, inherited down to this child) is a
+     JS-measured viewport height, not just CSS `dvh` - see
+     RoundSummary.css's .rsum for the full reasoning behind preferring a
+     JS measurement in this app's Android PWA context specifically. The
+     `- 64px` reserves a real gap at the top so this still reads as a
+     rising SHEET, not a full-screen takeover, even when its content is
+     long enough to need the internal scroll below. */
+  max-height: 80vh;
+  max-height: 80dvh;
+  max-height: calc(var(--js-vh, 100dvh) - 64px);
+  overflow: hidden; /* .reveal__body below is the one intended scroller */
   width: 100%;
   max-width: 32rem;
   margin: 0 auto;
@@ -214,6 +246,22 @@
   font-weight: 500;
   color: var(--ink-100);
   text-align: center;
+  /* Header, not part of the scroll region - see .reveal__body below. */
+  flex: 0 0 auto;
+}
+
+.reveal__body {
+  /* The ONE intended scroll region - everything that can genuinely grow
+     with the number of players/cards (the tie note, the hand-by-hand
+     breakdown, the points line) lives in here; the title above and the
+     Continue button below are fixed header/footer rows that stay put. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .reveal__tie {
@@ -273,7 +321,7 @@
 }
 
 .reveal__points {
-  margin: 0 0 var(--space-3);
+  margin: 0;
   text-align: center;
   font-size: var(--text-base);
   color: var(--brass-300);
@@ -281,6 +329,10 @@
 
 .reveal__sheet .btn {
   width: 100%;
+  /* Footer, not part of the scroll region - always reachable regardless
+     of how tall .reveal__body's content gets. */
+  flex: 0 0 auto;
+  margin-top: var(--space-3);
 }
 
 /* ---- Narrow phones (320px) ---------------------------------------------- */
@@ -310,4 +362,131 @@
     margin-right: auto;
   }
   .hazari__set-cards > * + * { margin-left: -0.75rem; }
+}
+
+/* Premium release pass — geometry is deliberately untouched. */
+.hazari {
+  background:
+    radial-gradient(ellipse 78% 43% at 50% -4%, rgba(98,70,43,.5), transparent 69%),
+    linear-gradient(180deg, #15120f, var(--room-950) 62%, #070605);
+}
+.hazari__bar {
+  border-bottom-color: rgba(168,132,63,.12);
+  background: linear-gradient(180deg, rgba(20,17,14,.74), transparent);
+}
+.hazari__hand {
+  border-top-color: rgba(168,132,63,.16);
+  background:
+    linear-gradient(180deg, rgba(66,43,29,.18), rgba(16,12,9,.94));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.02), 0 -8px 24px rgba(0,0,0,.1);
+}
+.hazari__set {
+  border-color: rgba(168,132,63,.07);
+  background: rgba(5,5,4,.16);
+}
+.hazari__set.is-active {
+  border-color: rgba(220,192,134,.55);
+  background: linear-gradient(180deg, rgba(200,164,92,.08), rgba(14,11,9,.28));
+  box-shadow: 0 0 16px rgba(200,164,92,.045);
+}
+.reveal { background: rgba(4,5,4,.74); backdrop-filter: blur(2px); }
+.reveal__sheet {
+  border-color: rgba(200,164,92,.42);
+  background:
+    radial-gradient(ellipse 78% 40% at 50% 0%, rgba(47,96,74,.28), transparent 66%),
+    linear-gradient(165deg, #292018, #11100d 74%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 24px 70px rgba(0,0,0,.56);
+}
+.reveal__hand.is-winner {
+  border-color: var(--brass-500);
+  background: linear-gradient(90deg, rgba(200,164,92,.12), rgba(200,164,92,.035));
+}
+
+/* ==========================================================================
+   Premium release 1.1 — phase-led table chrome and Kitti-style hand identity.
+   Rules/state remain server authoritative; these are presentation cues only.
+   ========================================================================== */
+.hazari__bar {
+  align-items: flex-end;
+  border-bottom-color: rgba(168,132,63,.13);
+  background: linear-gradient(180deg, rgba(20,17,14,.82), rgba(10,9,8,.28));
+}
+
+.hazari__phase {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.hazari__eyebrow {
+  margin: 0;
+  color: var(--brass-500);
+  font-size: .58rem;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+}
+
+.hazari__phase-title {
+  overflow: hidden;
+  color: var(--ink-100);
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: 500;
+  letter-spacing: .02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hazari__scoreline {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hazari__scoreline > span { color: var(--brass-300); }
+.hazari__scoreline > small { color: var(--ink-500); font-size: .56rem; letter-spacing: .08em; }
+
+.hazari__set {
+  background: linear-gradient(180deg, rgba(5,10,8,.18), rgba(0,0,0,.08));
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.18);
+}
+
+.hazari__set.is-active {
+  border-color: rgba(220,192,134,.64);
+  background: linear-gradient(180deg, rgba(200,164,92,.1), rgba(20,45,34,.16));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.015), 0 0 14px rgba(200,164,92,.055);
+}
+
+.hazari__set-label {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+}
+
+.hazari__set-label > small {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--ink-500);
+  font-size: .52rem;
+  font-weight: 400;
+  letter-spacing: .03em;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.hazari__set.is-active .hazari__set-label > small { color: var(--ink-300); }
+
+@media (max-width: 23.75rem) {
+  .hazari__eyebrow { font-size: .52rem; }
+  .hazari__scoreline > small { display: none; }
+  .hazari__set-label > small { font-size: .48rem; }
+}
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .hazari__eyebrow { display: none; }
+  .hazari__scoreline > small { display: none; }
 }

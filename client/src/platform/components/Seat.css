@@ -366,3 +366,25 @@
   border-color: var(--status-connected);
   box-shadow: 0 0 6px rgba(91, 158, 114, 0.6);
 }
+.seat__mic svg { width: .58rem; height: .58rem; stroke-width: 2; }
+
+/* Avatar identity tones mirror the profile/lobby medallions without importing
+   legacy lobby styles into the shared physical table. */
+.seat__avatar { --avatar-accent: rgba(200,164,92,.24); --avatar-deep: var(--wood-800); }
+.seat__avatar.avatar-tone-0 { --avatar-accent: rgba(200,164,92,.34); --avatar-deep: #2c261d; }
+.seat__avatar.avatar-tone-1 { --avatar-accent: rgba(129,155,134,.30); --avatar-deep: #162c25; }
+.seat__avatar.avatar-tone-2 { --avatar-accent: rgba(157,121,82,.32); --avatar-deep: #32231c; }
+.seat__avatar.avatar-tone-3 { --avatar-accent: rgba(111,132,153,.30); --avatar-deep: #1c252f; }
+.seat__avatar.avatar-tone-4 { --avatar-accent: rgba(139,112,145,.28); --avatar-deep: #2b2030; }
+.seat__avatar.avatar-tone-5 { --avatar-accent: rgba(151,139,96,.30); --avatar-deep: #302d1e; }
+.seat__avatar {
+  background:
+    radial-gradient(circle at 34% 26%, var(--avatar-accent), transparent 38%),
+    linear-gradient(160deg, rgba(255,255,255,.035), transparent 55%),
+    var(--avatar-deep);
+  border-color: rgba(200,164,92,.46);
+  box-shadow:
+    0 3px 9px rgba(0,0,0,.42),
+    inset 0 1px 0 rgba(255,255,255,.10),
+    inset 0 -2px 5px rgba(0,0,0,.24);
+}

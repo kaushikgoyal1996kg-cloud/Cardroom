@@ -1,8 +1,9 @@
 /* ==========================================================================
-   Home - entering the card room
+   Home — inside The Card Room
 
-   The page reads top to bottom as an arrival: the room name under a single
-   warm light, then the three tables you could sit at, then the way in.
+   Four table plaques, not a dashboard. Hazari and Kitti are open; Teen Patti
+   and Poker can be seen without pretending they are playable. The selected
+   table gets the strongest material treatment and owns the actions below.
    ========================================================================== */
 
 .home {
@@ -10,33 +11,53 @@
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  isolation: isolate;
   background:
-    radial-gradient(ellipse 90% 55% at 50% -5%, var(--room-700), transparent 70%),
-    var(--room-950);
+    radial-gradient(ellipse 72% 42% at 50% -4%, rgba(99, 72, 45, .55), transparent 68%),
+    linear-gradient(180deg, #15120f 0%, var(--room-950) 52%, #080706 100%);
   color: var(--ink-200);
   font-family: var(--font-body);
   padding:
-    calc(var(--safe-top) + var(--space-5))
+    calc(var(--safe-top) + var(--space-4))
     calc(var(--safe-right) + var(--space-4))
     calc(var(--safe-bottom) + var(--space-5))
     calc(var(--safe-left) + var(--space-4));
   overflow-x: hidden;
 }
 
-/* A single overhead lamp. This is the one atmospheric flourish on the page -
-   everything else stays flat and quiet. */
+.home::before,
+.home::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: min(12vw, 7rem);
+  z-index: -2;
+  pointer-events: none;
+  opacity: .6;
+}
+.home::before {
+  left: 0;
+  background: linear-gradient(90deg, rgba(34,22,15,.9), transparent);
+}
+.home::after {
+  right: 0;
+  background: linear-gradient(-90deg, rgba(34,22,15,.9), transparent);
+}
+
 .home__lamp {
   position: absolute;
-  top: -30vh;
+  z-index: -1;
+  top: -31vh;
   left: 50%;
-  width: min(140vw, 900px);
+  width: min(138vw, 900px);
   aspect-ratio: 1;
   transform: translateX(-50%);
   background: radial-gradient(
     circle,
-    rgba(200, 164, 92, 0.12) 0%,
-    rgba(200, 164, 92, 0.04) 38%,
-    transparent 65%
+    rgba(235, 207, 151, 0.14) 0%,
+    rgba(200, 164, 92, 0.055) 34%,
+    transparent 66%
   );
   pointer-events: none;
 }
@@ -46,59 +67,61 @@
 .home__header {
   position: relative;
   text-align: center;
-  margin-bottom: var(--space-6);
+  margin: 0 auto var(--space-5);
+  width: 100%;
+  max-width: 60rem;
 }
 
 .home__eyebrow {
   margin: 0;
   font-size: var(--text-xs);
-  letter-spacing: var(--tracking-wider);
+  font-weight: 600;
+  letter-spacing: .36em;
   text-transform: uppercase;
   color: var(--brass-500);
+  transform: translateX(.18em);
 }
 
 .home__brand {
-  margin: var(--space-1) 0 0;
+  margin: .15rem 0 0;
   font-family: var(--font-display);
-  font-size: var(--text-3xl);
+  font-size: clamp(2.15rem, 8vw, 3.15rem);
   font-weight: 500;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.025em;
   line-height: 1;
   color: var(--ink-100);
+  text-shadow: 0 3px 20px rgba(0,0,0,.45);
+}
+
+.home__subtitle {
+  margin: .5rem 0 0;
+  color: var(--ink-400);
+  font-size: var(--text-sm);
+  line-height: 1.4;
 }
 
 .home__identity {
-  margin-top: var(--space-4);
+  margin-top: var(--space-3);
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   min-height: var(--touch-min);
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--room-700);
+  padding: .35rem .85rem .35rem .4rem;
+  border: 1px solid rgba(168,132,63,.28);
   border-radius: var(--radius-pill);
-  background: var(--room-900);
+  background: linear-gradient(180deg, rgba(36,31,26,.9), rgba(16,14,12,.92));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 7px 18px rgba(0,0,0,.2);
   color: inherit;
   font: inherit;
   cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease-smooth);
+  transition: border-color var(--dur-fast) var(--ease-smooth), transform var(--dur-fast) var(--ease-settle);
 }
 
-.home__identity-avatar {
-  display: inline-flex;
-  align-items: center;
-}
-
-.home__identity:hover {
-  border-color: var(--brass-600);
-}
-
-.home__identity-name {
-  font-size: var(--text-base);
-  color: var(--ink-100);
-}
-
+.home__identity-avatar { display: inline-flex; align-items: center; }
+.home__identity:hover { border-color: var(--brass-500); transform: translateY(-1px); }
+.home__identity-name { font-size: var(--text-sm); color: var(--ink-100); }
 .home__identity-edit {
-  font-size: var(--text-xs);
+  font-size: .62rem;
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
   color: var(--ink-400);
@@ -109,141 +132,199 @@
 .home__main {
   position: relative;
   width: 100%;
-  max-width: 30rem;
+  max-width: 32rem;
   margin: 0 auto;
   flex: 1;
 }
 
 .home__section-title {
   margin: 0 0 var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: .75rem;
   font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: var(--tracking-wider);
+  letter-spacing: .18em;
   text-transform: uppercase;
   color: var(--ink-500);
+}
+.home__section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(168,132,63,.28), transparent);
 }
 
 .home__games {
   list-style: none;
-  margin: 0 0 var(--space-5);
+  margin: 0 0 var(--space-4);
   padding: 0;
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
 }
 
-/* ---- Game card: a small piece of felt in a wooden frame ---------------- */
-
 .gamecard {
   position: relative;
-  display: block;
+  display: flex;
+  flex-direction: column;
   width: 100%;
+  min-height: 10rem;
   text-align: left;
-  padding: var(--space-4);
-  border: 1px solid var(--wood-700);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(160deg, var(--wood-800), var(--wood-900));
+  padding: var(--space-3);
+  border: 1px solid rgba(107,75,53,.8);
+  border-radius: 16px;
+  background:
+    linear-gradient(145deg, rgba(80,54,37,.88), rgba(31,20,15,.96) 58%, rgba(19,14,11,.98));
   color: var(--ink-200);
   font: inherit;
   cursor: pointer;
   overflow: hidden;
-  box-shadow: var(--shadow-md);
+  isolation: isolate;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.05),
+    inset 0 -10px 28px rgba(0,0,0,.18),
+    0 9px 24px rgba(0,0,0,.3);
   transition:
     border-color var(--dur-base) var(--ease-smooth),
-    transform var(--dur-base) var(--ease-settle);
+    transform var(--dur-base) var(--ease-settle),
+    box-shadow var(--dur-base) var(--ease-smooth);
+}
+
+.gamecard::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  z-index: -1;
+  border-radius: 11px;
+  border: 1px solid rgba(200,164,92,.06);
+  pointer-events: none;
 }
 
 .gamecard__felt {
   position: absolute;
+  z-index: -2;
   inset: 0;
-  background: radial-gradient(
-    ellipse 70% 100% at 100% 0%,
-    var(--felt-700),
-    transparent 70%
-  );
-  opacity: 0.55;
-  transition: opacity var(--dur-base) var(--ease-smooth);
+  background:
+    radial-gradient(circle at 86% 8%, rgba(44,91,71,.72), transparent 38%),
+    radial-gradient(ellipse 90% 65% at 50% 112%, rgba(13,38,32,.78), transparent 68%);
+  opacity: .38;
+  transition: opacity var(--dur-base) var(--ease-smooth), transform var(--dur-base) var(--ease-smooth);
 }
 
-.gamecard > *:not(.gamecard__felt) {
-  position: relative;
+.gamecard__topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .35rem;
+  margin-bottom: .55rem;
 }
 
-.gamecard:hover {
-  border-color: var(--wood-500);
+.gamecard__index {
+  font-family: var(--font-numeric);
+  font-size: .62rem;
+  letter-spacing: .12em;
+  color: var(--ink-500);
 }
 
+.gamecard__availability {
+  padding: .17rem .42rem;
+  border-radius: var(--radius-pill);
+  font-size: .56rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.gamecard__availability.is-open {
+  color: #a9d1b5;
+  background: rgba(91,158,114,.12);
+  border: 1px solid rgba(91,158,114,.28);
+}
+.gamecard__availability.is-soon {
+  color: var(--ink-400);
+  background: rgba(255,255,255,.025);
+  border: 1px solid rgba(154,139,113,.18);
+}
+
+.gamecard:hover { border-color: var(--wood-500); }
 .gamecard.is-active {
-  border-color: var(--brass-500);
-  transform: translateY(-2px);
+  border-color: var(--brass-400);
+  transform: translateY(-3px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.07),
+    0 0 0 1px rgba(200,164,92,.14),
+    0 14px 34px rgba(0,0,0,.42),
+    0 0 30px rgba(200,164,92,.07);
 }
-
-.gamecard.is-active .gamecard__felt {
-  opacity: 1;
-}
-
-.gamecard:focus-visible {
-  outline: 3px solid var(--brass-300);
-  outline-offset: 2px;
-}
+.gamecard.is-active .gamecard__felt { opacity: .9; transform: scale(1.02); }
+.gamecard:focus-visible { outline: 3px solid var(--brass-300); outline-offset: 2px; }
 
 .gamecard__mark {
-  display: inline-block;
+  align-self: flex-start;
   margin-bottom: var(--space-2);
   padding: 2px var(--space-2);
-  border: 1px solid var(--brass-600);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-xs);
-  letter-spacing: var(--tracking-wide);
+  border: 1px solid rgba(220,192,134,.45);
+  border-radius: 4px;
+  font-size: .58rem;
+  letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--brass-300);
+  background: rgba(7,6,5,.18);
 }
 
 .gamecard__name {
   display: block;
   font-family: var(--font-display);
-  font-size: var(--text-2xl);
+  font-size: clamp(1.35rem, 6vw, 1.8rem);
   font-weight: 500;
   line-height: 1.05;
   color: var(--ink-100);
+  text-shadow: 0 2px 12px rgba(0,0,0,.35);
 }
 
 .gamecard__meta {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-top: var(--space-1);
-  font-size: var(--text-sm);
+  margin-top: .35rem;
+  font-size: .72rem;
   color: var(--brass-300);
 }
-
-.gamecard__dot {
-  color: var(--ink-500);
-}
+.gamecard__dot { color: var(--ink-500); }
 
 .gamecard__blurb {
   display: block;
+  flex: 1;
   margin-top: var(--space-2);
-  font-size: var(--text-sm);
+  font-size: .76rem;
   line-height: 1.45;
   color: var(--ink-400);
 }
 
-/* A limited game is marked with text, never colour alone. */
 .gamecard__note {
   display: block;
-  margin-top: var(--space-3);
+  margin-top: auto;
   padding-top: var(--space-2);
-  border-top: 1px solid var(--wood-700);
-  font-size: var(--text-xs);
+  border-top: 1px solid rgba(107,75,53,.5);
+  font-size: .66rem;
   color: var(--status-away);
 }
+
+.gamecard.is-limited { filter: saturate(.72); }
+.gamecard.is-limited .gamecard__name { color: var(--ink-300); }
 
 /* ---- Actions ----------------------------------------------------------- */
 
 .home__actions {
   display: grid;
   gap: var(--space-2);
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-5);
+  padding: var(--space-3);
+  border: 1px solid rgba(168,132,63,.14);
+  border-radius: 14px;
+  background: rgba(10,9,8,.42);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
 }
 
 .btn {
@@ -253,10 +334,10 @@
   min-height: var(--touch-min);
   padding: var(--space-3) var(--space-5);
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: 9px;
   font-family: var(--font-body);
   font-size: var(--text-base);
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.01em;
   cursor: pointer;
   touch-action: manipulation;
@@ -264,62 +345,50 @@
   transition:
     background-color var(--dur-fast) var(--ease-smooth),
     border-color var(--dur-fast) var(--ease-smooth),
-    transform var(--dur-fast) var(--ease-settle);
+    transform var(--dur-fast) var(--ease-settle),
+    box-shadow var(--dur-fast) var(--ease-smooth);
 }
-
-.btn:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.btn:focus-visible {
-  outline: 3px solid var(--brass-300);
-  outline-offset: 2px;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:focus-visible { outline: 3px solid var(--brass-300); outline-offset: 2px; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .btn--primary {
-  background: linear-gradient(180deg, var(--brass-400), var(--brass-500));
-  border-color: var(--brass-600);
-  color: var(--room-950);
-  font-weight: 600;
+  background: linear-gradient(180deg, #d5b66f, var(--brass-500));
+  border-color: #83652f;
+  color: #171008;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.32), 0 7px 20px rgba(0,0,0,.25);
 }
-
 .btn--primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, var(--brass-300), var(--brass-400));
+  background: linear-gradient(180deg, #e0c68d, var(--brass-400));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 9px 24px rgba(0,0,0,.32);
 }
-
 .btn--secondary {
-  background: var(--room-800);
+  background: linear-gradient(180deg, rgba(42,34,28,.92), rgba(24,20,17,.95));
   border-color: var(--wood-600);
   color: var(--ink-100);
 }
-
-.btn--secondary:hover:not(:disabled) {
-  border-color: var(--brass-600);
-}
-
+.btn--secondary:hover:not(:disabled) { border-color: var(--brass-600); }
 .btn--ghost {
   background: transparent;
   border-color: var(--wood-600);
   color: var(--ink-200);
 }
+.btn--ghost:hover:not(:disabled) { border-color: var(--brass-600); color: var(--ink-100); }
 
-.btn--ghost:hover:not(:disabled) {
-  border-color: var(--brass-600);
-  color: var(--ink-100);
+.home__unavailable {
+  margin: calc(var(--space-2) * -1) 0 var(--space-4);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--status-away);
+  text-align: center;
 }
 
 /* ---- Join -------------------------------------------------------------- */
 
 .home__join {
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--room-800);
+  padding-top: var(--space-4);
+  border-top: 1px solid rgba(168,132,63,.14);
 }
-
 .home__join-label {
   display: block;
   margin-bottom: var(--space-2);
@@ -328,166 +397,136 @@
   text-transform: uppercase;
   color: var(--ink-500);
 }
-
-.home__join-row {
-  display: flex;
-  gap: var(--space-2);
-}
-
+.home__join-row { display: flex; gap: var(--space-2); }
 .home__join-input {
   flex: 1;
   min-width: 0;
   min-height: var(--touch-min);
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--wood-600);
-  border-radius: var(--radius-md);
-  background: var(--room-900);
+  border-radius: 9px;
+  background: linear-gradient(180deg, rgba(12,11,10,.92), rgba(25,21,18,.9));
   color: var(--ink-100);
   font-family: var(--font-numeric);
-  font-size: var(--text-lg);
-  letter-spacing: var(--tracking-wide);
-  text-align: center;
-  /* 16px minimum stops iOS Safari zooming the page on focus. */
   font-size: max(1rem, var(--text-lg));
+  letter-spacing: .14em;
+  text-align: center;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,.25);
+}
+.home__join-input::placeholder { color: var(--ink-500); }
+.home__join-input:focus { outline: none; border-color: var(--brass-500); }
+.home__join-input:focus-visible { outline: 3px solid var(--brass-300); outline-offset: 1px; }
+.home__join-error { margin: var(--space-2) 0 0; font-size: var(--text-sm); color: var(--status-lost); }
+
+/* Compact phone cards keep the four-game cabinet visible without shrinking
+   touch targets or forcing the descriptive copy to compete with actions. */
+@media (max-width: 47.99rem) {
+  .gamecard { min-height: 9.7rem; }
+  .gamecard__meta { align-items: flex-start; flex-direction: column; gap: 0; line-height: 1.35; }
+  .gamecard__dot { display: none; }
+  .gamecard__blurb { display: none; }
 }
 
-.home__join-input::placeholder {
-  color: var(--ink-500);
+@media (max-width: 23.75rem) {
+  .home { padding-inline: calc(var(--safe-left) + var(--space-3)); }
+  .home__games { gap: var(--space-2); }
+  .gamecard { padding: .68rem; min-height: 9.2rem; }
+  .gamecard__availability { font-size: .5rem; padding-inline: .3rem; }
+  .gamecard__name { font-size: 1.25rem; }
 }
 
-.home__join-input:focus {
-  outline: none;
-  border-color: var(--brass-500);
-}
-
-.home__join-input:focus-visible {
-  outline: 3px solid var(--brass-300);
-  outline-offset: 1px;
-}
-
-.home__join-error {
-  margin: var(--space-2) 0 0;
-  font-size: var(--text-sm);
-  color: var(--status-lost);
-}
-
-/* ---- Desktop -----------------------------------------------------------
-   Not a stretched phone: the column stays its natural width and centres,
-   and the three tables sit side by side once there is room.               */
-
+/* ---- Desktop ----------------------------------------------------------- */
 @media (min-width: 48rem) {
-  .home__main {
-    max-width: 56rem;
-  }
-
-  .home__games {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  .gamecard {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-  }
-
-  .gamecard__blurb {
-    flex: 1;
-  }
-
+  .home__main { max-width: 62rem; }
+  .home__games { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .gamecard { min-height: 14.5rem; padding: var(--space-4); }
+  .gamecard__blurb { display: block; }
   .home__actions {
     grid-template-columns: repeat(2, minmax(0, 16rem));
     justify-content: center;
+    max-width: 36rem;
+    margin-inline: auto;
   }
-
-  .home__join {
-    max-width: 24rem;
-    margin: 0 auto;
-  }
+  .home__join { max-width: 25rem; margin: 0 auto; }
 }
 
-/* ---- Short mobile landscape ---------------------------------------------
-   Height is the scarce dimension here, not width. Confirmed on staging: the
-   hero ate too much vertical space, the primary action ("Play <game>",
-   functionally a quick match) was partly clipped, and the join row fell
-   below the viewport. Compress the header, drop the purely atmospheric
-   lamp, and let the three game cards sit side by side (the same pattern
-   already used at the desktop breakpoint below) instead of stacked, so
-   everything essential fits without shrinking any control below its touch
-   target or hiding it off-screen.                                          */
+/* ---- Short mobile landscape ------------------------------------------ */
 @media (orientation: landscape) and (max-height: 30rem) {
   .home {
+    overflow-y: auto;
     padding-top: calc(var(--safe-top) + var(--space-2));
     padding-bottom: calc(var(--safe-bottom) + var(--space-2));
   }
-
-  .home__lamp {
-    display: none;
-  }
-
-  .home__header {
-    margin-bottom: var(--space-3);
-  }
-
-  .home__eyebrow {
-    display: none;
-  }
-
-  .home__brand {
-    font-size: var(--text-xl);
-  }
-
-  .home__identity {
-    margin-top: var(--space-2);
-    min-height: 36px;
-    padding: var(--space-1) var(--space-3);
-  }
-
-  .home__section-title {
+  .home__lamp { display: none; }
+  .home__header { margin-bottom: var(--space-2); }
+  .home__eyebrow, .home__subtitle { display: none; }
+  .home__brand { font-size: var(--text-xl); }
+  .home__identity { margin-top: var(--space-1); min-height: var(--touch-min); padding-block: .15rem; }
+  .home__section-title { margin-bottom: var(--space-2); }
+  .home__games {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-2);
     margin-bottom: var(--space-2);
   }
-
-  .home__games {
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--space-2);
-    margin-bottom: var(--space-3);
-  }
-
-  .gamecard {
-    padding: var(--space-2);
-  }
-
-  .gamecard__mark {
-    margin-bottom: var(--space-1);
-  }
-
-  .gamecard__name {
-    font-size: var(--text-lg);
-  }
-
-  /* The blurb is the first thing to give up its space on a short screen -
-     name plus player/card count is enough to choose between three games. */
-  .gamecard__blurb {
-    display: none;
-  }
-
-  .home__actions {
-    margin-bottom: var(--space-3);
-  }
-
-  .home__join {
-    padding-top: var(--space-3);
-  }
+  .gamecard { min-height: 6.65rem; padding: .48rem; border-radius: 10px; }
+  .gamecard__topline { margin-bottom: .25rem; }
+  .gamecard__availability { font-size: .46rem; padding: .1rem .28rem; }
+  .gamecard__mark { display: none; }
+  .gamecard__name { font-size: 1rem; }
+  .gamecard__meta { font-size: .62rem; }
+  .gamecard__note { padding-top: .3rem; margin-top: .25rem; font-size: .55rem; }
+  .home__actions { grid-template-columns: 1fr 1fr; margin-bottom: var(--space-2); padding: .4rem; }
+  .home__actions .btn { min-height: var(--touch-min); padding-block: .4rem; font-size: .78rem; }
+  .home__unavailable { margin-bottom: var(--space-2); font-size: .72rem; }
+  .home__join { padding-top: var(--space-2); }
 }
 
-/* A game with no server controller yet states why, in words. */
-.home__unavailable {
-  margin: calc(var(--space-3) * -1) 0 var(--space-5);
-  font-size: var(--text-sm);
-  line-height: 1.45;
-  color: var(--status-away);
+@media (prefers-reduced-motion: reduce) {
+  .gamecard.is-active,
+  .home__identity:hover { transform: none; }
+}
+
+/* Contextual table actions: avoid dead controls before a game is selected and
+   avoid pretending Coming Soon tables have actions that merely fail. */
+.home__actions.is-idle {
+  min-height: 5.5rem;
+  place-items: center;
+}
+.home__selection-prompt,
+.home__coming-soon {
+  width: 100%;
+  min-height: 4.25rem;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: .3rem;
   text-align: center;
 }
-
-.gamecard.is-limited .gamecard__name {
-  color: var(--ink-300);
+.home__selection-prompt { grid-template-columns: auto 1fr; text-align: left; }
+.home__selection-prompt p,
+.home__coming-soon p { margin: 0; color: var(--ink-400); font-size: var(--text-sm); line-height: 1.45; }
+.home__selection-mark {
+  width: 2.35rem;
+  height: 2.35rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(200,164,92,.34);
+  border-radius: 50%;
+  color: var(--brass-300);
+  background: linear-gradient(145deg, rgba(61,43,28,.88), rgba(20,15,11,.95));
+  font: 500 .68rem/1 var(--font-display);
+  letter-spacing: .08em;
 }
+.home__coming-soon > span {
+  color: var(--brass-500);
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+}
+.home__coming-soon strong {
+  color: var(--ink-100);
+  font: 500 var(--text-lg)/1.15 var(--font-display);
+}
+.home__selection-prompt,
+.home__coming-soon { grid-column: 1 / -1; }

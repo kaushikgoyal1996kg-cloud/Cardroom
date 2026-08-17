@@ -129,7 +129,7 @@
 }
 
 /* ---- Short mobile landscape ---------------------------------------------
-   The sheet is short-form already, but the 22-option avatar grid plus name
+   The sheet is short-form already, but the expanded avatar grid plus name
    field plus title/tagline can still exceed a short landscape viewport's
    height. Compress vertical rhythm first; let the sheet scroll internally
    as an intentional fallback (DESIGN_SYSTEM.md) rather than overflow the
@@ -165,3 +165,66 @@
     grid-template-columns: repeat(8, 1fr);
   }
 }
+
+/* Premium identity pass: this should feel like being issued a seat identity,
+   not filling a generic account form. */
+.player-profile {
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse 80% 46% at 50% -5%, rgba(102,73,45,.52), transparent 70%),
+    linear-gradient(180deg, #15120f 0%, var(--room-950) 60%, #070605 100%);
+}
+.player-profile::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: -33vh;
+  left: 50%;
+  width: min(145vw, 900px);
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, rgba(239,211,156,.11), rgba(200,164,92,.035) 40%, transparent 68%);
+}
+.player-profile__sheet {
+  border-color: rgba(168,132,63,.34);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 88% 6%, rgba(42,82,65,.22), transparent 39%),
+    linear-gradient(150deg, rgba(73,49,34,.97), rgba(24,17,13,.99) 70%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.045), 0 28px 72px rgba(0,0,0,.42);
+}
+.player-profile__back {
+  width: var(--touch-min);
+  height: var(--touch-min);
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  border-color: rgba(200,164,92,.28);
+  background: rgba(9,7,6,.36);
+  color: var(--brass-300);
+}
+.player-profile__seal {
+  width: 2.85rem;
+  height: 2.85rem;
+  display: grid;
+  place-items: center;
+  margin: 0 auto var(--space-2);
+  border: 1px solid var(--brass-600);
+  border-radius: 50%;
+  background: linear-gradient(145deg, #3a291c, #15100c 72%);
+  box-shadow: inset 0 0 0 3px rgba(8,6,4,.55), 0 7px 18px rgba(0,0,0,.36);
+  color: var(--brass-300);
+  font: 500 .78rem/1 var(--font-display);
+  letter-spacing: .08em;
+}
+.player-profile__preview {
+  display: grid;
+  place-items: center;
+  min-height: 3.4rem;
+  margin-bottom: var(--space-2);
+}
+.player-profile__input {
+  border-color: rgba(168,132,63,.28);
+  background: rgba(8,7,6,.42);
+}
+.player-profile__continue { border-radius: var(--radius-md); }
+.player-profile__back svg { width: 1rem; height: 1rem; }

@@ -1,5 +1,12 @@
 import { io, Socket } from 'socket.io-client';
-import type { Card, ChatMessage, DismissalReason, GameId, HaazariPublicStatePayload, PlayerId, PublicRoomInfo, RoundResult, TableSummary } from '../game/types';
+import type { Card, ChatMessage, DismissalReason, GameId, HaazariPublicStatePayload, KittiPublicStatePayload, KittiRoundResult, PlayerId, PublicRoomInfo, RoundResult, TableSummary, TeenPattiAction, TeenPattiLobbySetup, TeenPattiPlayerSettlement, TeenPattiPrivateStatePayload, TeenPattiPublicStatePayload, TeenPattiRoundOutcome, TeenPattiRoundVariantConfig, TeenPattiTableConfig } from '../game/types';
+
+export interface VoiceIceServersAck {
+  ok: boolean;
+  iceServers: RTCIceServer[];
+  relayAvailable: boolean;
+  error?: string;
+}
 
 export interface RoomAck {
   ok: boolean;
@@ -19,7 +26,12 @@ interface ClientToServerEvents {
   'room:start': () => void;
   'room:listTables': (payload: { gameId?: GameId } | undefined, ack: (res: TablesAck) => void) => void;
   'room:addBot': () => void;
+  'room:removeBot': (payload: { playerId: PlayerId }) => void;
   'room:playAgain': () => void;
+  'room:playMoneyPropose': (payload: { amount: number }) => void;
+  'room:playMoneyAccept': () => void;
+  'room:playMoneyDecline': () => void;
+  'room:playMoneyCancel': () => void;
   'room:chat': (payload: { message: string; kind: 'text' | 'emoji' | 'voice'; durationSec?: number }) => void;
   'hazari:confirmArrangement': (payload: { cardIdSets: [string[], string[], string[], string[]] }) => void;
   'hazari:requestSuggestion': (ack: (res: SuggestionAck) => void) => void;
@@ -30,8 +42,21 @@ interface ClientToServerEvents {
     proposedCardIdSets?: [string[], string[], string[], string[]];
   }) => void;
   'hazari:startNextRound': () => void;
+  'room:leave': () => void;
   'room:leaveTable': () => void;
+  'kitti:confirmArrangement': (payload: { cardIdGroups: [string[], string[], string[]] }) => void;
+  'kitti:requestSuggestion': (ack: (res: KittiSuggestionAck) => void) => void;
+  'kitti:playHand': () => void;
+  'kitti:playDecider': () => void;
+  'kitti:startNextRound': () => void;
+  'teenpatti:proposeSetup': (payload: { tableConfig: TeenPattiTableConfig; roundVariant: TeenPattiRoundVariantConfig }, ack: (res: TeenPattiSetupAck) => void) => void;
+  'teenpatti:acceptSetup': (payload: { revision: number }, ack: (res: TeenPattiSetupAck) => void) => void;
+  'teenpatti:action': (payload: { action: TeenPattiAction; expectedSeq?: number }) => void;
+  'teenpatti:topUp': (payload: { amount: number }) => void;
+  'teenpatti:startNextRound': () => void;
+  'teenpatti:leaveTable': (ack: (res: TeenPattiLeaveAck) => void) => void;
 
+  'voice:getIceServers': (ack: (res: VoiceIceServersAck) => void) => void;
   'voice:join': () => void;
   'voice:leave': () => void;
   'voice:signal': (payload: { toPlayerId: PlayerId; data: unknown }) => void;
@@ -58,10 +83,29 @@ export interface SuggestionAck {
   cardIdSets?: [string[], string[], string[], string[]];
 }
 
+export interface KittiSuggestionAck {
+  ok: boolean;
+  error?: string;
+  cardIdGroups?: [string[], string[], string[]];
+}
+
 export interface TablesAck {
   ok: boolean;
   error?: string;
   tables?: TableSummary[];
+}
+
+export interface TeenPattiSetupAck {
+  ok: boolean;
+  error?: string;
+  setup?: TeenPattiLobbySetup;
+}
+
+export interface TeenPattiLeaveAck {
+  ok: boolean;
+  error?: string;
+  settlement?: TeenPattiPlayerSettlement;
+  tableEnded?: boolean;
 }
 
 interface ServerToClientEvents {
@@ -74,6 +118,17 @@ interface ServerToClientEvents {
   'game:error': (payload: { message: string }) => void;
   'hazari:roundComplete': (payload: { result: RoundResult }) => void;
   'hazari:over': (payload: { winnerId: PlayerId; finalScores: Record<PlayerId, number> }) => void;
+  'kitti:yourHand': (payload: { hand: Card[] }) => void;
+  'kitti:yourArrangement': (payload: { groups: [Card[], Card[], Card[]] }) => void;
+  'kitti:yourDeciderHand': (payload: { hand: Card[] }) => void;
+  'kitti:state': (publicState: KittiPublicStatePayload) => void;
+  'kitti:roundComplete': (payload: { result: KittiRoundResult }) => void;
+  'kitti:over': (payload: { winnerId: PlayerId; roundsWon: Record<PlayerId, number> }) => void;
+  'teenpatti:setup': (payload: { setup: TeenPattiLobbySetup | null }) => void;
+  'teenpatti:private': (payload: TeenPattiPrivateStatePayload) => void;
+  'teenpatti:state': (publicState: TeenPattiPublicStatePayload) => void;
+  'teenpatti:roundComplete': (payload: { result: TeenPattiRoundOutcome }) => void;
+  'teenpatti:tableEnded': (payload: { reason: 'NOT_ENOUGH_PLAYERS'; settlements: TeenPattiPlayerSettlement[] }) => void;
 
   'voice:participants': (payload: { playerIds: PlayerId[] }) => void;
   'voice:peerJoined': (payload: { playerId: PlayerId }) => void;

@@ -33,119 +33,104 @@ RoundSummary and WinnerScreen migrations, reliability tests.
 
 ## Current checkpoint
 
-Hazari is feature-complete enough for staging. **Staging is now deployed**
-(Netlify + Render, see `PROJECT_STATE.md`), and a **first-pass Android QA
-round** has happened and found confirmed layout issues — see
-`SESSION_CHANGELOG.md` for the dated entry.
+The first Android test track is now intentionally narrow: **Hazari + Kitti are
+playable; Teen Patti + Poker are shown as Coming Soon.** Kitti has moved from a
+partial engine to an online playable core. The native Capacitor wrapper/source
+scaffolding is present, but an APK cannot be produced in this build environment
+because npm registry access and the Android SDK are unavailable here.
 
-**Full real browser/device QA has not happened.** That remains the gate to
-production. The first-pass round covered one Android phone, portrait and
-landscape, on Home/Lobby/Arrangement/Table only — no iPhone, no reconnection
-drills, no full match.
+Production remains blocked. The old live Hazari app stays untouched. Real-device
+QA is still the release gate; repository tests must also be rerun on a machine
+with dependencies before this checkpoint is called a verified baseline.
 
 ---
 
 ## Next
 
-### 1. ~~Staging-only deployment~~ — done
-Backend and frontend are both deployed to staging per `DEPLOYMENT.md`.
-Production stays blocked and the old live app stays untouched.
+### 1. First Android test track — Hazari + Kitti
+Build a debug APK on an Android-capable machine from `ANDROID_RELEASE.md`. Add
+`https://localhost` alongside the staging Netlify origin in Render
+`ALLOWED_ORIGINS`, then run the first-device gate: Hazari, Kitti, voice, Back,
+rotation, reconnect, Bug 5 reveal scrolling and Bug 6 dismissal.
 
-### 2. Fix the confirmed first-pass findings, then continue real-device QA
-Fix the layout issues the first-pass round found, then keep working through
-`STAGING-CHECKLIST.md` on real phones. Look hardest at: dealing timing,
-play-travel visibility, the two migrated result screens, chat with the
-keyboard open, and reconnect behaviour — none of that has been exercised yet.
+### 2. Fix findings without changing game rules
+Anything clearly broken, unsafe, inconsistent or below the premium product bar
+may be corrected. Game rules are the locked layer. Keep server authority, hidden
+card privacy, reconnect semantics and the game-agnostic room boundary intact.
 
-### 3. Fix findings
-Expect timing and spacing adjustments. Most live in one place —
-`seatLayout.ts` for animation timing, `tokens.css` for FAB reserves.
+### 3. Kitti Release 1.5 hardening and device QA
+The authoritative rules, online session/controller, client arrangement/table,
+round/match flow, decider, reconnect, optional computer seats, bot-only
+arrangement Suggest and consensual virtual board are implemented. The remaining
+gate is full repository verification plus real-device 2–5 seat/full-match QA.
 
-### 4. Kitti — phases below
-### 5. Teen Patti — phases below
-### 6. Production, only after approval
+### 4. Teen Patti development continues behind Coming Soon
+The Classic engine/session/lobby-setup groundwork exists, but the game stays
+`networkPlayable: false` until the full client table, variant execution,
+play-money/P&L flow, reconnect and mobile QA are complete.
+
+### 5. Production only after approval
+Do not replace the family build until the staged/native test track has passed.
 
 ---
 
-## Kitti implementation phases
+## Kitti implementation status
 
-Read `RULES_KITTI.md` first. The agreed spec **conflicts with the current
-engine** in several places; K1 exists to resolve that deliberately.
-
-**K1 — Spec freeze and engine reconciliation.**
-Reconcile the engine against the agreed spec. Known conflicts: strongest→
-weakest ordering is currently *not* enforced; ties are flagged rather than
-resolved; the platform dealing helper starts *after* the dealer while the spec
-says *at* the dealer. Update `UNRESOLVED_RULES`, flip `KITTI_SCORING_CONFIRMED`
-only when genuinely true. Tests alongside each rule.
-*Opus. Rules work.*
-
-**K2 — Server controller and session.**
-`KittiSession` adapter, factory case, `networkPlayable: true`, `kitti:*`
-events, private/public state split. Round and match structure: first to two
-hands wins the round; ten rounds; standings by rounds won.
-*Opus. Multiplayer state.*
-
-**K3 — Arrangement and client flow.**
-Nine cards into three groups of three, strictly strongest→weakest. Reuse
-`ArrangementTable`'s language; do **not** fork `PlayingCard`.
-*Sonnet once K1/K2 are settled.*
-
-**K4 — Gameplay table.**
-Three sequential hands on the shared `CardTable`, 2–5 seats. Reuse the seat
-ring and play-travel.
-*Sonnet.*
-
-**K5 — Decider, bots, reconnect, play money.**
-The three-different-winners decider. Bots optional. Reconnect restoring
-groups and hand results. Consensual play-money board.
-*Opus for the decider and reconnect.*
-
-**K6 — Integration, mobile, QA.**
-Widths 320–430, landscape, safe areas, full-match tests.
-*Sonnet.*
+- **K1 — rules + engine reconciliation:** implemented. Strict strongest→weakest
+  groups, later-throw exact ties, dealer-first deal, dealer-left first lead.
+- **K2 — session/controller:** implemented. `KittiSession`, `kitti:*`, public/
+  private split, ten scheduled rounds + sudden death.
+- **K3 — arrangement/client flow:** implemented. Nine cards into three groups.
+- **K4 — gameplay table:** implemented on the shared table for 2–5 seats.
+- **K5 — decider/reconnect/bots/play money:** three-winner decider + reconnect, optional computer seats, host add/remove, bot-only Suggest, and consensual virtual board are implemented.
+- **K6 — integration/mobile/QA:** source integration done; real-device/full-match
+  verification remains pending.
 
 ---
 
 ## Teen Patti implementation phases
 
-Read `RULES_TEEN_PATTI.md`. The agreed spec conflicts substantially with the
-current engine — betting model, dealer rotation, sideshow, and an entire
-variant framework that does not exist.
+Read `RULES_TEEN_PATTI.md` first. Teen Patti remains **Coming Soon** in the
+Hazari + Kitti Android test track; the entries below are development status, not
+permission to enable it early.
 
-**T1 — Authoritative rule and variant model.**
-Reconcile the betting model: blind doubling to a host-defined max, seen = 2×
-current blind, max three blind chances then forced seen. Dealer = previous
-round winner, not clockwise. Design the variant descriptor (cards dealt,
-discard rules, joker modifiers, target-number rules) as data, not branches.
-*Opus. The hardest design work in the project.*
+**T1 — Authoritative rule and variant model — substantially implemented.**
+Classic betting configuration now uses blind doubling capped at host max, seen =
+2× current blind, and three blind chances before forced seen betting. Dealer is
+the previous unique round winner. Variant descriptors are data-driven and
+explicitly mark unsupported runtime variants rather than silently falling back
+to Classic. Full live execution of non-Classic variants remains pending.
 
-**T2 — Betting and session engine.**
-Rework the engine to T1. Compulsory sideshow when all remaining players are
-seen, comparison anticlockwise, tie → initiator packs. Final-two mutual show.
-*Opus.*
+**T2 — Classic betting/session engine — core implemented, full suite pending.**
+Compulsory sideshow, anticlockwise opponent selection, initiator-packs-on-tie,
+final-two mutual open show, card privacy and stable result→next-dealer timing are
+in the engine. This still needs the repository suite and broader multiplayer QA.
 
-**T3 — Server controller and protocol.**
-`TeenPattiSession`, `teenpatti:*` events, up to 9 seats, per-player table P&L,
-mid-round top-ups.
-*Opus.*
+**T3 — Server controller and protocol — groundwork implemented behind gate.**
+`TeenPattiSession`, setup/state/private/action/top-up/next-round events and
+result restoration exist, but the registry remains `networkPlayable: false`.
+Do not use protocol presence as a reason to expose the game.
 
-**T4 — Classic client table.**
-Up to 9 seats on the shared table. Blind/seen/chaal/pack/show controls.
-*Sonnet.*
+**T4 — Classic client table — hidden core implemented.**
+A shared-table Classic client exists behind the disabled registry with up to 9
+seats, private face-down cards until explicit See, blind/seen/chaal/pack,
+compulsory sideshow, final-two show controls, in-round help and a round summary.
+It remains unreleased while lifecycle/mobile QA is incomplete.
 
-**T5 — Variant framework and UI.**
-Dealer selection locked before information is revealed. A "How to play this
-variant" panel every player can open mid-round.
-*Opus for the engine, Sonnet for the UI.*
+**T5 — Variant execution and UI — pending.**
+Dealer selection must be locked before information is revealed. Every player
+needs an in-round “How to play this variant” panel.
 
-**T6 — Play-money system.**
-Host-configured balances, consensual board, live P&L, settle on leave.
-Persistent wallet if pursued.
-*Opus.*
+**T6 — Play-money/P&L product flow — partial across engine/protocol/UI.**
+Host-configured balances, unanimous setup acceptance, live P&L and top-up now
+exist. The remaining critical gap is Teen Patti-specific settle-on-leave /
+dynamic player lifecycle; do not substitute Hazari's bot-takeover leave path.
+No real-money path is permitted.
 
-**T7 — Bots, reconnect, integration, mobile.**
-*Mixed.*
+**T7 — reconnect, integration and mobile — partial groundwork, release QA pending.**
+Round-result reconnect restoration exists, but active-session leave/reconnect,
+multi-device integration and 2–9 seat real-device QA remain blockers. Teen Patti
+cannot leave Coming Soon until these pass.
 
 ---
 

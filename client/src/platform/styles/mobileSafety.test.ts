@@ -236,6 +236,66 @@ describe('notch and home-indicator collisions', () => {
 });
 
 // ============================================================================
+// The per-set reveal sheet (Bug 5, CLARIFIED 2026-08-16)
+//
+// Two prior rounds of "end-of-hand scroll" fixes targeted RoundSummary,
+// which turned out never to be the actually-broken screen. Hazari plays 4
+// SETS per round; after EACH set (1-4, the same component every time) a
+// separate per-set result sheet (`.reveal`, HazariTable.tsx/css) appears -
+// THIS is the screen real-device testing found unscrollable. RoundSummary
+// (checked above) is a different, separate component shown once, after the
+// round's 4th set AND the round itself resolve, and was not touched here.
+// ============================================================================
+
+describe('the per-set reveal sheet has its own bounded scroll structure, separate from RoundSummary', () => {
+  const ruleBody = (css: string, selector: string) => {
+    const start = css.indexOf(`${selector} {`);
+    if (start === -1) throw new Error(`no rule found for ${selector}`);
+    const openBrace = css.indexOf('{', start);
+    const closeBrace = css.indexOf('\n}', openBrace);
+    return css.slice(openBrace, closeBrace);
+  };
+
+  it('.reveal__sheet is bounded (max-height, governed by the JS-measured viewport) and clips - .reveal__body is the one intended scroller', () => {
+    const sheet = ruleBody(TABLE_CSS, '.reveal__sheet');
+    expect(sheet, 'must cap height, not grow unbounded').toMatch(/max-height:\s*calc\(var\(--js-vh,\s*100dvh\)/);
+    expect(sheet, 'must clip its own overflow - .reveal__body is the intended scroller').toMatch(
+      /overflow:\s*hidden/
+    );
+    expect(sheet, 'must be a flex column so header/body/footer stack predictably').toMatch(/display:\s*flex/);
+  });
+
+  it('.reveal__body is the ONE scroll region - flex: 1 1 auto, min-height: 0, overflow-y: auto, vertical pan explicitly permitted', () => {
+    const body = ruleBody(TABLE_CSS, '.reveal__body');
+    expect(body).toMatch(/flex:\s*1\s+1\s+auto/);
+    expect(body, 'the classic flex-child overflow gotcha').toMatch(/min-height:\s*0/);
+    expect(body).toMatch(/overflow-y:\s*auto/);
+    expect(body).toMatch(/overflow-x:\s*hidden/);
+    expect(body, 'must explicitly permit vertical pan gestures').toMatch(/touch-action:\s*pan-y/);
+  });
+
+  it('.reveal__title (header) and the Continue button (footer) are NOT part of the scroll region - fixed cross-axis rows', () => {
+    const title = ruleBody(TABLE_CSS, '.reveal__title');
+    expect(title, 'header must not grow/shrink - fixed size, always visible').toMatch(/flex:\s*0\s+0\s+auto/);
+    const btnRule = ruleBody(TABLE_CSS, '.reveal__sheet .btn');
+    expect(btnRule, 'footer button must not grow/shrink - fixed size, always reachable').toMatch(
+      /flex:\s*0\s+0\s+auto/
+    );
+  });
+
+  it('the reveal overlay itself uses inset: 0 (not height: 100dvh) - already the reliable half of this component', () => {
+    // .reveal (the fixed backdrop) was never the broken part - inset: 0
+    // on a position: fixed element pins directly to the true viewport
+    // without depending on a dvh calculation the way .reveal__sheet's own
+    // bound does. Confirms this wasn't accidentally changed while fixing
+    // the sheet.
+    const overlay = ruleBody(TABLE_CSS, '.reveal');
+    expect(overlay).toMatch(/position:\s*fixed/);
+    expect(overlay).toMatch(/inset:\s*0/);
+  });
+});
+
+// ============================================================================
 // Viewport units
 // ============================================================================
 

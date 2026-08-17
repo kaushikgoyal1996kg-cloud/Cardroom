@@ -98,6 +98,7 @@ export const CardTable = memo(function CardTable({
       <div className="table__felt">
         <div className="table__felt-texture" aria-hidden="true" />
         <div className="table__light" aria-hidden="true" />
+        <div className="table__monogram" aria-hidden="true">CR</div>
 
         {/* Centre: the deck during dealing, otherwise the played sets. */}
         <div className="table__centre">

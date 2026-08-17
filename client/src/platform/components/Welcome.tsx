@@ -24,12 +24,18 @@ export function Welcome({ identity, onEnter, onContinueAs, onChangeProfile }: We
   return (
     <div className="welcome">
       <div className="welcome__lamp" aria-hidden="true" />
+      <div className="welcome__door-frame" aria-hidden="true" />
 
       <div className="welcome__content">
+        <div className="welcome__seal" aria-hidden="true">
+          <span className="welcome__seal-mark">CR</span>
+        </div>
         <p className="welcome__eyebrow">Private tables. Classic games.</p>
         <h1 className="welcome__brand">
           <span className="welcome__brand-the">The</span> Card Room
         </h1>
+        <div className="welcome__rule" aria-hidden="true"><span>◆</span></div>
+        <p className="welcome__invitation">For friends, family and familiar rivals.</p>
 
         {identity ? (
           <div className="welcome__returning">
@@ -46,7 +52,8 @@ export function Welcome({ identity, onEnter, onContinueAs, onChangeProfile }: We
           </div>
         ) : (
           <button type="button" className="btn btn--primary welcome__cta" onClick={onEnter}>
-            Enter Cardroom
+            <span>Enter the Card Room</span>
+            <span className="welcome__cta-arrow" aria-hidden="true">→</span>
           </button>
         )}
       </div>

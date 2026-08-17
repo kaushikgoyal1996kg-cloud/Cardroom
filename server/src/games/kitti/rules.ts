@@ -1,11 +1,8 @@
 // ============================================================================
-// KITTI - Rules configuration
+// KITTI - Authoritative house rules
 //
-// Everything in CONFIRMED_RULES was explicitly supplied by the owner.
-// Everything in UNRESOLVED_RULES is NOT implemented and must not be guessed.
-// The engine refuses to score a round while any required rule is unresolved,
-// rather than silently inventing behaviour. See KITTI RULE QUESTIONS in the
-// project README.
+// Source of truth: RULES_KITTI.md. These are the owner's agreed rules.
+// Do not change game behaviour here without changing that specification.
 // ============================================================================
 
 export interface KittiRulesConfig {
@@ -14,10 +11,20 @@ export interface KittiRulesConfig {
   CARDS_PER_PLAYER: number;
   GROUP_COUNT: number;
   GROUP_SIZE: number;
-  /** Owner confirmed explicitly: 2-3-5 is NOT a special hand in this house. */
+  MATCH_ROUNDS: number;
+  HANDS_TO_WIN_ROUND: number;
+  /** Owner confirmed explicitly: 2-3-5 is NOT a special hand. */
   TWO_THREE_FIVE_IS_SPECIAL: false;
   DEAL_DIRECTION: 'CLOCKWISE';
+  /** Cards are dealt one at a time starting AT the dealer. */
+  DEAL_STARTS_AT_DEALER: true;
   DEALER_ROTATION: 'CLOCKWISE';
+  /** First hand is led by the player immediately clockwise/left of dealer. */
+  FIRST_LEAD: 'AFTER_DEALER';
+  /** Exact equal hands are won by the later thrower. */
+  EXACT_TIE: 'LATER_THROWER_WINS';
+  /** If all three hands have different winners, a one-hand decider is played. */
+  THREE_WINNER_DECIDER: true;
 }
 
 export const KITTI_RULES: KittiRulesConfig = {
@@ -26,42 +33,24 @@ export const KITTI_RULES: KittiRulesConfig = {
   CARDS_PER_PLAYER: 9,
   GROUP_COUNT: 3,
   GROUP_SIZE: 3,
+  MATCH_ROUNDS: 10,
+  HANDS_TO_WIN_ROUND: 2,
   TWO_THREE_FIVE_IS_SPECIAL: false,
   DEAL_DIRECTION: 'CLOCKWISE',
+  DEAL_STARTS_AT_DEALER: true,
   DEALER_ROTATION: 'CLOCKWISE',
+  FIRST_LEAD: 'AFTER_DEALER',
+  EXACT_TIE: 'LATER_THROWER_WINS',
+  THREE_WINNER_DECIDER: true,
 };
 
 /**
- * Rules that are genuinely required to finish a game of Kitti but which the
- * owner has NOT yet confirmed. Each is a hard blocker on scoring.
- *
- * The engine exposes everything that does NOT depend on these (dealing,
- * arrangement, per-group comparison), so the table, animations and UI can be
- * built and tested now, and scoring drops in once the answers arrive.
+ * The previously unresolved questions have all been answered in
+ * RULES_KITTI.md. Keep the export for compatibility with older tests/docs,
+ * but it must stay empty unless a genuinely new rule question is introduced.
  */
-export const UNRESOLVED_RULES = [
-  'GROUP_ORDERING',   // must the three groups be ordered strongest -> weakest?
-  'SCORING',          // what points does winning a group award?
-  'WIN_CONDITION',    // what ends the game - target score, fixed rounds, other?
-  'TIE_RESOLUTION',   // how is an exact tie between two equal groups resolved?
-  'STARTING_PLAYER',  // who leads - dealer, or left of dealer?
-] as const;
+export const UNRESOLVED_RULES = [] as const;
+export type UnresolvedRule = never;
 
-export type UnresolvedRule = (typeof UNRESOLVED_RULES)[number];
-
-/**
- * Set to true ONLY once every entry in UNRESOLVED_RULES has been answered by
- * the owner and implemented. Guards scoring so an unconfirmed rule can never
- * silently reach a real game.
- */
-export const KITTI_SCORING_CONFIRMED = false;
-
-export class KittiRuleUnresolvedError extends Error {
-  constructor(rule: UnresolvedRule | 'SCORING_SET') {
-    super(
-      `Kitti rule "${rule}" has not been confirmed by the owner. ` +
-        `Kitti scoring is intentionally disabled until it is - see KITTI RULE QUESTIONS.`
-    );
-    this.name = 'KittiRuleUnresolvedError';
-  }
-}
+/** Kitti's round/match rules are now fully specified and implemented. */
+export const KITTI_SCORING_CONFIRMED = true;

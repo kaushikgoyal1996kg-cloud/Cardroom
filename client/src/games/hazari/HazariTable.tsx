@@ -8,6 +8,8 @@ import { playCardPlaySound, playRevealSound, playPointsSound } from '../../lib/s
 import { hapticMedium } from '../../lib/haptics';
 import { classifySet, labelFor, setValue } from '../../game/handClassification';
 import { useWakeLock } from '../../lib/useWakeLock';
+import { useVisualViewport } from '../../platform/lib/useVisualViewport';
+import { PlayMoneyPotBadge } from '../../platform/components/PlayMoneyBoard';
 import type { PlayerId } from '../../game/types';
 import './HazariTable.css';
 
@@ -40,6 +42,11 @@ export function HazariTable() {
   /** Blocks a second Play tap until the server's state actually moves on. */
   const [playPending, setPlayPending] = useState(false);
   const playedCountRef = useRef<number>(-1);
+  // JS-measured viewport height for the reveal sheet's own bound - see
+  // HazariTable.css's .reveal__sheet comment for the full reasoning (Bug 5,
+  // 2026-08-16 CLARIFIED: the per-set reveal, not RoundSummary, was the
+  // actually-broken screen).
+  const { viewportHeight } = useVisualViewport();
   /**
    * Sets already on the felt when this component last rendered. A set only
    * animates in on the render where it FIRST appears, identified by a stable
@@ -87,6 +94,8 @@ export function HazariTable() {
     }
   }, [safePlayedCount]);
 
+  const pendingPlayerId = gameState?.currentPlayOrder?.[gameState.playersPlayedThisSubRound.length] ?? null;
+
   const seats: SeatPlayer[] = useMemo(() => {
     if (!room || !gameState) return [];
     return room.players.map((p) => ({
@@ -100,15 +109,16 @@ export function HazariTable() {
       hasActed: gameState.playersPlayedThisSubRound.includes(p.playerId),
       inVoiceCall: voiceParticipants.includes(p.playerId),
       speaking: speakingPlayerIds.includes(p.playerId),
+      statusLabel: p.isBot && p.playerId === pendingPlayerId ? 'Thinking…' : undefined,
     }));
-  }, [room, gameState, voiceParticipants, speakingPlayerIds]);
+  }, [room, gameState, voiceParticipants, speakingPlayerIds, pendingPlayerId]);
 
   // Defensive fallback, not the primary guard - see RoomLobby.tsx's comment
   // on the same pattern.
   if (!room || !gameState || !myPlayerId) {
     return (
       <div className="waiting-screen">
-        <LoadingSpinner message="Returning to Cardroom…" />
+        <LoadingSpinner message="Returning to the Card Room…" />
       </div>
     );
   }
@@ -116,7 +126,7 @@ export function HazariTable() {
   const currentSetIdx = gameState.currentSetIndex;
   const playOrder = gameState.currentPlayOrder ?? [];
   const played = new Set(gameState.playersPlayedThisSubRound);
-  const nextToPlay = playOrder[gameState.playersPlayedThisSubRound.length] ?? null;
+  const nextToPlay = pendingPlayerId;
   const isMyTurn = nextToPlay === myPlayerId && !played.has(myPlayerId);
 
   const nameOf = (pid: PlayerId) =>
@@ -189,18 +199,24 @@ export function HazariTable() {
       ? isMyTurn
         ? 'Your turn'
         : nextToPlay
-          ? `Waiting for ${nameOf(nextToPlay)}`
+          ? room.players.find((p) => p.playerId === nextToPlay)?.isBot
+            ? `${nameOf(nextToPlay)} is thinking…`
+            : `Waiting for ${nameOf(nextToPlay)}`
           : undefined
       : undefined;
 
   return (
     <div className="hazari">
       <header className="hazari__bar">
-        <span className="hazari__room">{room.roomCode}</span>
-        <span className="hazari__round">
-          Round {gameState.roundNumber} · {SET_LABELS[currentSetIdx]}
-        </span>
-        <span className="hazari__points">{pointsSoFar}/360</span>
+        <div className="hazari__phase">
+          <p className="hazari__eyebrow">Hazari · Round {gameState.roundNumber}</p>
+          <strong className="hazari__phase-title">{SET_LABELS[currentSetIdx]}</strong>
+        </div>
+        <div className="hazari__scoreline">
+          <span>{pointsSoFar}/360 points</span>
+          <small>Room {room.roomCode}</small>
+          <PlayMoneyPotBadge />
+        </div>
       </header>
 
       <div className="hazari__table-area">
@@ -232,8 +248,11 @@ export function HazariTable() {
                   .join(' ')}
               >
                 <span className="hazari__set-label">
-                  {SET_LABELS[idx]}
-                  {isDone && <span className="hazari__set-tick" aria-label="played"> ✓</span>}
+                  <span>
+                    {SET_LABELS[idx]}
+                    {isDone && <span className="hazari__set-tick" aria-label="played"> ✓</span>}
+                  </span>
+                  <small>{labelFor(classifySet(set))}</small>
                 </span>
                 <div className="hazari__set-cards">
                   {set.map((card) => (
@@ -277,46 +296,54 @@ export function HazariTable() {
       )}
 
       {showReveal && latestResult && (
-        <div className="reveal" role="dialog" aria-label="Set result">
+        <div
+          className="reveal"
+          role="dialog"
+          aria-label="Set result"
+          style={viewportHeight ? ({ '--js-vh': `${viewportHeight}px` } as React.CSSProperties) : undefined}
+        >
           <div className="reveal__sheet">
             <h2 className="reveal__title">{SET_LABELS[latestResult.setIndex]}</h2>
-            {latestResult.wasTie && (
-              <p className="reveal__tie">Tied — last throw takes it</p>
-            )}
 
-            <ul className="reveal__hands" role="list">
-              {latestResult.playedSets.map((ps) => {
-                const isWinner = ps.playerId === latestResult.winnerId;
-                return (
-                  <li
-                    key={ps.playerId}
-                    className={`reveal__hand${isWinner ? ' is-winner' : ''}`}
-                  >
-                    <span className="reveal__hand-name">
-                      {nameOf(ps.playerId)}
-                      {isWinner && <span className="reveal__crown"> · won</span>}
-                    </span>
-                    <span className="reveal__hand-cards">
-                      {ps.cards.map((cd) => (
-                        <PlayingCard
-                          key={cd.id}
-                          card={cd}
-                          size="sm"
-                          highlighted={isWinner}
-                        />
-                      ))}
-                    </span>
-                    <span className="reveal__hand-label">
-                      {labelFor(classifySet(ps.cards))}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="reveal__body">
+              {latestResult.wasTie && (
+                <p className="reveal__tie">Tied — last throw takes it</p>
+              )}
 
-            <p className="reveal__points">
-              {latestResult.pointsAwarded} points to {nameOf(latestResult.winnerId)}
-            </p>
+              <ul className="reveal__hands" role="list">
+                {latestResult.playedSets.map((ps) => {
+                  const isWinner = ps.playerId === latestResult.winnerId;
+                  return (
+                    <li
+                      key={ps.playerId}
+                      className={`reveal__hand${isWinner ? ' is-winner' : ''}`}
+                    >
+                      <span className="reveal__hand-name">
+                        {nameOf(ps.playerId)}
+                        {isWinner && <span className="reveal__crown"> · won</span>}
+                      </span>
+                      <span className="reveal__hand-cards">
+                        {ps.cards.map((cd) => (
+                          <PlayingCard
+                            key={cd.id}
+                            card={cd}
+                            size="sm"
+                            highlighted={isWinner}
+                          />
+                        ))}
+                      </span>
+                      <span className="reveal__hand-label">
+                        {labelFor(classifySet(ps.cards))}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              <p className="reveal__points">
+                {latestResult.pointsAwarded} points to {nameOf(latestResult.winnerId)}
+              </p>
+            </div>
 
             <button
               type="button"

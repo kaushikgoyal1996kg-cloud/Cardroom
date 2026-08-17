@@ -1,29 +1,11 @@
-// A curated set of avatar icons themed to fit Haazari's Indian card-table
-// aesthetic - symbols plus character faces. Kept as plain emoji (no image
-// assets needed) so they render everywhere with zero extra network requests.
+// Curated Card Room seat identities. Kept as plain Unicode symbols/emoji so
+// the same value renders in the website, Android wrapper and iPhone Safari
+// without image downloads or per-platform asset paths. The server validates
+// every client-supplied avatar against this exact allow-list.
 export const AVATAR_OPTIONS = [
-  '🦚', // peacock
-  '👑', // crown
-  '🐘', // elephant
-  '🐯', // tiger
-  '🦁', // lion
-  '🦜', // parrot
-  '🐍', // cobra
-  '🪷', // lotus
-  '🔱', // trident
-  '🎭', // mask
-  '🌙', // moon
-  '⭐', // star
-  '🤴', // prince
-  '👸', // princess
-  '🧞', // genie
-  '👳', // person wearing turban
-  '🧕', // person with headscarf
-  '🥷', // ninja
-  '🧙', // wizard
-  '🕵️', // detective
-  '🤠', // cowboy
-  '🥸', // disguise face
+  '🦚', '👑', '🐘', '🐯', '🦁', '🦜', '🐍', '🪷', '🔱', '🎭', '🌙', '⭐',
+  '🐆', '🦅', '🐺', '🐉', '🦉', '🐎', '🐂', '🦊', '💎', '⚜️', '🛡️', '♠️',
+  '🤴', '👸', '🧞', '👳', '🧕', '🥷', '🧙', '🕵️', '🤠', '🥸',
 ] as const;
 
 export type Avatar = (typeof AVATAR_OPTIONS)[number];

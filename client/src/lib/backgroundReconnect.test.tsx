@@ -240,6 +240,24 @@ describe('Bug 1 - backgrounding must not lose an active game', () => {
     expect(socket.joinEmitCount()).toBe(0);
   });
 
+  it('Play/Create/Join actions cannot create a second seat while the stored seat is recoverable', async () => {
+    const { GameProvider, useGame } = await loadStore();
+    const { result } = renderHook(() => useGame(), { wrapper: GameProvider });
+
+    act(() => socket.fire('connect'));
+    expect(socket.reconnectEmitCount()).toBe(1);
+
+    let ack: unknown;
+    await act(async () => {
+      ack = await result.current.createRoom('Alice', undefined, 'HAZARI');
+    });
+
+    expect(ack).toMatchObject({ ok: false });
+    expect(socket.joinEmitCount()).toBe(0);
+    // The original reconnect is still the only room-lifecycle operation.
+    expect(socket.pendingReconnectCount()).toBe(1);
+  });
+
   it('a stale reconnect ack from a superseded attempt cannot wipe a newer, successful one', async () => {
     const { GameProvider, useGame } = await loadStore();
     const { result } = renderHook(() => useGame(), { wrapper: GameProvider });

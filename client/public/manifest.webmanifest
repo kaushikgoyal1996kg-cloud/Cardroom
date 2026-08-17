@@ -1,7 +1,7 @@
 {
-  "name": "Cardroom",
-  "short_name": "Cardroom",
-  "description": "A premium room for card games - Hazari, Kitti and Teen Patti - with friends.",
+  "name": "The Card Room",
+  "short_name": "Card Room",
+  "description": "A private card room for Hazari and Kitti, with more tables coming soon.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

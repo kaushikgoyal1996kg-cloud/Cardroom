@@ -77,6 +77,25 @@ function setFakeGame(myPlayerId = 'p1') {
   };
 }
 
+function setFakeDismissedGame(myPlayerId = 'p1') {
+  const startNextRound = vi.fn();
+  fakeGame = {
+    room: makeRoom(),
+    lastRoundResult: {
+      roundNumber: 2,
+      dismissed: true,
+      dismissalReason: 'SIX_PAIRS',
+      pointsThisRound: { p1: 0, p2: 0, p3: 0, p4: 0 },
+      cumulativeScores: { p1: 40, p2: 10, p3: 5, p4: 0 },
+      subRounds: [],
+    },
+    gameState: { dealerId: 'p3', state: 'DISMISSED_ROUND' },
+    myPlayerId,
+    startNextRound,
+  };
+  return startNextRound;
+}
+
 afterEach(() => {
   cleanup();
   mockViewportHeight = 0;
@@ -145,5 +164,24 @@ describe('RoundSummary: bounded shell structure actually renders (Bug 5)', () =>
     const button = container.querySelector('.rsum__next');
     expect(button).not.toBeNull();
     expect(actions!.contains(button)).toBe(true);
+  });
+
+
+  it('Bug 6: a dismissed hand stays on the normal round-summary path and Next round calls the existing room action', async () => {
+    const startNextRound = setFakeDismissedGame('p1');
+    const { RoundSummary } = await import('./RoundSummary');
+    const { container } = render(<RoundSummary />);
+
+    expect(container.textContent).toContain('Hand dismissed');
+    expect(container.textContent).toContain('Nobody scores this round');
+    // Dismissed rounds have no played-set breakdown; importantly, this is
+    // still the SAME result screen with the SAME Next round control rather
+    // than a leave/rejoin path.
+    expect(container.querySelector('.rsum__sets')).toBeNull();
+
+    const button = container.querySelector('.rsum__next') as HTMLButtonElement;
+    expect(button).not.toBeNull();
+    button.click();
+    expect(startNextRound).toHaveBeenCalledTimes(1);
   });
 });

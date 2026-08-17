@@ -134,7 +134,7 @@ describe('room:leaveTable over a real socket', () => {
     // game a real window to generate several MORE room:update/hazari:state
     // broadcasts, not just the immediate one, so a subscription that
     // merely missed the first message would still be caught here.
-    await new Promise((r) => setTimeout(r, 900));
+    await new Promise((r) => setTimeout(r, 1400));
 
     expect(sawOwnLeaveBroadcast).toBe(false);
 

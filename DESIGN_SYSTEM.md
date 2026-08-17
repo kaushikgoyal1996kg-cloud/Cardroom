@@ -185,3 +185,55 @@ Neither should look like a spreadsheet or a jackpot.
 - Play-travel is a short glide with a slight settle. No arcs, no flourishes.
 - Prefer CSS transforms and opacity so animation stays on the compositor.
 - Everything must degrade cleanly under `prefers-reduced-motion`.
+
+---
+
+## Multi-game shell and navigation
+
+The Card Room is the product; no playable game is presented as the default or
+"flagship" in the player-facing selector.
+
+- **Cold launch:** Welcome → Profile when needed → The Card Room.
+- **Game selector:** no game pre-selected. Hazari and Kitti have equal visual
+  weight. Teen Patti and Poker may be shown as polished **Coming Soon** entries,
+  but they must not expose dead/fake Play or Create controls.
+- **Contextual actions:** before selection, invite the player to choose a table;
+  after selecting a playable game, show its Play/Create actions; after selecting
+  Coming Soon, show explanation only.
+- **Deliberate table exit:** returns to The Card Room, not all the way out through
+  Welcome. Welcome remains the building entrance, not a punishment for leaving a
+  table.
+- **Active-seat peek/return:** if the player is still connected to a room, show a
+  premium live-seat pass with game + room identity and one obvious Return action.
+- **Invite links:** use a neutral Card Room invitation screen and identify the
+  invited game. Shared/native invite URLs must be public, never a local WebView
+  origin.
+
+## Shared support and transient screens
+
+Loading, reconnect, offline/error, Settings, Rules, Stats, History, confirmed-hand
+waiting and similar utility states are part of the premium product. They must not
+fall back to a legacy green/glass/browser-tool visual language.
+
+- Use the same opaque room/wood/brass materials as the main shell; no
+  glassmorphism/backdrop-filter utility panels.
+- Use consistent vector chrome for Close, Back, Settings, Voice, Chat, Rules,
+  Stats and History. Emoji are content (reactions), not navigation icons.
+- Player-facing copy says **The Card Room** consistently. Avoid web-deployment
+  language such as "landing page", implementation variable names, or browser
+  alerts.
+- Web install/update prompts are secondary shell UI and must never cover a live
+  room. Native builds must not ask the player to install or refresh a PWA.
+- The 44×44 minimum touch-target rule applies equally to banners, modal chrome
+  and support screens, not only gameplay.
+
+
+
+## Player identity / avatars
+
+Avatar choices are compact seat identities, not profile photos. The picker uses
+a curated Unicode/emoji set shared by server and client so the same identity
+works in browser, Android and iPhone Safari without image downloads. Release 1
+expands the set with restrained animal/symbol identities such as panther, eagle,
+wolf, dragon, owl, stallion, bull, fox, diamond, shield and spade. Picker
+targets remain at least 44×44px; seat rendering stays a small brass medallion.

@@ -605,3 +605,50 @@
     overflow-y: auto;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Routed Hazari waiting state — same physical shared table, not the legacy
+   square felt screen retained elsewhere as rollback code.
+   -------------------------------------------------------------------------- */
+.arranging-wait {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background:
+    radial-gradient(ellipse 72% 34% at 50% 0%, rgba(99,70,43,.44), transparent 72%),
+    var(--room-950);
+  overflow: hidden;
+  padding-top: calc(var(--safe-top) + var(--top-fab-reserve));
+}
+.arranging-wait__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) calc(var(--safe-right) + var(--space-4)) var(--space-2) calc(var(--safe-left) + var(--space-4));
+}
+.arranging-wait__header > div { display: grid; gap: .1rem; text-align: left; }
+.arranging-wait__header span { color: var(--brass-400); font-size: .65rem; font-weight: 600; letter-spacing: .17em; text-transform: uppercase; }
+.arranging-wait__header strong { color: var(--ink-100); font: 500 var(--text-base)/1.2 var(--font-display); }
+.arranging-wait__header p { margin: 0; color: var(--ink-400); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.arranging-wait__table { min-height: 0; display: grid; place-items: center; padding-inline: calc(var(--safe-left) + var(--space-1)) calc(var(--safe-right) + var(--space-1)); }
+.arranging-wait__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: min(32rem, calc(100% - var(--safe-left) - var(--safe-right) - 2 * var(--space-3)));
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-4) calc(var(--safe-bottom) + var(--space-3));
+  color: var(--ink-300);
+}
+.arranging-wait__footer strong { display: block; margin-bottom: .15rem; color: var(--ink-100); font: 500 var(--text-sm)/1.25 var(--font-display); }
+.arranging-wait__footer p { margin: 0; color: var(--ink-500); font-size: var(--text-xs); line-height: 1.4; }
+.arranging-wait__check {
+  width: 2rem; height: 2rem; flex: 0 0 auto; display: grid; place-items: center;
+  border: 1px solid var(--brass-600); border-radius: 50%; color: var(--brass-300); background: rgba(200,164,92,.08);
+}
+@media (orientation: landscape) and (max-height: 30rem) {
+  .arranging-wait__header { padding-block: .3rem; }
+  .arranging-wait__footer { padding-top: .4rem; padding-bottom: calc(var(--safe-bottom) + .4rem); }
+  .arranging-wait__footer p { display: none; }
+}

@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { AvatarPicker } from '../../components/Lobby/AvatarPicker';
+import { AvatarBadge, AvatarPicker } from '../../components/Lobby/AvatarPicker';
 import { AVATAR_OPTIONS } from '../../game/avatars';
 import { saveIdentity, type SavedIdentity } from '../../lib/identity';
+import { ChromeIcon } from './ChromeIcon';
 import './PlayerProfile.css';
 
 export interface PlayerProfileProps {
@@ -36,11 +37,16 @@ export function PlayerProfile({ initial, onSaved, onCancel }: PlayerProfileProps
     <div className="player-profile">
       <div className="player-profile__sheet">
         <button type="button" className="player-profile__back" onClick={onCancel} aria-label="Back">
-          ‹
+          <ChromeIcon name="back" />
         </button>
 
+        <div className="player-profile__seal" aria-hidden="true">CR</div>
+        <div className="player-profile__preview" aria-hidden="true">
+          <AvatarBadge avatar={avatar} size="lg" ring />
+        </div>
+
         <h1 className="player-profile__title">
-          {initial ? 'Change Profile' : 'Your Cardroom Identity'}
+          {initial ? 'Change Profile' : 'Your Player Profile'}
         </h1>
         <p className="player-profile__tagline">
           {initial

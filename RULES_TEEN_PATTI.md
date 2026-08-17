@@ -2,9 +2,12 @@
 
 **Teen Patti comes after Kitti.**
 
-This file is the agreed rule specification. The great majority is **not yet
-implemented**. The final section lists where the existing engine conflicts with
-this spec — **documented, not resolved. No code was changed.**
+This file is the agreed rule specification. The **Classic** engine and hidden
+multiplayer/client groundwork now implement a substantial part of it, but Teen
+Patti remains **Coming Soon** and deliberately cannot be entered from the game
+selector. Non-Classic variant execution and the complete leave/settlement/mobile
+release flow are still pending. The rules below remain the authority; status
+markers describe implementation only.
 
 Status key: ✅ implemented · 🟡 partial · ⛔ not implemented
 
@@ -15,9 +18,9 @@ Status key: ✅ implemented · 🟡 partial · ⛔ not implemented
 ## Table and session
 
 - **Maximum 9 players.** ✅
-- **No fixed round count** — play continues until players stop. ⛔
+- **No fixed round count** — play continues until players stop. ✅
 
-## Dealer ⛔
+## Dealer ✅
 
 - **First dealer** by one-card highest draw. Ace high. Redraw ties.
 - **Next round's dealer is the previous round's winner.** *(Not clockwise
@@ -25,7 +28,7 @@ Status key: ✅ implemented · 🟡 partial · ⛔ not implemented
 
 ---
 
-## Play money ⛔
+## Play money 🟡
 
 Host configures:
 
@@ -44,7 +47,7 @@ leaves, settle their table account against the current session state.
 
 ---
 
-## Betting ⛔ (a different model from the current engine)
+## Betting ✅ (Classic engine core)
 
 - Players are **blind** or **seen**.
 - **Seen amount = 2× the current blind.**
@@ -56,7 +59,7 @@ leaves, settle their table account against the current session state.
 - **Once seen, a player cannot return to blind.**
 - **Pack** is allowed on any turn.
 
-### Compulsory sideshow ⛔
+### Compulsory sideshow ✅
 
 - Available **only when all remaining active players are seen** — and then it
   is **compulsory**.
@@ -66,7 +69,7 @@ leaves, settle their table account against the current session state.
 - The **weaker hand packs**.
 - **Exact tie → the sideshow initiator packs.**
 
-### Final two ⛔
+### Final two ✅
 
 - The two may **mutually agree to an open show at no extra cost**.
 - Otherwise betting continues, and either may initiate a showdown.
@@ -95,9 +98,12 @@ colour and high card by highest, then second, then third. Suit is never used.
 
 ---
 
-## Dealer-selected variant framework ⛔
+## Dealer-selected variant framework 🟡
 
-Nothing of this exists. It is the largest single piece of future work.
+The descriptor/configuration framework exists and the rules are represented as
+data. **Only Classic is runtime-enabled today.** Unsupported variants are
+rejected explicitly rather than silently behaving like Classic. Live execution
+of the variants below remains future work.
 
 The dealer may select:
 
@@ -209,75 +215,63 @@ that round**.
 
 ---
 
-## Mismatches with the current engine
+## Implementation status and remaining gaps
 
-Found by inspecting `server/src/games/teenpatti/` against this spec. **Nothing
-has been changed.** Resolve deliberately in phases T1–T2.
+The original partial engine conflicted with this specification in several
+places. The Classic rewrite has resolved the core betting/dealer/sideshow
+conflicts below, but Teen Patti is still deliberately gated as **Coming Soon**.
 
-### 1. Betting model differs — **conflict**
+### Classic core now matches the agreed rules ✅
 
-Current: `BLIND_MULTIPLIERS: [1, 2]` and `SEEN_MULTIPLIERS: [2, 4]` — the
-player chooses a multiple of the current stake each turn.
+- host-configured starting balance, boot, base blind and max blind; the proposed
+  setup must be accepted by every seated player before Start
+- first dealer by Ace-high one-card draw with redraws for ties
+- previous unique round winner becomes dealer when the **next** round starts
+- blind doubles in steps to the configured maximum
+- exactly three blind turns, then forced **seen betting status** without
+  automatically revealing the player's cards
+- seen amount = 2× current blind; once seen, never blind again
+- pack on any turn where it is otherwise legal
+- compulsory sideshow when all remaining players (>2) are seen, using the nearest
+  active player anticlockwise; exact tie makes the initiator pack
+- final-two mutual free open show, or paid showdown at the current seen amount
+- exact showdown ties split the pot
+- no fixed number of rounds
+- explicit See keeps dealt cards private until the player actually looks
+- positive whole-number play-money top-ups with no maximum and live table P/L
 
-Spec: blind **doubles** in steps to a host-defined max (20 → 40 → 60), and
-seen is **2× the current blind**. These are different mechanics, not different
-numbers.
+### Play-money/session exit 🟡
 
-### 2. Blind limit differs — **conflict**
+Top-up, funding and live P/L exist in the Classic engine and protocol. The
+**settle-on-leave / dynamic active-session removal flow is not finished**. Do not
+reuse Hazari's `room:leaveTable` for Teen Patti: that event converts a Hazari seat
+to a bot and is not this game's agreed exit behaviour. Teen Patti must remain
+gated until its own settlement-safe leave path is implemented and tested.
 
-Current `MAX_BLIND_ROUNDS: 4`. Spec says **3** blind chances, then forced seen.
+### Variant framework 🟡
 
-### 3. Pot limit vs compulsory sideshow — **conflict**
+Descriptors/configuration exist for the agreed variants, including their deal
+counts, discard/joker/target metadata and in-round help text. **Classic is the
+only runtime-enabled variant.** Attempting to configure an unsupported variant
+throws/refuses instead of falling back to Classic. The actual joker, discard,
+Muflis, Best-of-Four, assumed-third and Closest-to-N evaluators still need to be
+implemented.
 
-Current `POT_LIMIT: 1000` forces a showdown when the pot is reached. This was
-added to stop a measured **599-turn** all-blind round, since a blind player
-cannot call a show.
+### Network/session/client 🟡
 
-The spec has **no pot limit**; termination comes from the 3-blind cap and
-compulsory sideshow. Once T2 implements those, the pot limit should be
-reconsidered — but **do not remove it before the replacement exists**, or the
-599-turn problem returns.
+`TeenPattiSession`, `teenpatti:*` setup/state/private/action/top-up/next-round
+events, reconnect result restoration, a hidden Classic shared-table UI and a
+round-summary/top-up flow now exist. Private dealt cards are never placed in the
+public state. The server registry deliberately remains `networkPlayable: false`,
+so none of this is release-reachable yet.
 
-### 4. Sideshow not implemented — **gap**
+### Release work still required ⛔
 
-`SIDE_SHOW_ENABLED: false` and there is no sideshow logic at all. The spec
-makes it compulsory when all remaining players are seen, compared
-anticlockwise.
-
-### 5. Dealer rotation differs — **conflict**
-
-Current: `rotateDealer()` moves clockwise. Spec: **the previous round's winner
-deals next.**
-
-### 6. Host configuration missing — **gap**
-
-`BOOT_AMOUNT: 10` and `STARTING_CHIPS: 1000` are fixed constants. The spec has
-the host configure starting balance, board, base blind and max blind.
-
-### 7. No play-money system — **gap**
-
-No P&L, no top-ups, no settle-on-leave, no consensual board.
-
-### 8. No variant framework — **gap**
-
-None of it exists. Only Classic behaviour is implemented.
-
-### 9. Final-two mutual show — **gap**
-
-Showdown exists and costs 2× the stake (which matches "normal current seen
-amount"). A **free mutually-agreed open show** does not exist.
-
-### 10. Matches the spec ✅
-
-- Maximum 9 players
-- Hand ranking and sequence order, including A-2-3 second
-- Exact ties split the pot equally
-- No real money anywhere
-
-### 11. Not network-playable — **expected**
-
-`networkPlayable: false`; no controller, no UI, no `teenpatti:*` events.
-Correct until T3.
+- Teen Patti-specific settle-on-leave and room/player lifecycle
+- full reconnect/multi-device/socket integration tests for the new flow
+- real-device mobile/rotation/keyboard/voice QA with up to 9 seats
+- runtime implementations and UI for the non-Classic variants
+- final product-level play-money consent/settlement polish
 
 ---
 
@@ -285,12 +279,19 @@ Correct until T3.
 
 | Piece | Status |
 |---|---|
-| Max 9 players | ✅ |
-| Hand ranking + sequence order | ✅ |
-| Boot collection, blind/seen, chaal, pack | 🟡 different model |
-| Show, showdown, pot split | 🟡 |
-| Chip conservation, server authority, duplicate-action guards | ✅ |
-| Dealer rotation | 🟡 clockwise, spec says winner |
-| Everything else in this document | ⛔ |
+| Maximum 9 players + hand ranking/sequence order | ✅ |
+| Initial dealer draw + previous-winner next dealer | ✅ Classic core |
+| Boot, blind doubling/cap, three-blind force-seen, chaal, pack | ✅ Classic core |
+| Compulsory sideshow + final-two shows + exact-tie split | ✅ Classic core |
+| Card privacy / explicit See | ✅ |
+| Host setup proposal + unanimous acceptance | ✅ server flow |
+| Top-up + live P/L | 🟡 engine/protocol/UI; leave settlement pending |
+| Variant descriptors + “How to play” data | 🟡 Classic runtime only |
+| `TeenPattiSession` + `teenpatti:*` protocol | 🟡 built behind disabled registry |
+| Hidden Classic table + round summary | 🟡 built, not release-enabled |
+| Teen Patti-specific settle-on-leave | ⛔ |
+| Full variant execution | ⛔ |
+| Registry | ✅ deliberately `networkPlayable: false` |
 
-24 tests, covering only what exists.
+The repository test suite has **not** been rerun in the current constrained
+environment; do not treat these status markers as a new verified test baseline.

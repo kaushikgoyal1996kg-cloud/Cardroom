@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGame } from './lib/GameStore';
 import { HomeScreen } from './platform/components/HomeScreen';
+import { ChromeIcon } from './platform/components/ChromeIcon';
 import { RoomLobby } from './components/Lobby/RoomLobby';
 import { ArrangementTable } from './games/hazari/ArrangementTable';
 import { DealingTable, useDealCeremony } from './games/hazari/DealingTable';
@@ -9,6 +10,15 @@ import { ArrangingWaitScreen } from './components/Play/ArrangingWaitScreen';
 import { HazariTable } from './games/hazari/HazariTable';
 import { RoundSummary } from './games/hazari/RoundSummary';
 import { WinnerScreen } from './games/hazari/WinnerScreen';
+import { KittiArrangement } from './games/kitti/KittiArrangement';
+import { canUseKittiArrangementAssist } from './games/kitti/arrangementAssist';
+import { KittiDealingTable } from './games/kitti/KittiDealingTable';
+import { KittiTable } from './games/kitti/KittiTable';
+import { KittiWaitingTable } from './games/kitti/KittiWaitingTable';
+import { KittiRoundSummary } from './games/kitti/KittiRoundSummary';
+import { KittiWinner } from './games/kitti/KittiWinner';
+import { TeenPattiTable } from './games/teenpatti/TeenPattiTable';
+import { TeenPattiRoundSummary } from './games/teenpatti/TeenPattiRoundSummary';
 import { RulesModal } from './components/RulesModal';
 import { SettingsModal } from './components/SettingsModal';
 import { StatsModal } from './components/StatsModal';
@@ -21,9 +31,13 @@ import { UpdateBanner } from './components/UpdateBanner';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { useBackGuard } from './lib/useBackGuard';
 import { hasSeenTutorial } from './lib/tutorial';
+import { hasGameGuide, type GuideGameId } from './platform/games/gameGuides';
 import './App.css';
 
 const ARRANGING_STATES = new Set(['ARRANGING_HANDS', 'WAITING_FOR_HAND_CONFIRMATION', 'ROUND_READY']);
+const KITTI_ARRANGING_STATES = new Set(['ARRANGING', 'WAITING_FOR_ARRANGEMENTS']);
+const KITTI_PLAYING_STATES = new Set(['PLAYING_HAND_1', 'PLAYING_HAND_2', 'PLAYING_HAND_3', 'PLAYING_DECIDER']);
+
 const PLAYING_STATES = new Set([
   'PLAYING_SET_1',
   'REVEALING_SET_1',
@@ -36,35 +50,58 @@ const PLAYING_STATES = new Set([
 ]);
 
 function HomeScreenReturn() {
-  const { room, gameState, returnToGame, leaveSession, leaveTable } = useGame();
-  const inActiveGame = room?.status === 'IN_GAME' && gameState && !['GAME_COMPLETE'].includes(gameState.state);
+  const { room, gameState, kittiState, teenPattiState, returnToGame, leaveSession, leaveTable, leaveTeenPattiTable } = useGame();
+  const [confirmTeenPattiLeave, setConfirmTeenPattiLeave] = useState(false);
+  if (!room) return null;
+  const isHazari = room.gameId === 'HAZARI';
+  const hazariActive = isHazari && room.status === 'IN_GAME' && gameState?.state !== 'GAME_COMPLETE';
+  const kittiActive = room.gameId === 'KITTI' && room.status === 'IN_GAME' && kittiState?.state !== 'MATCH_COMPLETE';
+  const teenPattiActive = room.gameId === 'TEEN_PATTI' && room.status === 'IN_GAME';
+  const gameName = room.gameId === 'HAZARI' ? 'Hazari' : room.gameId === 'KITTI' ? 'Kitti' : 'Teen Patti';
 
   return (
-    <div className="landing">
-      <h1 className="wordmark landing__title">Haazari</h1>
-      <div className="landing__form panel">
-        {room ? (
-          <>
-            <p>
-              You have an active {room.status === 'LOBBY' ? 'room' : 'game'} — <strong>{room.roomCode}</strong>.
-            </p>
-            <button className="btn btn-primary" onClick={returnToGame}>
-              {room.status === 'LOBBY' ? 'Return to Room' : 'Rejoin Game'}
-            </button>
-            {inActiveGame && (
-              <button className="btn btn-ghost" onClick={leaveTable}>
-                Leave Table Instead
-              </button>
-            )}
-            <button className="btn btn-ghost" onClick={leaveSession}>
-              Leave &amp; Go to Landing
-            </button>
-          </>
-        ) : (
-          <p className="text-muted">No active game.</p>
+    <main className="home-return">
+      <div className="home-return__lamp" aria-hidden="true" />
+      <section className="home-return__pass" aria-label={`Active ${gameName} table`}>
+        <p className="home-return__eyebrow">Your seat is still connected</p>
+        <h1>{gameName}</h1>
+        <div className="home-return__room-code">{room.roomCode}</div>
+        <p className="home-return__copy">
+          You stepped away from the table without leaving it. Your original seat is still yours.
+        </p>
+        <button className="btn btn-primary home-return__primary" onClick={returnToGame}>
+          {room.status === 'LOBBY' ? 'Return to room' : `Return to ${gameName}`}
+        </button>
+
+        {hazariActive && (
+          <button className="btn btn-ghost" onClick={leaveTable}>
+            Leave seat to a computer
+          </button>
         )}
-      </div>
-    </div>
+        {!hazariActive && !kittiActive && !teenPattiActive && (
+          <button className="btn btn-ghost" onClick={leaveSession}>
+            Leave this table
+          </button>
+        )}
+        {kittiActive && (
+          <p className="home-return__note">Your Kitti seat remains reserved while the match is in progress.</p>
+        )}
+        {teenPattiActive && !confirmTeenPattiLeave && (
+          <button className="btn btn-ghost" onClick={() => setConfirmTeenPattiLeave(true)}>
+            Leave and settle table
+          </button>
+        )}
+        {teenPattiActive && confirmTeenPattiLeave && (
+          <div className="home-return-settle">
+            <p className="home-return__note">Leaving packs your live hand if needed, settles your play-money P/L, and permanently releases your seat.</p>
+            <div>
+              <button className="btn btn-ghost" onClick={() => setConfirmTeenPattiLeave(false)}>Stay</button>
+              <button className="btn btn-primary" onClick={() => void leaveTeenPattiTable()}>Leave &amp; settle</button>
+            </div>
+          </div>
+        )}
+      </section>
+    </main>
   );
 }
 
@@ -74,18 +111,32 @@ export function App() {
     hasConnectedOnce,
     room,
     gameState,
+    kittiState,
     myPlayerId,
     lastRoundResult,
     winnerInfo,
     myHand,
     myArrangedSets,
+    kittiHand,
+    kittiArrangedGroups,
+    lastKittiRoundResult,
+    kittiWinnerInfo,
+    teenPattiState,
+    teenPattiPrivate,
+    lastTeenPattiRoundResult,
+    teenPattiSettlementNotice,
     gameError,
     clearGameError,
     confirmArrangement,
     requestDismissal,
     requestSuggestionOptions,
+    requestKittiSuggestion,
+    confirmKittiArrangement,
     viewMode,
+    goToHomeScreen,
     leaveTable,
+    leaveTeenPattiTable,
+    clearTeenPattiSettlementNotice,
     leaveSession,
     returnToGame,
   } = useGame();
@@ -94,7 +145,9 @@ export function App() {
   const [showStats, setShowStats] = useState(false);
   const [showRoundHistory, setShowRoundHistory] = useState(false);
   const [showConnBanner, setShowConnBanner] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(() => !hasSeenTutorial());
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialGameId, setTutorialGameId] = useState<GuideGameId | null>(null);
+  const guideRoomRef = useRef<string | null>(null);
   // Set only by the Android/PWA/browser Back guard below, when the current
   // screen needs confirmation before it's safe to actually leave - never by
   // any of the screens' own visible Leave buttons, which already call
@@ -102,6 +155,28 @@ export function App() {
   // room" wording; 'game' adds the bot-takeover warning, matching
   // SettingsModal's existing in-game leave confirmation.
   const [pendingLeaveConfirm, setPendingLeaveConfirm] = useState<null | 'lobby' | 'game'>(null);
+
+  // A multi-game card room must never open with one game's rules before a
+  // game has even been chosen. Show the guide only after the player actually
+  // enters a playable game, and remember that choice independently per game.
+  // Reconnects / returning to the same live room do not re-open the guide;
+  // Settings -> Rules & How to Play remains available at any time.
+  useEffect(() => {
+    if (!room || viewMode !== 'active' || !hasGameGuide(room.gameId)) return;
+    const roomKey = `${room.gameId}:${room.roomCode}`;
+    if (guideRoomRef.current === roomKey) return;
+    guideRoomRef.current = roomKey;
+    if (hasSeenTutorial(room.gameId)) return;
+    setTutorialGameId(room.gameId);
+    setShowTutorial(true);
+  }, [room?.gameId, room?.roomCode, viewMode]);
+
+  useEffect(() => {
+    if (room) return;
+    guideRoomRef.current = null;
+    setShowTutorial(false);
+    setTutorialGameId(null);
+  }, [room]);
 
   // Delay showing the connection banner briefly so a normal fast connection
   // never flashes it - only show once a wait is actually noticeable.
@@ -141,9 +216,36 @@ export function App() {
     return () => clearTimeout(t);
   }, [gameState?.state]);
 
+  // Like Hazari's final set, Kitti's third hand/decider resolves in the same
+  // authoritative tick that marks the round complete. Keep the table visible
+  // briefly so the final cards do not vanish straight into a summary screen.
+  const [holdingKittiFinalReveal, setHoldingKittiFinalReveal] = useState(false);
+  const prevKittiStateRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const prev = prevKittiStateRef.current;
+    const curr = kittiState?.state;
+    const justFinished = !!prev && KITTI_PLAYING_STATES.has(prev) && (curr === 'ROUND_COMPLETE' || curr === 'MATCH_COMPLETE');
+    prevKittiStateRef.current = curr;
+    if (!justFinished) return;
+    setHoldingKittiFinalReveal(true);
+    const timer = setTimeout(() => setHoldingKittiFinalReveal(false), 2800);
+    return () => clearTimeout(timer);
+  }, [kittiState?.state]);
+
   // Cosmetic dealing ceremony. Runs only for a genuinely new deal (never on
-  // reconnect) and never under prefers-reduced-motion.
-  const dealingCeremony = useDealCeremony(room?.players.length ?? 4, 13);
+  // reconnect). Reduced motion keeps the informative dealer-draw reveal but
+  // skips the flying-card deal animation.
+  const dealCardsEach = room?.gameId === 'KITTI' ? 9 : room?.gameId === 'TEEN_PATTI' ? 3 : 13;
+  const initialDealerDrawRounds = room?.gameId === 'HAZARI'
+    ? gameState?.roundNumber === 1 ? (gameState.initialDealerDraws?.length ?? 0) : 0
+    : room?.gameId === 'KITTI'
+      ? kittiState?.roundNumber === 1 && kittiState.scheduledRoundsComplete === 0 ? kittiState.initialDealerDraws.length : 0
+      : 0;
+  const dealingCeremony = useDealCeremony(
+    room?.players.length ?? 4,
+    dealCardsEach,
+    initialDealerDrawRounds
+  );
 
   let screen: React.ReactNode;
   let screenKey: string;
@@ -157,15 +259,57 @@ export function App() {
   } else if (room.status === 'LOBBY') {
     screen = <RoomLobby />;
     screenKey = 'lobby';
+  } else if (room.gameId === 'KITTI') {
+    if (kittiState?.state === 'MATCH_COMPLETE' && !holdingKittiFinalReveal && kittiWinnerInfo) {
+      screen = <KittiWinner />;
+      screenKey = 'winner';
+    } else if (kittiState?.state === 'ROUND_COMPLETE' && !holdingKittiFinalReveal && lastKittiRoundResult) {
+      screen = <KittiRoundSummary />;
+      screenKey = 'round-summary';
+    } else if (
+      kittiState && myPlayerId &&
+      (KITTI_PLAYING_STATES.has(kittiState.state) || (holdingKittiFinalReveal && ['ROUND_COMPLETE', 'MATCH_COMPLETE'].includes(kittiState.state)))
+    ) {
+      screen = <KittiTable />;
+      screenKey = 'playing';
+    } else if (kittiState && KITTI_ARRANGING_STATES.has(kittiState.state)) {
+      if (kittiState.spectatorIds.includes(myPlayerId ?? '') || (kittiArrangedGroups && myPlayerId)) {
+        screen = <KittiWaitingTable />;
+        screenKey = 'arranging-waiting';
+      } else if (dealingCeremony && kittiHand.length === 9) {
+        screen = <KittiDealingTable />;
+        screenKey = 'dealing';
+      } else if (kittiHand.length === 9) {
+        screen = (
+          <KittiArrangement
+            hand={kittiHand}
+            onConfirm={confirmKittiArrangement}
+            canSuggest={canUseKittiArrangementAssist(room.players, myPlayerId)}
+            onSuggest={requestKittiSuggestion}
+            submitError={gameError}
+          />
+        );
+        screenKey = 'arranging';
+      } else {
+        screen = <div className="waiting-screen"><LoadingSpinner message="Dealing nine cards…" /></div>;
+        screenKey = 'dealing';
+      }
+    } else {
+      screen = <div className="waiting-screen"><LoadingSpinner message="Loading Kitti…" /></div>;
+      screenKey = 'loading';
+    }
+  } else if (room.gameId === 'TEEN_PATTI') {
+    if (teenPattiState?.state === 'ROUND_COMPLETE' && lastTeenPattiRoundResult) {
+      screen = <TeenPattiRoundSummary />;
+      screenKey = 'round-summary';
+    } else if (teenPattiState?.state === 'BETTING' && teenPattiPrivate) {
+      screen = <TeenPattiTable dealing={dealingCeremony} />;
+      screenKey = dealingCeremony ? 'dealing' : 'playing';
+    } else {
+      screen = <div className="waiting-screen"><LoadingSpinner message="Loading Teen Patti…" /></div>;
+      screenKey = 'loading';
+    }
   } else if (gameState?.state === 'GAME_COMPLETE' && !holdingFinalReveal && winnerInfo) {
-    // winnerInfo is required here defensively, not just by WinnerScreen's
-    // own guard: WinnerScreen (like the other screens below) independently
-    // calls useGame() and returns null if its own required state is
-    // missing. Requiring the SAME state here too means App never asks it
-    // to render in a state it would refuse - route state and GameStore
-    // state cannot "temporarily disagree" into a blank page, because
-    // there is only one place (here) that decides what to render, and it
-    // now checks everything the chosen screen actually needs.
     screen = <WinnerScreen />;
     screenKey = 'winner';
   } else if (
@@ -226,11 +370,17 @@ export function App() {
     screenKey = 'loading';
   }
 
-  const inGameForSettings = !!(
-    room &&
+  const hazariCanLeaveToBot = !!(
+    room?.gameId === 'HAZARI' &&
     viewMode === 'active' &&
     gameState &&
     (ARRANGING_STATES.has(gameState.state) || PLAYING_STATES.has(gameState.state))
+  );
+  const teenPattiCanSettleAndLeave = !!(
+    room?.gameId === 'TEEN_PATTI' &&
+    room.status === 'IN_GAME' &&
+    viewMode === 'active' &&
+    teenPattiState
   );
 
   // Android/PWA/browser Back guard. `screenKey` above already IS the
@@ -245,8 +395,8 @@ export function App() {
     onBack: () => {
       switch (screenKey) {
         case 'home-return':
-          // The player navigated here via Settings -> "Return to Landing
-          // Screen (stay connected)" - Back undoes exactly that, the same
+          // The player navigated here via Settings -> "Back to Card Room
+          // (stay connected)" - Back undoes exactly that, the same
           // as tapping "Return to Room" would.
           returnToGame();
           return 'handled';
@@ -257,6 +407,14 @@ export function App() {
         case 'arranging-waiting':
         case 'arranging':
         case 'playing':
+          if (room?.gameId === 'KITTI' || room?.gameId === 'TEEN_PATTI') {
+            // Kitti and Teen Patti do not use Hazari's bot-takeover exit.
+            // Back returns to the Card Room shell while keeping the live
+            // seat/session connected. Teen Patti's settle-on-leave path is a
+            // separate product flow and must not be faked by `room:leaveTable`.
+            goToHomeScreen();
+            return 'handled';
+          }
           setPendingLeaveConfirm('game');
           return 'blocked';
         case 'round-summary':
@@ -266,7 +424,7 @@ export function App() {
           // No sensible Back destination from a transient/result screen -
           // absorb the press rather than unexpectedly exiting the PWA or
           // silently abandoning anything. The screen's own buttons (Next
-          // round, Play Again, Return to Lobby, Leave) remain the way
+          // round, Play Again, Return to Card Room, Leave) remain the way
           // forward.
           return 'blocked';
       }
@@ -306,13 +464,13 @@ export function App() {
       {showConnBanner && connectionStatus !== 'connected' && (
         <div className="conn-banner">
           {hasConnectedOnce
-            ? 'Reconnecting…'
-            : 'Waking up the table… this can take up to a minute the first time'}
+            ? 'Returning you to the table…'
+            : 'Opening the Card Room… the first connection can take up to a minute'}
         </div>
       )}
       {room && viewMode === 'active' && (
         <button className="settings-fab fab" onClick={() => setShowSettings(true)} aria-label="Settings">
-          ⚙️
+          <ChromeIcon name="settings" />
         </button>
       )}
       {room && viewMode === 'active' && <ChatPanel />}
@@ -320,8 +478,12 @@ export function App() {
       <div key={screenKey} className="screen-fade">
         {screen}
       </div>
-      {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} />}
-      {showRules && <RulesModal onClose={() => setShowRules(false)} />}
+      {showTutorial && tutorialGameId && (
+        <TutorialModal gameId={tutorialGameId} onClose={() => setShowTutorial(false)} />
+      )}
+      {showRules && room && hasGameGuide(room.gameId) && (
+        <RulesModal gameId={room.gameId} onClose={() => setShowRules(false)} />
+      )}
       {showStats && <StatsModal onClose={() => setShowStats(false)} />}
       {showRoundHistory && <RoundHistoryModal onClose={() => setShowRoundHistory(false)} />}
       {showSettings && (
@@ -329,15 +491,38 @@ export function App() {
           onClose={() => setShowSettings(false)}
           onOpenRules={() => setShowRules(true)}
           onOpenStats={() => setShowStats(true)}
-          onOpenTutorial={() => setShowTutorial(true)}
           onOpenRoundHistory={() => setShowRoundHistory(true)}
-          onLeaveTable={inGameForSettings ? leaveTable : undefined}
+          onLeaveTable={
+            hazariCanLeaveToBot
+              ? leaveTable
+              : teenPattiCanSettleAndLeave
+                ? () => { void leaveTeenPattiTable(); }
+                : undefined
+          }
+          leaveDescription={
+            teenPattiCanSettleAndLeave
+              ? 'Leaving packs your live hand if needed, settles your current play-money P/L, and permanently releases your seat. You cannot reconnect to this table with the old session token.'
+              : undefined
+          }
+          leaveActionLabel={teenPattiCanSettleAndLeave ? 'Leave & settle' : undefined}
         />
       )}
-      {gameError && !ARRANGING_STATES.has(gameState?.state ?? '') && !PLAYING_STATES.has(gameState?.state ?? '') && (
+      {gameError && !ARRANGING_STATES.has(gameState?.state ?? '') && !PLAYING_STATES.has(gameState?.state ?? '') && !KITTI_ARRANGING_STATES.has(kittiState?.state ?? '') && !KITTI_PLAYING_STATES.has(kittiState?.state ?? '') && (
         <div className="toast toast--error" onClick={clearGameError}>
           {gameError}
         </div>
+      )}
+      {teenPattiSettlementNotice && (
+        <aside className="tp-settlement-notice" role="status" aria-live="polite">
+          <div>
+            <span>Teen Patti table settled</span>
+            <strong className={teenPattiSettlementNotice.profitLoss >= 0 ? 'is-positive' : 'is-negative'}>
+              P/L {teenPattiSettlementNotice.profitLoss >= 0 ? '+' : ''}{teenPattiSettlementNotice.profitLoss}
+            </strong>
+            <small>Final balance {teenPattiSettlementNotice.currentBalance} · Funding {teenPattiSettlementNotice.totalFunding}</small>
+          </div>
+          <button type="button" onClick={clearTeenPattiSettlementNotice} aria-label="Dismiss settlement">✕</button>
+        </aside>
       )}
       {pendingLeaveConfirm && (
         <ConfirmDialog

@@ -15,6 +15,34 @@ open. See `SESSION_CHANGELOG.md` for the dated entry.
 Automated tests cover the game logic underneath these flows. What they cannot
 cover is real phones, real networks, and real fingers.
 
+**Fourth-pass QA update — 2026-08-16 (later).** Bug 5's diagnosis was
+corrected: real-device feedback clarified that the actual broken screen is
+the **per-set result sheet** shown after Set 1, 2, or 3 (and, structurally,
+Set 4 too — it's the same shared component) — NOT RoundSummary, which the
+previous two rounds had been fixing and which was, per this same feedback,
+never actually broken. See `SESSION_CHANGELOG.md`'s "Bug 5 diagnosis
+corrected" entry for the full root-cause reasoning. **Bug 5 is NOT
+real-device verified after this round either.** Given this bug's history —
+two prior fixes to the wrong screen, each confirmed clean by a full test
+suite at the time — do not mark it passed from a green test suite alone.
+Redeploy to staging and specifically:
+
+- Play a hand in a short **landscape** viewport. After **Set 1** completes,
+  the per-set result sheet appears (shows all four hands with cards, the
+  winner, and points) — confirm **physical touch-swipe scrolls it** and
+  every hand plus the "Continue" button is reachable. Repeat after **Set 2**
+  and **Set 3**.
+- Confirm **Set 4**'s own result sheet behaves the same way, and that the
+  round-statistics screen (RoundSummary) that follows it still scrolls
+  correctly and was not affected by this change.
+- Bugs 1-4 need no re-check this round (their files were not touched), but
+  a quick sanity pass on Bug 4 (right-seat names) alongside this costs
+  little if convenient.
+
+---
+
+## Prior QA rounds
+
 **Third-pass QA update — 2026-08-16.** Bugs 1 (backgrounding), 2 (Leave
 Table), and 3 (Arrangement FAB vs Dealt) are now **owner-verified real-device
 PASS** — confirmed working on the installed Android PWA. Neither their code

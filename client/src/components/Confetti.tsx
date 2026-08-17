@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import './Confetti.css';
 
-const COLORS = ['var(--gold-300)', 'var(--gold-500)', 'var(--ivory-100)', 'var(--ruby-300)', 'var(--sapphire-500)'];
+const COLORS = ['var(--brass-300)', 'var(--brass-500)', 'var(--ink-100)', 'var(--wood-highlight)', 'var(--felt-500)'];
 
 interface Piece {
   left: number;
@@ -13,7 +13,7 @@ interface Piece {
   drift: number;
 }
 
-export function Confetti({ count = 60 }: { count?: number }) {
+export function Confetti({ count = 42 }: { count?: number }) {
   const pieces = useMemo<Piece[]>(() => {
     return Array.from({ length: count }, () => ({
       left: Math.random() * 100,

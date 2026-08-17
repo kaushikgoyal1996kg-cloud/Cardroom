@@ -1,4 +1,4 @@
-import { AVATAR_OPTIONS, AVATAR_NAMES } from '../../game/avatars';
+import { AVATAR_OPTIONS, AVATAR_NAMES, avatarToneClass } from '../../game/avatars';
 import './Lobby.css';
 
 interface Props {
@@ -16,7 +16,7 @@ export function AvatarPicker({ value, onChange }: Props) {
           role="radio"
           aria-checked={value === a}
           aria-label={AVATAR_NAMES[a] ?? 'Avatar'}
-          className={`avatar-picker__option ${value === a ? 'avatar-picker__option--selected' : ''}`}
+          className={`avatar-picker__option ${avatarToneClass(a)} ${value === a ? 'avatar-picker__option--selected' : ''}`}
           onClick={() => onChange(a)}
         >
           {a}
@@ -37,5 +37,5 @@ export function AvatarBadge({
   size?: 'sm' | 'md' | 'lg';
   ring?: boolean;
 }) {
-  return <span className={`avatar-badge avatar-badge--${size} ${ring ? 'avatar-badge--ring' : ''}`}>{avatar}</span>;
+  return <span className={`avatar-badge avatar-badge--${size} ${avatarToneClass(avatar)} ${ring ? 'avatar-badge--ring' : ''}`}>{avatar}</span>;
 }
