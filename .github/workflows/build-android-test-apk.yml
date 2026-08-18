@@ -2,6 +2,9 @@ name: Build Android Test APK
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - four-game-release-audit-2026-08-18
 
 permissions:
   contents: read
