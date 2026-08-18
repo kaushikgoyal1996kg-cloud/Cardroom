@@ -418,7 +418,7 @@ describe('premium table chrome stays compact and non-glass', () => {
   });
 
   it('Teen Patti keeps the felt mounted while a matching private snapshot is between packets', () => {
-    const teenRoute = APP_TSX.slice(APP_TSX.indexOf("room.gameId === 'TEEN_PATTI'"), APP_TSX.indexOf("room.gameId === 'POKER'"));
+    const teenRoute = APP_TSX.slice(APP_TSX.indexOf("} else if (room.gameId === 'TEEN_PATTI') {"), APP_TSX.indexOf("} else if (room.gameId === 'POKER') {"));
     expect(teenRoute).toMatch(/state === 'BETTING'[\s\S]*<TeenPattiTable/);
     expect(teenRoute).not.toMatch(/AWAITING_REFERENCE_ASSIGNMENT'\) && teenPattiPrivate/);
     expect(TEEN_PATTI_TABLE_CSS).toMatch(/\.tp-actions__status/);
