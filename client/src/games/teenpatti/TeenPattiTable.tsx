@@ -8,6 +8,7 @@ import { useVisualViewport } from '../../platform/lib/useVisualViewport';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useWakeLock } from '../../lib/useWakeLock';
 import { twoReferenceJokerSet } from './twoReferenceJokers';
+import { TwoReferenceJokerChoice } from './TwoReferenceJokerChoice';
 import './TeenPattiTable.css';
 
 interface TeenPattiTableProps {
@@ -351,24 +352,18 @@ export function TeenPattiTable({ dealing = false, onOpenRules }: TeenPattiTableP
           <div className="tp-reference-choice" role="group" aria-label="Choose Two-Reference Joker set">
             <div className="tp-reference-choice__copy">
               <strong>{teenPattiState.referenceAssignmentReason === 'SIDESHOW' ? 'Choose your joker set for this sideshow' : 'Choose your joker set for this showdown'}</strong>
-              <small>This choice appears only when your hand is actually being compared — never just because you became Seen. Pick the joker set you want; your choice is private and remains locked for this hand.</small>
+              <small>This choice appears only when your hand is actually being compared — never just because you became Seen. Select the joker set you want, review the exact jokers, then confirm it. Only the confirmed choice is locked for your hand and remains private.</small>
             </div>
-            {!referenceChoiceRequiredForMe ? (
-              <p className="tp-actions__substatus">Waiting for the player{teenPattiState.referenceAssignmentRequiredPlayerIds.length === 1 ? '' : 's'} whose hand needs a joker choice.</p>
-            ) : myReferenceAssignment ? (
-              <p className="tp-actions__substatus">Chosen jokers: <strong>{chosenReferenceJokers.join(' · ')}</strong> · waiting for the comparison.</p>
-            ) : referenceA && referenceB ? (
-              <div className="tp-reference-choice__buttons">
-                <button className="btn btn-primary" type="button" onClick={() => assignTeenPattiTwoReference(0)}>
-                  Option A · Jokers: {referenceOptionA.join(' · ')}
-                </button>
-                <button className="btn" type="button" onClick={() => assignTeenPattiTwoReference(1)}>
-                  Option B · Jokers: {referenceOptionB.join(' · ')}
-                </button>
-              </div>
-            ) : (
-              <p className="tp-actions__status">Waiting for the two board references…</p>
-            )}
+            <TwoReferenceJokerChoice
+              key={`${teenPattiState.roundNumber}:${teenPattiState.sequence}:${myPlayerId}`}
+              reason={teenPattiState.referenceAssignmentReason}
+              requiredForMe={referenceChoiceRequiredForMe}
+              requiredPlayerCount={teenPattiState.referenceAssignmentRequiredPlayerIds.length}
+              assignment={myReferenceAssignment}
+              optionA={referenceOptionA}
+              optionB={referenceOptionB}
+              onConfirm={assignTeenPattiTwoReference}
+            />
           </div>
         ) : mutualShowOpen && !me.packed ? (
           <div className="tp-open-show-request" role="dialog" aria-label="Mutual Show request">

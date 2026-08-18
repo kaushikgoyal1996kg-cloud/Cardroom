@@ -445,3 +445,31 @@
   color: var(--ink-100);
   text-align: center;
 }
+
+/* Bug 10 — Two-Reference Joker uses an explicit local select -> confirm step.
+   The last chooser must be able to see their exact joker set before their
+   server confirmation is allowed to resolve the comparison. */
+.tp-reference-choice__confirmation {
+  display: grid;
+  gap: .3rem;
+  justify-items: center;
+  padding: .55rem .65rem;
+  border: 1px solid rgba(168,132,63,.28);
+  border-radius: var(--radius-md);
+  background: rgba(8, 8, 8, .28);
+}
+.tp-reference-choice__confirmation > span,
+.tp-reference-choice__confirmation > small { color: var(--ink-500); }
+.tp-reference-choice__confirmation > strong { color: var(--ink-100); }
+.tp-reference-choice__confirmation > small { font-size: .62rem; line-height: 1.35; }
+.tp-reference-choice__confirm-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .45rem;
+}
+.tp-reference-choice__confirm-actions .btn { min-height: var(--touch-min); }
+
+@media (max-width: 430px) {
+  .tp-reference-choice__confirm-actions { grid-template-columns: 1fr; }
+}
