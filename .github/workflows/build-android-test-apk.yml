@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - four-game-release-audit-2026-08-18
+      - staging-bugfix-batch-2-10-2026-08-19
 
 permissions:
   contents: read
