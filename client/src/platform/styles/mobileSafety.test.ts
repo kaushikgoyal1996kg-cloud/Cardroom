@@ -350,7 +350,7 @@ describe('premium table chrome stays compact and non-glass', () => {
 
   it('Kitti short-landscape keeps medium cards and fits them by overlap instead of shrinking them', () => {
     expect(KITTI_ARR_CSS, 'do not override the shared PlayingCard width inside Kitti arrangement').not.toMatch(/--pcard-w\s*:/);
-    const landscape = KITTI_ARR_CSS.slice(KITTI_ARR_CSS.lastIndexOf('@media (orientation: landscape) and (max-height: 30rem)'));
+    const landscape = KITTI_ARR_CSS.slice(KITTI_ARR_CSS.indexOf('@media (orientation: landscape) and (max-height: 30rem)'));
     expect(landscape).toMatch(/grid-template-columns:\s*repeat\(5,\s*2\.4rem\)/);
   });
 

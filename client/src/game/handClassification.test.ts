@@ -8,8 +8,8 @@ function c(rank: Card['rank'], suit: Card['suit']): Card {
 
 describe('Hazari Set 4 best-three rule', () => {
   it('ignores the unused fourth card for tiebreaks', () => {
-    const withKing = classifyFour([c('5', 'SPADES'), c('5', 'HEARTS'), c('2', 'DIAMONDS'), c('K', 'CLUBS')]);
-    const withThree = classifyFour([c('5', 'SPADES'), c('5', 'HEARTS'), c('2', 'DIAMONDS'), c('3', 'CLUBS')]);
+    const withKing = classifyFour([c('5', 'SPADES'), c('5', 'HEARTS'), c('5', 'DIAMONDS'), c('K', 'CLUBS')]);
+    const withThree = classifyFour([c('5', 'SPADES'), c('5', 'HEARTS'), c('5', 'DIAMONDS'), c('3', 'CLUBS')]);
     expect(compareHand(withKing, withThree)).toBe(0);
   });
 

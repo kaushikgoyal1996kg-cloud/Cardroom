@@ -136,7 +136,7 @@ describe('Lobby: Back is guarded, never a silent exit', () => {
 describe('Active game (playing): Back is guarded with the bot-takeover warning', () => {
   function playingValue() {
     return baseGameValue({
-      room: { status: 'IN_GAME', roomCode: 'HZR482', players: [] },
+      room: { gameId: 'HAZARI', status: 'IN_GAME', roomCode: 'HZR482', players: [] },
       gameState: { state: 'PLAYING_SET_1', subRoundResultsThisRound: [], cumulativeScores: {} },
     });
   }
@@ -170,7 +170,7 @@ describe('Round Summary / Winner: Back never unexpectedly exits the PWA', () => 
   it('Back on Round Summary is absorbed - no dialog, no navigation, no leave call', async () => {
     useGameMock.mockReturnValue(
       baseGameValue({
-        room: { status: 'IN_GAME', roomCode: 'HZR482', players: [] },
+        room: { gameId: 'HAZARI', status: 'IN_GAME', roomCode: 'HZR482', players: [] },
         gameState: { state: 'ROUND_COMPLETE', subRoundResultsThisRound: [], cumulativeScores: {} },
         lastRoundResult: { winnerId: 'p1', points: {}, dealerId: 'p1' },
       })
@@ -202,7 +202,7 @@ describe('a stale leave-confirm dialog is dismissed if the room changes undernea
     // this player confirming or cancelling anything.
     useGameMock.mockReturnValue(
       baseGameValue({
-        room: { status: 'IN_GAME', roomCode: 'HZR482', players: [] },
+        room: { gameId: 'HAZARI', status: 'IN_GAME', roomCode: 'HZR482', players: [] },
         gameState: { state: 'PLAYING_SET_1', subRoundResultsThisRound: [], cumulativeScores: {} },
       })
     );
@@ -220,7 +220,7 @@ describe('Bug 2 defensive invariant: never select a screen whose required state 
   it('GAME_COMPLETE without winnerInfo falls back to Loading, not WinnerScreen (which would return null)', async () => {
     useGameMock.mockReturnValue(
       baseGameValue({
-        room: { status: 'IN_GAME', roomCode: 'HZR482', players: [] },
+        room: { gameId: 'HAZARI', status: 'IN_GAME', roomCode: 'HZR482', players: [] },
         gameState: { state: 'GAME_COMPLETE', subRoundResultsThisRound: [], cumulativeScores: {} },
         winnerInfo: null, // the gap this fix closes
       })
@@ -235,7 +235,7 @@ describe('Bug 2 defensive invariant: never select a screen whose required state 
   it('ROUND_COMPLETE without lastRoundResult falls back to Loading, not RoundSummary', async () => {
     useGameMock.mockReturnValue(
       baseGameValue({
-        room: { status: 'IN_GAME', roomCode: 'HZR482', players: [] },
+        room: { gameId: 'HAZARI', status: 'IN_GAME', roomCode: 'HZR482', players: [] },
         gameState: { state: 'ROUND_COMPLETE', subRoundResultsThisRound: [], cumulativeScores: {} },
         lastRoundResult: null, // the gap this fix closes
       })
@@ -250,7 +250,7 @@ describe('Bug 2 defensive invariant: never select a screen whose required state 
   it('PLAYING_SET_1 without myPlayerId falls back to Loading, not HazariTable', async () => {
     useGameMock.mockReturnValue(
       baseGameValue({
-        room: { status: 'IN_GAME', roomCode: 'HZR482', players: [] },
+        room: { gameId: 'HAZARI', status: 'IN_GAME', roomCode: 'HZR482', players: [] },
         gameState: { state: 'PLAYING_SET_1', subRoundResultsThisRound: [], cumulativeScores: {} },
         myPlayerId: null, // the gap this fix closes
       })
@@ -265,7 +265,7 @@ describe('Bug 2 defensive invariant: never select a screen whose required state 
   it('the normal, fully-populated case is unaffected - still selects the real screen', async () => {
     useGameMock.mockReturnValue(
       baseGameValue({
-        room: { status: 'IN_GAME', roomCode: 'HZR482', players: [] },
+        room: { gameId: 'HAZARI', status: 'IN_GAME', roomCode: 'HZR482', players: [] },
         gameState: { state: 'GAME_COMPLETE', subRoundResultsThisRound: [], cumulativeScores: {} },
         winnerInfo: { winnerId: 'p1', finalScores: { p1: 100 } },
       })
@@ -281,7 +281,7 @@ describe('home-return: Back returns to the active game, matching "Return to Room
   it('Back calls returnToGame() directly, with no confirmation needed', async () => {
     useGameMock.mockReturnValue(
       baseGameValue({
-        room: { status: 'IN_GAME', roomCode: 'HZR482', players: [] },
+        room: { gameId: 'HAZARI', status: 'IN_GAME', roomCode: 'HZR482', players: [] },
         gameState: { state: 'PLAYING_SET_1', subRoundResultsThisRound: [], cumulativeScores: {} },
         viewMode: 'home',
       })

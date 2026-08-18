@@ -111,7 +111,7 @@ describe('a tray row fits at the narrowest supported width', () => {
   it('empty slots match the real card footprint so rows do not jump as cards land', () => {
     // Match the standalone .tray__empty rule (not the shared reset block).
     const empty = CSS.match(/\.tray__empty\s*\{[^}]*width:[^}]*\}/)![0];
-    expect(empty).toContain('width: 2.375rem');
+    expect(empty).toContain('width: var(--touch-min)');
     // Height is the card height to two decimals.
     expect(Math.abs(3.37 * 16 - CARD_SM_HEIGHT)).toBeLessThan(1.5);
   });
@@ -120,7 +120,7 @@ describe('a tray row fits at the narrowest supported width', () => {
 describe('touch and safe areas', () => {
   it('every interactive control meets the touch minimum', () => {
     expect(CSS).toMatch(/\.arr__buttons \.btn\s*\{[^}]*min-height:\s*var\(--touch-min\)/);
-    expect(CSS).toMatch(/\.sortbar__btn\s*\{[^}]*min-height:\s*30px/);
+    expect(CSS).toMatch(/\.sortbar__btn\s*\{[^}]*min-height:\s*var\(--touch-min\)/);
     expect(CSS).toMatch(/\.suggest__close\s*\{[^}]*min-height:\s*var\(--touch-min\)/);
   });
 

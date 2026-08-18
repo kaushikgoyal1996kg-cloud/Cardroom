@@ -3,7 +3,7 @@ import { buildInviteUrl } from './inviteUrl';
 
 describe('shareable Card Room invite URL', () => {
   it('uses the current public web origin when no explicit app URL is configured', () => {
-    expect(buildInviteUrl('hzr482', 'https://cardroom.example/play?old=1#x', undefined))
+    expect(buildInviteUrl('hzr482', 'https://cardroom.example/play?old=1#x', ''))
       .toBe('https://cardroom.example/play?join=HZR482');
   });
 
@@ -13,7 +13,7 @@ describe('shareable Card Room invite URL', () => {
   });
 
   it('never shares Capacitor or local-development localhost as a public invite', () => {
-    expect(buildInviteUrl('HZR482', 'https://localhost/', undefined)).toBeNull();
-    expect(buildInviteUrl('HZR482', 'http://127.0.0.1:5173/', undefined)).toBeNull();
+    expect(buildInviteUrl('HZR482', 'https://localhost/', '')).toBeNull();
+    expect(buildInviteUrl('HZR482', 'http://127.0.0.1:5173/', '')).toBeNull();
   });
 });
