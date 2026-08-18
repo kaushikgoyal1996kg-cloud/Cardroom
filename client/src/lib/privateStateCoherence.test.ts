@@ -8,9 +8,9 @@ import type {
 import { coherentPokerPrivateState, coherentTeenPattiPrivateState } from './privateStateCoherence';
 
 const teenPublic = { roundNumber: 4, sequence: 12 } as TeenPattiPublicStatePayload;
-const teenPrivate = { roundNumber: 4, sequence: 12, cards: [] } as TeenPattiPrivateStatePayload;
+const teenPrivate: TeenPattiPrivateStatePayload = { roundNumber: 4, sequence: 12, cards: [], cardCount: 0, cardsViewed: false, seen: false, friendlyAssist: { enabled: false, coachLockedTargetPlayerId: null, outgoing: null, incoming: [] }, twoReferenceAssignment: null, discardState: null };
 const pokerPublic = { handNumber: 7, sequence: 31 } as PokerPublicStatePayload;
-const pokerPrivate = { handNumber: 7, sequence: 31, holeCards: [] } as PokerPrivateStatePayload;
+const pokerPrivate: PokerPrivateStatePayload = { handNumber: 7, sequence: 31, holeCards: [], toCall: 0, legalActions: { fold: false, check: false, call: false, raise: false, minRaiseTo: null, maxRaiseTo: null } };
 
 describe('private/public snapshot coherence', () => {
   it('accepts Teen Patti private state only for the exact public round and sequence', () => {
