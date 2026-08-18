@@ -8,10 +8,10 @@ describe('Card Room client catalog', () => {
     expect(ids).toEqual(['HAZARI', 'KITTI', 'TEEN_PATTI', 'POKER']);
   });
 
-  it('keeps unfinished games honestly gated while retaining their real identities', () => {
+  it('marks all four release games as network-playable', () => {
     expect(catalogEntry('HAZARI').networkPlayable).toBe(true);
     expect(catalogEntry('KITTI').networkPlayable).toBe(true);
-    expect(catalogEntry('TEEN_PATTI')).toMatchObject({ networkPlayable: false, unavailableReason: 'Coming Soon' });
-    expect(catalogEntry('POKER')).toMatchObject({ networkPlayable: false, unavailableReason: 'Coming Soon' });
+    expect(catalogEntry('TEEN_PATTI').networkPlayable).toBe(true);
+    expect(catalogEntry('POKER').networkPlayable).toBe(true);
   });
 });

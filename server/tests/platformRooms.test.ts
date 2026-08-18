@@ -52,11 +52,11 @@ describe('game registry stays in sync with each engine', () => {
     expect(maxPlayersFor('TEEN_PATTI')).toBe(9);
   });
 
-  it('Poker is registered but stays network-disabled until its controller is complete', () => {
+  it('Poker limits match POKER_VARIANTS and Poker is network-playable', () => {
     expect(GAMES.POKER.minPlayers).toBe(Math.min(...Object.values(POKER_VARIANTS).map((variant) => variant.minPlayers)));
     expect(GAMES.POKER.maxPlayers).toBe(Math.max(...Object.values(POKER_VARIANTS).map((variant) => variant.maxPlayers)));
     expect(GAMES.POKER.cardsPerPlayer).toBe('VARIES');
-    expect(GAMES.POKER.networkPlayable).toBe(false);
+    expect(GAMES.POKER.networkPlayable).toBe(true);
   });
 
   it('validates game ids', () => {
@@ -123,13 +123,20 @@ describe('rooms are game-aware', () => {
     expect(tables[0].status).toBe('LOBBY');
   });
 
-  it('allows Kitti rooms now that its controller exists, while refusing unavailable games', () => {
+  it('allows rooms for all four network-playable release games', () => {
     const rooms = new RoomManager();
-    const { room } = rooms.createRoom('Alice', 'KITTI');
-    expect(room.gameId).toBe('KITTI');
-    expect(room.roomCode.startsWith('KIT')).toBe(true);
-    expect(() => rooms.createRoom('Alice', 'TEEN_PATTI')).toThrow(RoomManagerError);
-    expect(() => rooms.createRoom('Alice', 'POKER')).toThrow(RoomManagerError);
+
+    const { room: kitti } = rooms.createRoom('Alice', 'KITTI');
+    expect(kitti.gameId).toBe('KITTI');
+    expect(kitti.roomCode.startsWith('KIT')).toBe(true);
+
+    const { room: teenPatti } = rooms.createRoom('Bob', 'TEEN_PATTI');
+    expect(teenPatti.gameId).toBe('TEEN_PATTI');
+    expect(teenPatti.roomCode.startsWith('TPT')).toBe(true);
+
+    const { room: poker } = rooms.createRoom('Carol', 'POKER');
+    expect(poker.gameId).toBe('POKER');
+    expect(poker.roomCode.startsWith('PKR')).toBe(true);
   });
 
   it('there is no API to change a room\'s game after creation', () => {
@@ -182,8 +189,8 @@ describe('seat limits follow the room\'s game', () => {
 // 4. The session factory, and the guarantee about HaazariGame.
 // ============================================================================
 
-describe('Poker session adapter (still network-gated)', () => {
-  it('adapts the authoritative engine without exposing it through room creation yet', () => {
+describe('Poker session adapter', () => {
+  it('adapts the authoritative engine for network play', () => {
     const session = new PokerSession('PKR1', ['a', 'b'], DEFAULT_POKER_TABLE_CONFIG);
     expect(session.gameId).toBe('POKER');
     expect(session.state).toBe('READY');
@@ -215,7 +222,7 @@ describe('game session factory', () => {
     expect(asHazari(session)).toBeInstanceOf(HaazariGame);
   });
 
-  it('builds Kitti without ever constructing Hazari, and still refuses unavailable Teen Patti', () => {
+  it('builds Kitti without ever constructing Hazari, while Teen Patti requires approved setup', () => {
     const kitti = createGameSession('KITTI', 'KIT1', ['a', 'b', 'c']);
     expect(kitti).toBeInstanceOf(KittiSession);
     expect(kitti.gameId).toBe('KITTI');
