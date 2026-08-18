@@ -47,6 +47,20 @@ jobs:
           npm test
           npm run build
 
+      - name: Post-unlock whole-game safety audit
+        env:
+          VITE_SERVER_URL: https://cardroom-staging-server.onrender.com
+          VITE_PUBLIC_APP_URL: https://cardroom-staging.netlify.app
+        run: |
+          set -euo pipefail
+          for pass in 1 2 3; do
+            echo "=== SERVER WHOLE-GAME SAFETY PASS $pass/3 ==="
+            (cd server && npm test)
+
+            echo "=== CLIENT WHOLE-GAME SAFETY PASS $pass/3 ==="
+            (cd client && npm test)
+          done
+
       - name: Generate Android project
         working-directory: client
         env:
