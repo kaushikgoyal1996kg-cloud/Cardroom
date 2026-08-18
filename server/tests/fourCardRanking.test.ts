@@ -38,8 +38,8 @@ describe('classifyFourCardHand - best 3-of-4 Teen Patti sub-combo', () => {
   });
 
   it('ignores the unused 4th card completely when the best three are equal', () => {
-    const kingLeftOver = classifyFourCardHand([c('5', 'SPADES'), c('5', 'HEARTS'), c('2', 'DIAMONDS'), c('K', 'CLUBS')]);
-    const threeLeftOver = classifyFourCardHand([c('5', 'SPADES'), c('5', 'HEARTS'), c('2', 'DIAMONDS'), c('3', 'CLUBS')]);
+    const kingLeftOver = classifyFourCardHand([c('5', 'SPADES'), c('5', 'HEARTS'), c('5', 'DIAMONDS'), c('K', 'CLUBS')]);
+    const threeLeftOver = classifyFourCardHand([c('5', 'SPADES'), c('5', 'HEARTS'), c('5', 'DIAMONDS'), c('3', 'CLUBS')]);
     expect(compareFourCardHands(kingLeftOver, threeLeftOver)).toBe(0);
   });
 
