@@ -178,7 +178,6 @@ export function App() {
     clearTeenPattiSettlementNotice,
     choosePokerVariant,
     pokerAction,
-    startNextPokerHand,
     topUpPoker,
     leavePokerTable,
     clearPokerSettlementNotice,
@@ -377,8 +376,20 @@ export function App() {
       screen = <TeenPattiRoundSummary />;
       screenKey = 'round-summary';
     } else if (teenPattiState?.state === 'AWAITING_VARIANT') {
-      screen = <TeenPattiVariantChoice />;
-      screenKey = 'variant-choice';
+      // Dealer Choice/configuration is private to the authoritative dealer.
+      // Everybody else stays seated at the physical table and sees only a
+      // waiting status; never expose the dealer's option list to the room.
+      if (teenPattiState.nextVariantChooserId === myPlayerId) {
+        screen = <TeenPattiVariantChoice />;
+        screenKey = 'variant-choice';
+      } else {
+        screen = (
+          <TeenPattiTable
+            onOpenRules={() => { setActiveTableUtility(null); setShowRules(true); }}
+          />
+        );
+        screenKey = 'variant-waiting-table';
+      }
     } else if (teenPattiState?.state === 'BETTING' || teenPattiState?.state === 'AWAITING_DISCARD' || teenPattiState?.state === 'AWAITING_REFERENCE_ASSIGNMENT') {
       // Public/private Teen Patti packets are deliberately coherence-gated in
       // GameStore. For a few milliseconds during an authoritative update the
@@ -408,10 +419,8 @@ export function App() {
           players={pokerRuntimeIdentities(room.players, room.playerDirectory)}
           lastHandResult={lastPokerHandResult}
           dealing={dealingCeremony && !['AWAITING_VARIANT', 'HAND_COMPLETE'].includes(pokerState.state)}
-          canStartNextHand={room.hostId === myPlayerId && pokerState.state === 'HAND_COMPLETE'}
           onChooseVariant={choosePokerVariant}
           onAction={pokerAction}
-          onStartNextHand={startNextPokerHand}
           onTopUp={topUpPoker}
           onBackToCardRoom={goToHomeScreen}
         />

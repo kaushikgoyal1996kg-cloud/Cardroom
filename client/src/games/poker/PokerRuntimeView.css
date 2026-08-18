@@ -398,3 +398,23 @@
   opacity: .58;
   cursor: default;
 }
+
+/* Non-dealers stay on the physical table during Dealer Choice. The option
+   catalogue itself is private to the upcoming dealer; everyone else sees only
+   this short status while no blinds/cards have been posted yet. */
+.poker-variant-waiting {
+  position: fixed;
+  z-index: 30;
+  left: 50%;
+  bottom: max(var(--safe-bottom), 1rem);
+  transform: translateX(-50%);
+  width: min(92vw, 32rem);
+  margin: 0;
+  padding: .62rem .85rem;
+  border-radius: .75rem;
+  text-align: center;
+  background: var(--wood-900);
+  border: 1px solid rgba(200,164,92,.32);
+  color: var(--ink-100);
+  box-shadow: 0 .45rem 1.25rem rgba(0,0,0,.28);
+}

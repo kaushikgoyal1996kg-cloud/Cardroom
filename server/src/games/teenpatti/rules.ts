@@ -17,7 +17,7 @@ export interface TeenPattiRulesConfig {
   NEXT_DEALER: 'PREVIOUS_ROUND_WINNER';
   MAX_BLIND_TURNS: 3;
   SEEN_MULTIPLIER: 2;
-  COMPULSORY_SIDESHOW: true;
+  COMPULSORY_SIDESHOW: false;
   SIDESHOW_DIRECTION: 'ANTICLOCKWISE';
   SIDESHOW_TIE: 'INITIATOR_PACKS';
   FINAL_EQUAL_HANDS: 'SPLIT_POT';
@@ -33,7 +33,7 @@ export const TEEN_PATTI_RULES: TeenPattiRulesConfig = {
   NEXT_DEALER: 'PREVIOUS_ROUND_WINNER',
   MAX_BLIND_TURNS: 3,
   SEEN_MULTIPLIER: 2,
-  COMPULSORY_SIDESHOW: true,
+  COMPULSORY_SIDESHOW: false,
   SIDESHOW_DIRECTION: 'ANTICLOCKWISE',
   SIDESHOW_TIE: 'INITIATOR_PACKS',
   FINAL_EQUAL_HANDS: 'SPLIT_POT',
@@ -200,7 +200,7 @@ export const TEEN_PATTI_VARIANTS: Record<TeenPattiVariantId, TeenPattiVariantDes
   CLASSIC: {
     id: 'CLASSIC', name: 'Classic', dealCount: 3, ranking: 'NORMAL', selection: 'DEALT_THREE', joker: 'NONE',
     runtimeImplemented: true,
-    howToPlay: 'Three cards each. Normal Teen Patti ranking. Blind, seen, pack, compulsory sideshow and final show rules apply.',
+    howToPlay: 'Three cards each. Normal Teen Patti ranking. Blind, seen and pack rules apply. When at least three active players are all seen, Sideshow becomes available but normal Chaal remains legal. Mutual Show may be proposed with any 2+ active players and requires unanimous consent.',
   },
   MUFLIS: {
     id: 'MUFLIS', name: 'Muflis / Lowball', dealCount: 3, ranking: 'LOWBALL', selection: 'DEALT_THREE', joker: 'NONE',
@@ -280,7 +280,7 @@ export const TEEN_PATTI_VARIANTS: Record<TeenPattiVariantId, TeenPattiVariantDes
   TWO_REFERENCE_JOKER: {
     id: 'TWO_REFERENCE_JOKER', name: 'Two-Reference Joker', dealCount: 3, ranking: 'NORMAL', selection: 'DEALT_THREE', joker: 'TWO_REFERENCE',
     requiresTwoReferenceAssignment: true, runtimeImplemented: true,
-    howToPlay: 'Two reference cards are revealed. Before betting, each player privately assigns one reference to Up/Down and the other to Same-rank. The two roles cannot be duplicated.',
+    howToPlay: 'Two reference cards stay public throughout the hand. Normal betting continues without an assignment prompt. Only when your hand must be compared in a sideshow or final showdown do you privately choose between the two resulting joker sets; that choice is then locked for your hand.',
   },
   DISCARD_LOW_HIGH: {
     id: 'DISCARD_LOW_HIGH', name: '5 Cards · Discard Low + High', dealCount: 5, ranking: 'NORMAL', selection: 'DISCARD_TO_THREE', joker: 'NONE',

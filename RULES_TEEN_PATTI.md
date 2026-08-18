@@ -2,12 +2,10 @@
 
 **Teen Patti comes after Kitti.**
 
-This file is the agreed rule specification. The **Classic** engine and hidden
-multiplayer/client groundwork now implement a substantial part of it, but Teen
-Patti remains **Coming Soon** and deliberately cannot be entered from the game
-selector. Non-Classic variant execution and the complete leave/settlement/mobile
-release flow are still pending. The rules below remain the authority; status
-markers describe implementation only.
+This file is the agreed rule specification and authority for the four-game
+release candidate. Teen Patti is network-playable on staging, including the
+runtime-ready variant table, live join/reconnect, settlement and mobile table
+flow described below. Production still waits for final staging QA.
 
 Status key: ✅ implemented · 🟡 partial · ⛔ not implemented
 
@@ -19,6 +17,7 @@ Status key: ✅ implemented · 🟡 partial · ⛔ not implemented
 
 - **Maximum 9 players.** ✅
 - **No fixed round count** — play continues until players stop. ✅
+- **No host Deal Next Round button between ordinary rounds.** After the result-reading pause, the server advances automatically. If the next round genuinely needs dealer variant/configuration or a player top-up for boot, it pauses only for that required action and then continues automatically. ✅
 
 ## Dealer ✅
 
@@ -59,26 +58,32 @@ leaves, settle their table account against the current session state.
 - **Once seen, a player cannot return to blind.**
 - **Pack** is allowed on any turn.
 
-### Compulsory sideshow ✅
+### Sideshow ✅
 
-- Available **only when all remaining active players are seen** — and then it
-  is **compulsory**.
+- Sideshow becomes available **only when at least three active players remain and all of them are seen**.
+- It is **never compulsory merely because everyone is seen**. Normal Chaal and Pack remain available until the current player actually chooses Sideshow.
 - Normal play proceeds **clockwise**.
-- Sideshow comparison runs **anticlockwise**: the current player compares with
-  the nearest active player anticlockwise.
+- Sideshow comparison runs **anticlockwise**: the current player compares with the nearest active player anticlockwise.
 - The **weaker hand packs**.
 - **Exact tie → the sideshow initiator packs.**
 
 ### Mutual Show / final show ✅
 
-- **Any active player may propose Mutual Show**, including when three or more players remain.
-- The request is **free** and does not itself place another bet.
-- Cards are opened only if **every currently active player accepts** the same request.
-- While the unanimous vote is pending, betting pauses on the exact current turn. If any active player declines, the request is cancelled and betting resumes from that unchanged turn.
-- On unanimous acceptance, all active hands are revealed and compared. The best hand wins; if two or more best hands are exactly tied, the pot is **split equally among those tied winners**.
-- With the final two players, this same Mutual Show flow preserves the already-locked no-cost mutual open show rule.
-- If Mutual Show is not agreed with the final two, betting continues and either may initiate a paid showdown.
-- A **paid showdown costs the normal current seen amount**.
+- **Mutual Show is available whenever at least two active players remain, including 3+ players.**
+- Any active player may propose it. The request is **free** and does not itself place another bet.
+- Cards are opened only if **every currently active player accepts the same proposal**.
+- While the request is pending, betting pauses on the exact current turn. If any eligible player declines, the request is cancelled and betting resumes from that unchanged turn.
+- On unanimous acceptance, all active hands are revealed and compared. The strongest hand wins; tied strongest hands **split the pot equally**.
+- If Mutual Show is not agreed, normal betting continues. The separate **paid showdown** remains a final-two action and costs the current seen amount.
+
+---
+
+## Ongoing round flow ✅
+
+- A completed Teen Patti round advances to the next round **automatically** after the result pause.
+- There is no host-only **Deal next round** requirement.
+- The automatic transition pauses only for a genuine required action, such as the next dealer choosing/configuring a variant or a player topping up enough play money for the next boot. Once that requirement is satisfied, the deal continues automatically.
+- Starting an entirely new table/session after players have ended the session remains an explicit choice.
 
 ---
 
@@ -105,7 +110,7 @@ colour and high card by highest, then second, then third. Suit is never used.
 ## Dealer-selected variant framework 🟡
 
 The descriptor/configuration framework exists and the rules are represented as
-data. The currently complete runtime paths remain **behind the Coming Soon
+data. The current four-game release runtime paths are network-enabled after
 release gate**. Unsupported variants are rejected explicitly rather than
 silently behaving like Classic; a descriptor alone never makes a variant
 playable.
@@ -174,15 +179,18 @@ Reference a random undealt card.
 
 ### Two-reference-card joker
 
-Reveal two random undealt reference cards. Each player **independently**
-assigns one reference to Up/Down and the other to Same-rank.
+Reveal two random undealt reference cards and keep both visible throughout the hand. **There is no assignment prompt after the deal and no prompt merely because a player becomes Seen.** Players may mentally evaluate both possibilities while betting normally.
 
-- Cannot choose Same for both.
-- Cannot choose Up/Down for both.
+Only when that player's hand must actually be compared in a **Sideshow** or **Show/Showdown** does the game present the two possible resulting joker sets:
+
+- **Option A** — first reference supplies Up + Down; second reference supplies Same.
+- **Option B** — second reference supplies Up + Down; first reference supplies Same.
+
+The player chooses one option privately. The game clearly shows that player the joker set they selected, then locks that choice for the rest of that hand and resolves the comparison. Other players do not receive the private selection except the comparison result/reveals required by normal Teen Patti rules.
 
 ### 5-card retained-discard structures
 
-**Runtime status:** 🟢 hidden/runtime-ready behind the Teen Patti Coming Soon gate.
+**Runtime status:** 🟢 hidden/runtime-ready behind the Teen Patti four-game release.
 
 The round dealer configures the 5-card structure **before the deal** and chooses one of:
 
@@ -200,7 +208,7 @@ At sideshow or showdown, all five originally dealt cards are revealed and the tw
 
 ### 2-card assumed-third
 
-**Runtime status:** 🟢 hidden/runtime-ready behind the Teen Patti Coming Soon gate. The server automatically chooses the strongest legal assumed card while enforcing the restriction below; it never uses a rank strictly between the two real ranks.
+**Runtime status:** 🟢 hidden/runtime-ready behind the Teen Patti four-game release. The server automatically chooses the strongest legal assumed card while enforcing the restriction below; it never uses a rank strictly between the two real ranks.
 
 Deal 2 actual cards. The player may **assume any third card**, rank and suit,
 to form the strongest legal 3-card hand.
@@ -277,7 +285,7 @@ dealt until the round dealer supplies those required settings.
 
 The original partial engine conflicted with this specification in several
 places. The Classic rewrite has resolved the core betting/dealer/sideshow
-conflicts below, but Teen Patti is still deliberately gated as **Coming Soon**.
+conflicts below; Teen Patti is network-enabled in the four-game release candidate.
 
 ### Classic core now matches the agreed rules ✅
 
@@ -290,9 +298,9 @@ conflicts below, but Teen Patti is still deliberately gated as **Coming Soon**.
   automatically revealing the player's cards
 - seen amount = 2× current blind; once seen, never blind again
 - pack on any turn where it is otherwise legal
-- compulsory sideshow when all remaining players (>2) are seen, using the nearest
+- optional sideshow when at least three remaining players are all seen, using the nearest
   active player anticlockwise; exact tie makes the initiator pack
-- final-two mutual free open show, or paid showdown at the current seen amount
+- free unanimous Mutual Show with any 2+ active players; paid showdown remains final-two at the current seen amount
 - exact showdown ties split the pot
 - no fixed number of rounds
 - explicit See keeps dealt cards private until the player actually looks
@@ -302,13 +310,12 @@ conflicts below, but Teen Patti is still deliberately gated as **Coming Soon**.
 
 Top-up, funding and live P/L exist in the Teen Patti engine/protocol, and a
 Teen-Patti-specific **permanent settle-on-leave / dynamic active-session removal
-flow is implemented behind the gate**. It does not reuse Hazari's bot-takeover
-`room:leaveTable` semantics. Teen Patti must still remain gated until the full
-repository suites, reconnect/multi-device coverage and real-device QA pass.
+flow is implemented.** It does not reuse Hazari's bot-takeover
+`room:leaveTable` semantics. Production deployment still waits for staging reconnect/multi-device and real-device QA.
 
 ### Friendly Assist / Watch & Suggest
 
-**Runtime status:** 🟢 hidden/private-table social layer behind the Teen Patti Coming Soon gate.
+**Runtime status:** 🟢 private-table social layer in the four-game release candidate.
 
 The host may enable Friendly Assist for a private table. After a player packs, that folded player may request permission to watch **one** still-active player's cards for the remainder of that hand. No card is revealed until the target explicitly accepts.
 
@@ -322,12 +329,12 @@ Descriptors/configuration exist for the agreed variants, including their deal
 counts, discard/joker/target metadata and in-round help text. Classic, Muflis,
 Best of Four, Standard/Lowest/Highest Joker, AK47, Pairs Are Jokers,
 Random-Pack Joker, Up–Down–Same, Up–Down, Down Only, **Revolving Joker**,
-**Two-Reference Joker**, all three **5-card retained-discard families**, **2 Cards · Assume the Third**, **Closest to N**, **K Little**, **Q Little** and **J Little** are runtime-enabled behind the release gate. **Surprise Me** is implemented as server-random selection over the host-approved runtime-ready pool, both for a dedicated Surprise Me Table and as a Dealer Choice option; if it lands on a dealer-configured variant such as Closest to N or a 5-card family, the round pauses before boot/deal for that dealer's required configuration. Unsupported variants still throw/refuse instead of falling back to Classic.
+**Two-Reference Joker**, all three **5-card retained-discard families**, **2 Cards · Assume the Third**, **Closest to N**, **K Little**, **Q Little** and **J Little** are runtime-enabled. **Surprise Me** is implemented as server-random selection over the host-approved runtime-ready pool, both for a dedicated Surprise Me Table and as a Dealer Choice option; if it lands on a dealer-configured variant such as Closest to N or a 5-card family, the round pauses before boot/deal for that dealer's required configuration. Unsupported variants still throw/refuse instead of falling back to Classic.
 
 ### Network/session/client 🟡
 
 `TeenPattiSession`, `teenpatti:*` setup/state/private/action/top-up/next-round
-events, reconnect result restoration, a hidden Classic shared-table UI and a
+events, reconnect result restoration, the shared-table UI and a
 round-summary/top-up flow now exist. Private dealt cards are never placed in the
 public state. The server registry deliberately remains `networkPlayable: false`,
 so none of this is release-reachable yet.
@@ -348,7 +355,7 @@ so none of this is release-reachable yet.
 | Maximum 9 players + hand ranking/sequence order | ✅ |
 | Initial dealer draw + previous-winner next dealer | ✅ Classic core |
 | Boot, blind doubling/cap, three-blind force-seen, chaal, pack | ✅ Classic core |
-| Compulsory sideshow + final-two shows + exact-tie split | ✅ Classic core |
+| Optional all-seen sideshow + 2+ player Mutual Show + final-two paid showdown + exact-tie split | ✅ Classic core |
 | Card privacy / explicit See | ✅ |
 | Host setup proposal + unanimous acceptance | ✅ server flow |
 | Top-up + live P/L | 🟡 engine/protocol/UI plus permanent settle-on-leave built behind gate; release QA pending |

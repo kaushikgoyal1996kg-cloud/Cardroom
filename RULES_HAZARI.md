@@ -36,6 +36,14 @@ Source: `server/src/games/hazari/` — `rules.ts`, `hands.ts`,
 
 ---
 
+## Ongoing round flow
+
+- After an ordinary or valid dismissed round result, the next Hazari round is **dealt automatically** after the short result pause.
+- The host does not have to press a Next/Deal button between rounds.
+- Automatic dealing stops when the Hazari game is complete; starting a completely new game remains an explicit table choice.
+
+---
+
 ## Arrangement
 
 Each player splits their 13 cards into **four sets of 3 / 3 / 3 / 4**.

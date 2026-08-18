@@ -43,6 +43,20 @@ type BotSchedule = {
  * two timers and make computer actions land almost simultaneously. */
 const pendingBotSchedules = new Map<string, BotSchedule>();
 
+/** Ongoing tables flow from one completed deal to the next automatically.
+ * The short server-owned pause leaves enough time to read the result while
+ * removing the old host-only "Deal next…" dead-end/double-tap surface. A new
+ * match/game still requires an explicit start after MATCH/GAME_COMPLETE. */
+const AUTO_NEXT_DEAL_DELAY_MS = 3000;
+type HazariRoundSchedule = { game: HaazariGame; timer: ReturnType<typeof setTimeout> };
+type KittiRoundSchedule = { game: KittiGame; timer: ReturnType<typeof setTimeout> };
+type TeenPattiRoundSchedule = { game: TeenPattiGame; timer: ReturnType<typeof setTimeout> };
+type PokerHandSchedule = { game: PokerGame; timer: ReturnType<typeof setTimeout> };
+const pendingHazariRoundSchedules = new Map<string, HazariRoundSchedule>();
+const pendingKittiRoundSchedules = new Map<string, KittiRoundSchedule>();
+const pendingTeenPattiRoundSchedules = new Map<string, TeenPattiRoundSchedule>();
+const pendingPokerHandSchedules = new Map<string, PokerHandSchedule>();
+
 function stableBotVariation(seed: string, span: number): number {
   if (span <= 0) return 0;
   let hash = 0;
@@ -111,19 +125,50 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
     });
 
     socket.on('room:join', ({ roomCode, playerName, avatar }, ack) => {
+      let joinedRoomCode: string | null = null;
+      let joinedPlayerId: PlayerId | null = null;
       try {
         assertSocketNotAlreadySeated(socket);
         const name = sanitizeName(playerName);
         const code = roomCode.trim().toUpperCase();
         const { room, playerId, token } = rooms.joinRoom(code, name, avatar);
-        reconcilePokerSetupAfterSeatChange(room);
+        joinedRoomCode = room.roomCode;
+        joinedPlayerId = playerId;
+
+        if (room.status === 'IN_GAME' && room.gameId === 'TEEN_PATTI') {
+          const teenPatti = asTeenPatti(room.game);
+          if (!teenPatti) throw new Error('Teen Patti table state is unavailable.');
+          const seatResult = teenPatti.addPlayerForNextRound(playerId);
+          if (!seatResult.ok) throw new Error(seatResult.error ?? 'Could not seat this player for the next Teen Patti round.');
+        } else {
+          reconcilePokerSetupAfterSeatChange(room);
+        }
+
         rooms.bindSocket(room.roomCode, playerId, socket.id);
         joinSocketToRoom(socket, room.roomCode, playerId);
         ack({ ok: true, roomCode: room.roomCode, playerId, token, room: rooms.toPublic(room) });
         broadcastRoom(io, rooms, room.roomCode);
         broadcastTeenPattiSetup(io, room);
         broadcastPokerSetup(io, room);
+        if (room.status === 'IN_GAME' && room.gameId === 'TEEN_PATTI') {
+          const teenPatti = asTeenPatti(room.game);
+          if (teenPatti) {
+            sendTeenPattiPublicState(io, room.roomCode, teenPatti);
+            sendTeenPattiPrivateState(io, teenPatti, playerId);
+          }
+        }
       } catch (err) {
+        // If room insertion succeeded but the game engine refused the live-seat
+        // transition, roll the new seat/token back before reporting failure.
+        if (joinedRoomCode && joinedPlayerId) {
+          try {
+            const joinedRoom = rooms.getRoomOrThrow(joinedRoomCode);
+            if (joinedRoom.players.has(joinedPlayerId)) {
+              if (joinedRoom.status === 'IN_GAME') rooms.releaseActiveSeat(joinedRoomCode, joinedPlayerId);
+              else rooms.leaveSession(joinedRoomCode, joinedPlayerId);
+            }
+          } catch { /* best-effort rollback */ }
+        }
         ack({ ok: false, error: errMessage(err) });
       }
     });
@@ -458,28 +503,32 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
       });
     });
 
-    socket.on('room:leave', () => {
-      withRoom(socket, rooms, (room, playerId) => {
-        const roomCode = room.roomCode;
+    socket.on('room:leave', (ack) => {
+      try {
+        const { roomCode, playerId } = socket.data;
+        if (!roomCode || !playerId) throw new Error('Not currently in a room.');
+        const room = rooms.getRoomOrThrow(roomCode);
+        assertCurrentSeatSocket(room, playerId, socket.id);
         const wasInCall = room.voiceCallParticipants.has(playerId);
         const leavingSetupOwner = room.status === 'LOBBY' && room.hostId === playerId
           && (room.gameId === 'TEEN_PATTI' || room.gameId === 'POKER');
         const remaining = rooms.leaveSession(roomCode, playerId);
-        // Detach before any broadcast so this client cannot receive a stale
-        // room:update after it has cleared its local session (same class of
-        // race as the fixed Leave Table bug).
+        // Explicit Leave is permanent, unlike a transient disconnect. Remove
+        // the token/seat first, detach this socket, then broadcast the new room
+        // snapshot. The ack is sent only after that authoritative removal so a
+        // client never clears itself locally while cousins still see a ghost.
         leaveSocketFromRoom(socket, roomCode, playerId);
         if (remaining) {
-          // A Teen Patti proposal belongs to the proposing host. If that host
-          // leaves before Start, the new host must explicitly propose settings
-          // so nobody inherits consent from a departed host.
           if (leavingSetupOwner) remaining.gameSetup = undefined;
           broadcastRoom(io, rooms, roomCode);
           broadcastTeenPattiSetup(io, remaining);
           broadcastPokerSetup(io, remaining);
         }
         if (wasInCall) io.to(roomCode).emit('voice:peerLeft', { playerId });
-      });
+        ack({ ok: true });
+      } catch (err) {
+        ack({ ok: false, error: errMessage(err) });
+      }
     });
 
     socket.on('room:leaveTable', () => {
@@ -711,22 +760,23 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
           return;
         }
         sendPublicGameState(io, roomCodeOf(socket), game);
+        const roomCode = roomCodeOf(socket);
         const lastRound = game.roundHistory[game.roundHistory.length - 1];
-        io.to(roomCodeOf(socket)).emit('hazari:roundComplete', { result: lastRound });
+        io.to(roomCode).emit('hazari:roundComplete', { result: lastRound });
+        scheduleHazariNextRound(io, rooms, roomCode, game);
       });
     });
 
+    // Legacy/manual fallback for older clients. Current clients never require
+    // the host to press Next Round; the server schedules the deal itself.
     socket.on('hazari:startNextRound', () => {
-      withGame(socket, rooms, (game, playerId) => {
+      withGame(socket, rooms, (game) => {
         const room = rooms.getRoomOrThrow(roomCodeOf(socket));
-        if (room.hostId !== playerId) {
-          socket.emit('game:error', { message: 'Only the host can start the next round.' });
-          return;
-        }
         if (game.state !== 'ROUND_COMPLETE' && game.state !== 'DISMISSED_ROUND') {
           socket.emit('game:error', { message: `Cannot start next round from state ${game.state}` });
           return;
         }
+        cancelHazariNextRound(room.roomCode, game);
         dealAndBroadcast(io, game);
         scheduleBotActions(io, rooms, room.roomCode);
       });
@@ -812,17 +862,16 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
       });
     });
 
+    // Legacy/manual fallback for older clients; normal Kitti rounds advance
+    // automatically until the match (including sudden death) is complete.
     socket.on('kitti:startNextRound', () => {
-      withKittiGame(socket, rooms, (game, playerId) => {
+      withKittiGame(socket, rooms, (game) => {
         const room = rooms.getRoomOrThrow(roomCodeOf(socket));
-        if (room.hostId !== playerId) {
-          socket.emit('game:error', { message: 'Only the host can start the next round.' });
-          return;
-        }
         if (game.state !== 'ROUND_COMPLETE') {
           socket.emit('game:error', { message: `Cannot start next Kitti round from state ${game.state}` });
           return;
         }
+        cancelKittiNextRound(room.roomCode, game);
         game.dealNewRound();
         sendKittiPublicState(io, room.roomCode, game);
         sendAllKittiPrivateHands(io, game);
@@ -970,7 +1019,7 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
         // each payload still contains only that player's cards.
         sendAllTeenPattiPrivateState(io, game);
         sendTeenPattiPublicState(io, roomCodeOf(socket), game);
-        maybeAnnounceTeenPattiRoundEnd(io, roomCodeOf(socket), game);
+        maybeAnnounceTeenPattiRoundEnd(io, rooms, roomCodeOf(socket), game);
       });
     });
 
@@ -990,16 +1039,15 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
         // snapshot too so no client retains legal/private state tagged to the
         // previous sequence while rendering the new public table.
         sendAllTeenPattiPrivateState(io, game);
+        if (game.state === 'ROUND_COMPLETE') scheduleTeenPattiNextRound(io, rooms, roomCodeOf(socket), game);
       });
     });
 
+    // Legacy/manual fallback retained for older clients. Current clients never
+    // need a host to press Deal Next Round; the server schedules it itself.
     socket.on('teenpatti:startNextRound', ({ expectedSeq }) => {
       withTeenPattiGame(socket, rooms, (game, playerId) => {
         const room = rooms.getRoomOrThrow(roomCodeOf(socket));
-        if (room.hostId !== playerId) {
-          socket.emit('game:error', { message: 'Only the host can start the next round.' });
-          return;
-        }
         if (!Number.isSafeInteger(expectedSeq) || expectedSeq !== game.sequence) {
           socket.emit('game:error', { message: 'That next-round request is stale. Wait for the latest Teen Patti table state.' });
           return;
@@ -1008,6 +1056,7 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
           socket.emit('game:error', { message: `Cannot start the next Teen Patti round from state ${game.state}.` });
           return;
         }
+        cancelTeenPattiNextRound(room.roomCode, game);
         game.dealNewRound();
         sendTeenPattiPublicState(io, room.roomCode, game);
         sendAllTeenPattiPrivateState(io, game);
@@ -1054,7 +1103,7 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
           broadcastRoom(io, rooms, roomCode);
           sendTeenPattiPublicState(io, roomCode, game);
           sendAllTeenPattiPrivateState(io, game);
-          if (leaveResult.roundEnded) maybeAnnounceTeenPattiRoundEnd(io, roomCode, game);
+          if (leaveResult.roundEnded) maybeAnnounceTeenPattiRoundEnd(io, rooms, roomCode, game);
         }
 
         if (wasInCall) io.to(roomCode).emit('voice:peerLeft', { playerId });
@@ -1096,7 +1145,7 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
         }
         sendPokerPublicState(io, roomCodeOf(socket), game);
         sendAllPokerPrivateState(io, game);
-        maybeAnnouncePokerHandEnd(io, roomCodeOf(socket), game);
+        maybeAnnouncePokerHandEnd(io, rooms, roomCodeOf(socket), game);
       });
     });
 
@@ -1107,28 +1156,29 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
             throw new Error('That Poker top-up is stale. Wait for the latest table state.');
           }
           game.topUp(playerId, amount);
-          sendPokerPublicState(io, roomCodeOf(socket), game);
+          const roomCode = roomCodeOf(socket);
+          sendPokerPublicState(io, roomCode, game);
           // Poker top-up also advances the table-wide sequence. Every seated
           // player's legal-actions snapshot is therefore stale, not just the
           // player who added chips. Refresh all private channels atomically.
           sendAllPokerPrivateState(io, game);
+          if (game.state === 'HAND_COMPLETE') schedulePokerNextHand(io, rooms, roomCode, game);
         } catch (err) {
           socket.emit('game:error', { message: errMessage(err) });
         }
       });
     });
 
+    // Legacy/manual fallback for older clients. Current Poker hands advance
+    // automatically; Dealer Choice still pauses at AWAITING_VARIANT as needed.
     socket.on('poker:startNextHand', ({ expectedSeq }) => {
-      withPokerGame(socket, rooms, (game, playerId) => {
+      withPokerGame(socket, rooms, (game) => {
         const room = rooms.getRoomOrThrow(roomCodeOf(socket));
-        if (room.hostId !== playerId) {
-          socket.emit('game:error', { message: 'Only the host can start the next poker hand.' });
-          return;
-        }
         try {
           if (!Number.isSafeInteger(expectedSeq) || expectedSeq !== game.sequence) {
             throw new Error('That next-hand request is stale. Wait for the latest Poker table state.');
           }
+          cancelPokerNextHand(room.roomCode, game);
           game.dealHand();
           sendPokerPublicState(io, room.roomCode, game);
           sendAllPokerPrivateState(io, game);
@@ -1173,7 +1223,7 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
           broadcastRoom(io, rooms, roomCode);
           sendPokerPublicState(io, roomCode, game);
           sendAllPokerPrivateState(io, game);
-          if (leaveResult.handEnded) maybeAnnouncePokerHandEnd(io, roomCode, game);
+          if (leaveResult.handEnded) maybeAnnouncePokerHandEnd(io, rooms, roomCode, game);
         }
 
         if (wasInCall) io.to(roomCode).emit('voice:peerLeft', { playerId });
@@ -1397,10 +1447,44 @@ function sendAllPokerPrivateState(io: IO, game: PokerGame): void {
   for (const playerId of game.seatedPlayerIds) sendPokerPrivateState(io, game, playerId);
 }
 
-function maybeAnnouncePokerHandEnd(io: IO, roomCode: string, game: PokerGame): void {
+function maybeAnnouncePokerHandEnd(io: IO, rooms: RoomManager, roomCode: string, game: PokerGame): void {
   if (game.state === 'HAND_COMPLETE' && game.lastOutcome) {
     io.to(roomCode).emit('poker:handComplete', { result: game.lastOutcome });
+    schedulePokerNextHand(io, rooms, roomCode, game);
   }
+}
+
+function cancelPokerNextHand(roomCode: string, game: PokerGame): void {
+  const existing = pendingPokerHandSchedules.get(roomCode);
+  if (existing?.game !== game) return;
+  clearTimeout(existing.timer);
+  pendingPokerHandSchedules.delete(roomCode);
+}
+
+function schedulePokerNextHand(io: IO, rooms: RoomManager, roomCode: string, game: PokerGame): void {
+  const existing = pendingPokerHandSchedules.get(roomCode);
+  if (existing?.game === game) return;
+  if (existing) clearTimeout(existing.timer);
+
+  const timer = setTimeout(() => {
+    pendingPokerHandSchedules.delete(roomCode);
+    try {
+      const room = rooms.getRoomOrThrow(roomCode);
+      const current = asPoker(room.game);
+      if (room.status !== 'IN_GAME' || current !== game || game.state !== 'HAND_COMPLETE') return;
+      game.dealHand();
+      sendPokerPublicState(io, roomCode, game);
+      sendAllPokerPrivateState(io, game);
+    } catch (err) {
+      const message = errMessage(err);
+      // A table with fewer than two funded stacks simply waits for a between-
+      // hand top-up. poker:topUp schedules the automatic transition again.
+      if (/At least two funded players are required/i.test(message)) return;
+      io.to(roomCode).emit('game:error', { message });
+    }
+  }, AUTO_NEXT_DEAL_DELAY_MS);
+
+  pendingPokerHandSchedules.set(roomCode, { game, timer });
 }
 
 function restorePokerResultState(socket: Sock, game: PokerGame): void {
@@ -1449,10 +1533,45 @@ function sendAllTeenPattiPrivateState(io: IO, game: TeenPattiGame): void {
   for (const playerId of game.playersClockwise) sendTeenPattiPrivateState(io, game, playerId);
 }
 
-function maybeAnnounceTeenPattiRoundEnd(io: IO, roomCode: string, game: TeenPattiGame): void {
+function maybeAnnounceTeenPattiRoundEnd(io: IO, rooms: RoomManager, roomCode: string, game: TeenPattiGame): void {
   if (game.state === 'ROUND_COMPLETE' && game.lastOutcome) {
     io.to(roomCode).emit('teenpatti:roundComplete', { result: game.lastOutcome });
+    scheduleTeenPattiNextRound(io, rooms, roomCode, game);
   }
+}
+
+function cancelTeenPattiNextRound(roomCode: string, game: TeenPattiGame): void {
+  const existing = pendingTeenPattiRoundSchedules.get(roomCode);
+  if (existing?.game !== game) return;
+  clearTimeout(existing.timer);
+  pendingTeenPattiRoundSchedules.delete(roomCode);
+}
+
+function scheduleTeenPattiNextRound(io: IO, rooms: RoomManager, roomCode: string, game: TeenPattiGame): void {
+  const existing = pendingTeenPattiRoundSchedules.get(roomCode);
+  if (existing?.game === game) return;
+  if (existing) clearTimeout(existing.timer);
+
+  const timer = setTimeout(() => {
+    pendingTeenPattiRoundSchedules.delete(roomCode);
+    try {
+      const room = rooms.getRoomOrThrow(roomCode);
+      const current = asTeenPatti(room.game);
+      if (room.status !== 'IN_GAME' || current !== game || game.state !== 'ROUND_COMPLETE') return;
+      game.dealNewRound();
+      sendTeenPattiPublicState(io, roomCode, game);
+      sendAllTeenPattiPrivateState(io, game);
+    } catch (err) {
+      const message = errMessage(err);
+      // Insufficient boot is a player action gate, not a broken automatic
+      // transition. Stay on the result screen until top-up; teenpatti:topUp
+      // schedules this same transition again after the balance changes.
+      if (/Top-up required before the next boot/i.test(message)) return;
+      io.to(roomCode).emit('game:error', { message });
+    }
+  }, AUTO_NEXT_DEAL_DELAY_MS);
+
+  pendingTeenPattiRoundSchedules.set(roomCode, { game, timer });
 }
 
 function restoreTeenPattiResultState(socket: Sock, game: TeenPattiGame): void {
@@ -1514,11 +1633,43 @@ function maybeAnnounceKittiEnd(io: IO, rooms: RoomManager, roomCode: string, gam
     const result = game.roundHistory[game.roundHistory.length - 1];
     if (result) io.to(roomCode).emit('kitti:roundComplete', { result });
   }
+  if (game.state === 'ROUND_COMPLETE') scheduleKittiNextRound(io, rooms, roomCode, game);
   if (game.state === 'MATCH_COMPLETE' && game.matchWinnerId) {
+    cancelKittiNextRound(roomCode, game);
     rooms.settlePlayMoney(roomCode, game.matchWinnerId);
     broadcastRoom(io, rooms, roomCode);
     io.to(roomCode).emit('kitti:over', { winnerId: game.matchWinnerId, roundsWon: { ...game.roundsWon } });
   }
+}
+
+function cancelKittiNextRound(roomCode: string, game: KittiGame): void {
+  const existing = pendingKittiRoundSchedules.get(roomCode);
+  if (existing?.game !== game) return;
+  clearTimeout(existing.timer);
+  pendingKittiRoundSchedules.delete(roomCode);
+}
+
+function scheduleKittiNextRound(io: IO, rooms: RoomManager, roomCode: string, game: KittiGame): void {
+  const existing = pendingKittiRoundSchedules.get(roomCode);
+  if (existing?.game === game) return;
+  if (existing) clearTimeout(existing.timer);
+
+  const timer = setTimeout(() => {
+    pendingKittiRoundSchedules.delete(roomCode);
+    try {
+      const room = rooms.getRoomOrThrow(roomCode);
+      const current = asKitti(room.game);
+      if (room.status !== 'IN_GAME' || current !== game || game.state !== 'ROUND_COMPLETE') return;
+      game.dealNewRound();
+      sendKittiPublicState(io, roomCode, game);
+      sendAllKittiPrivateHands(io, game);
+      scheduleBotActions(io, rooms, roomCode);
+    } catch (err) {
+      io.to(roomCode).emit('game:error', { message: errMessage(err) });
+    }
+  }, AUTO_NEXT_DEAL_DELAY_MS);
+
+  pendingKittiRoundSchedules.set(roomCode, { game, timer });
 }
 
 /**
@@ -1630,13 +1781,43 @@ function maybeAnnounceRoundOrGameEnd(io: IO, rooms: RoomManager, roomCode: strin
   if (game.state === 'ROUND_COMPLETE') {
     const lastRound = game.roundHistory[game.roundHistory.length - 1];
     io.to(roomCode).emit('hazari:roundComplete', { result: lastRound });
+    scheduleHazariNextRound(io, rooms, roomCode, game);
   }
   if (game.state === 'GAME_COMPLETE') {
+    cancelHazariNextRound(roomCode, game);
     const winnerId = game.getWinner()!;
     rooms.settlePlayMoney(roomCode, winnerId);
     broadcastRoom(io, rooms, roomCode);
     io.to(roomCode).emit('hazari:over', { winnerId, finalScores: game.cumulativeScores });
   }
+}
+
+function cancelHazariNextRound(roomCode: string, game: HaazariGame): void {
+  const existing = pendingHazariRoundSchedules.get(roomCode);
+  if (existing?.game !== game) return;
+  clearTimeout(existing.timer);
+  pendingHazariRoundSchedules.delete(roomCode);
+}
+
+function scheduleHazariNextRound(io: IO, rooms: RoomManager, roomCode: string, game: HaazariGame): void {
+  const existing = pendingHazariRoundSchedules.get(roomCode);
+  if (existing?.game === game) return;
+  if (existing) clearTimeout(existing.timer);
+
+  const timer = setTimeout(() => {
+    pendingHazariRoundSchedules.delete(roomCode);
+    try {
+      const room = rooms.getRoomOrThrow(roomCode);
+      const current = asHazari(room.game);
+      if (room.status !== 'IN_GAME' || current !== game || (game.state !== 'ROUND_COMPLETE' && game.state !== 'DISMISSED_ROUND')) return;
+      dealAndBroadcast(io, game);
+      scheduleBotActions(io, rooms, roomCode);
+    } catch (err) {
+      io.to(roomCode).emit('game:error', { message: errMessage(err) });
+    }
+  }, AUTO_NEXT_DEAL_DELAY_MS);
+
+  pendingHazariRoundSchedules.set(roomCode, { game, timer });
 }
 
 /**

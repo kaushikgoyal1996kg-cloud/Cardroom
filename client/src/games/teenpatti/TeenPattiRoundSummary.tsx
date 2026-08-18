@@ -3,6 +3,7 @@ import { useGame } from '../../lib/GameStore';
 import { PlayingCard } from '../../platform/components/PlayingCard';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useVisualViewport } from '../../platform/lib/useVisualViewport';
+import { twoReferenceJokerSet } from './twoReferenceJokers';
 import './TeenPattiResult.css';
 
 const REASON_LABEL = {
@@ -12,7 +13,7 @@ const REASON_LABEL = {
 } as const;
 
 export function TeenPattiRoundSummary() {
-  const { room, myPlayerId, teenPattiState, lastTeenPattiRoundResult, startNextTeenPattiRound, topUpTeenPatti, gameError, clearGameError, goToHomeScreen } = useGame();
+  const { room, myPlayerId, teenPattiState, teenPattiPrivate, lastTeenPattiRoundResult, topUpTeenPatti, gameError, clearGameError, goToHomeScreen } = useGame();
   const { viewportHeight } = useVisualViewport();
   const [topUpAmount, setTopUpAmount] = useState('');
   if (!room || !teenPattiState || !lastTeenPattiRoundResult) {
@@ -20,7 +21,13 @@ export function TeenPattiRoundSummary() {
   }
 
   const result = lastTeenPattiRoundResult;
-  const isHost = room.players.find((player) => player.playerId === myPlayerId)?.isHost ?? false;
+  const referenceA = teenPattiState.variantReferenceCards[0];
+  const referenceB = teenPattiState.variantReferenceCards[1];
+  const myTwoReferenceChoice = teenPattiPrivate?.twoReferenceAssignment && referenceA && referenceB
+    ? (teenPattiPrivate.twoReferenceAssignment.upDownReferenceIndex === 0
+        ? twoReferenceJokerSet(referenceA.rank, referenceB.rank)
+        : twoReferenceJokerSet(referenceB.rank, referenceA.rank))
+    : null;
   const nameOf = (id: string) => room.players.find((player) => player.playerId === id)?.name
     ?? room.playerDirectory?.[id]?.name
     ?? 'Player';
@@ -36,6 +43,9 @@ export function TeenPattiRoundSummary() {
         <p className="tp-result__eyebrow">Round {result.roundNumber} · {REASON_LABEL[result.reason]}</p>
         <h1>{winnerText}</h1>
         <p className="tp-result__pot">Pot awarded <strong>{result.potAwarded}</strong></p>
+        {myTwoReferenceChoice && (
+          <p className="tp-result__reference-choice">Your Two-Reference joker set: <strong>{myTwoReferenceChoice.join(' · ')}</strong></p>
+        )}
       </section>
 
       {result.showdown && (
@@ -102,11 +112,11 @@ export function TeenPattiRoundSummary() {
             </button>
           </div>
         )}
-        {isHost ? (
-          <button className="btn btn-primary" type="button" onClick={startNextTeenPattiRound} disabled={underfunded.length > 0}>Deal next round</button>
-        ) : (
-          <p>Waiting for the host to deal the next round…</p>
-        )}
+        <p className="tp-result__auto-next" role="status">
+          {underfunded.length > 0
+            ? 'The next round will start automatically as soon as the required top-up is complete.'
+            : 'Next round starting automatically…'}
+        </p>
         <button className="btn btn-ghost" type="button" onClick={goToHomeScreen}>Card Room</button>
         <small>Next dealer: {result.winnerIds.length === 1 ? nameOf(result.winnerIds[0]) : nameOf(teenPattiState.dealerId)}</small>
       </footer>

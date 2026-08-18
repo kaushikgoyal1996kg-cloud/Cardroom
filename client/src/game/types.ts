@@ -379,6 +379,8 @@ export interface TeenPattiPublicStatePayload {
   variantHelp: string;
   variantReferenceCards: Card[];
   twoReferenceAssignmentsComplete: number;
+  referenceAssignmentRequiredPlayerIds: PlayerId[];
+  referenceAssignmentReason: 'SIDESHOW' | 'SHOWDOWN' | null;
   discardSelectionsComplete: number;
   initialDealerDraws: {
     contenders: PlayerId[];
@@ -393,6 +395,7 @@ export interface TeenPattiPublicStatePayload {
     seen: boolean;
     cardsViewed: boolean;
     packed: boolean;
+    sittingOut: boolean;
     committed: number;
     blindTurns: number;
     topUps: number;

@@ -47,6 +47,11 @@ export type PlayerId = string;
 export type TeenPattiState = 'READY' | 'AWAITING_VARIANT' | 'DEALING' | 'AWAITING_DISCARD' | 'AWAITING_REFERENCE_ASSIGNMENT' | 'BETTING' | 'ROUND_COMPLETE';
 export type TeenPattiVariantDecision = 'CHOOSE_VARIANT' | 'CONFIGURE_VARIANT';
 
+type PendingReferenceResolution =
+  | { kind: 'SIDESHOW'; initiatorId: PlayerId; opponentId: PlayerId }
+  | { kind: 'PAID_SHOWDOWN'; initiatorId: PlayerId }
+  | { kind: 'MUTUAL_OPEN_SHOW'; playerIds: PlayerId[] };
+
 export interface TeenPattiPlayer {
   playerId: PlayerId;
   chips: number;
@@ -55,6 +60,8 @@ export interface TeenPattiPlayer {
   /** Whether this player explicitly chose to reveal their own cards to themself. */
   cardsViewed: boolean;
   packed: boolean;
+  /** Joined during a live hand: seated at the table, but enters from the next round. */
+  sittingOut: boolean;
   committed: number;
   blindTurns: number;
   /** Total play-money added after the configured starting balance. */
@@ -199,8 +206,11 @@ export class TeenPattiGame {
   initialDealerDraws: DealerDrawRound[] = [];
   /** Public reference card(s) for joker variants. Always server-selected. */
   variantReferenceCards: Card[] = [];
-  /** Two-Reference Joker role choice is private to each player. */
+  /** Two-Reference Joker role choice is private to each player and is requested only when comparison is actually needed. */
   private twoReferenceAssignments = new Map<PlayerId, TeenPattiTwoReferenceAssignment>();
+  /** Comparison currently paused while only the involved player(s) choose between the two resulting joker sets. */
+  private pendingReferenceResolution: PendingReferenceResolution | null = null;
+  private referenceAssignmentRequiredPlayerIds = new Set<PlayerId>();
   /** Locked retained-card discard indexes for 5-card variants. */
   private discardSelections = new Map<PlayerId, number[]>();
   /** Every legal discard pair for each player; indexes never reveal card identities to a blind client. */
@@ -284,6 +294,7 @@ export class TeenPattiGame {
         seen: false,
         cardsViewed: false,
         packed: false,
+        sittingOut: false,
         committed: 0,
         blindTurns: 0,
         topUps: 0,
@@ -358,6 +369,8 @@ export class TeenPattiGame {
     this.hands = {};
     this.variantReferenceCards = [];
     this.twoReferenceAssignments.clear();
+    this.pendingReferenceResolution = null;
+    this.referenceAssignmentRequiredPlayerIds.clear();
     this.discardSelections.clear();
     this.discardLegalSelections.clear();
     this.friendlyAssistRequests.clear();
@@ -371,6 +384,7 @@ export class TeenPattiGame {
       player.seen = false;
       player.cardsViewed = false;
       player.packed = false;
+      player.sittingOut = false;
       player.committed = 0;
       player.blindTurns = 0;
     }
@@ -451,17 +465,9 @@ export class TeenPattiGame {
   }
 
   private continueAfterDiscardGate(): void {
-    const jokerMode = teenPattiRoundJokerMode(this.roundVariant);
-    if (jokerMode === 'TWO_REFERENCE') {
-      // Both references are public, but every player's role assignment remains
-      // private. If a 5-card discard phase existed, it must be fully complete
-      // before joker roles are chosen.
-      this.currentTurn = null;
-      this.state = 'AWAITING_REFERENCE_ASSIGNMENT';
-      this.actionSeq += 1;
-      return;
-    }
-
+    // Two-Reference Joker does NOT pause immediately after the deal. Players
+    // play normally and choose between the two possible joker sets only when
+    // their hand must actually be compared in a sideshow/showdown.
     this.state = 'BETTING';
     this.currentTurn = this.pendingBettingTurn && this.players.has(this.pendingBettingTurn)
       ? this.pendingBettingTurn
@@ -650,7 +656,39 @@ export class TeenPattiGame {
   }
 
   activePlayers(): PlayerId[] {
-    return this.playersClockwise.filter((playerId) => !this.players.get(playerId)!.packed);
+    return this.playersClockwise.filter((playerId) => {
+      const player = this.players.get(playerId)!;
+      return !player.packed && !player.sittingOut;
+    });
+  }
+
+  /**
+   * Seats a completely new player at an already-running Teen Patti table.
+   * They are visible immediately but sit out the hand already in progress and
+   * become active automatically when prepareRoundShell() opens the next round.
+   * If the table is already pre-deal for that next round (AWAITING_VARIANT),
+   * there is no current hand to protect, so the newcomer may join that deal.
+   */
+  addPlayerForNextRound(playerId: PlayerId): ActionResult {
+    if (this.players.has(playerId)) return { ok: false, error: 'That player is already seated.' };
+    if (this.playersClockwise.length >= TEEN_PATTI_RULES.MAX_PLAYERS) return { ok: false, error: 'This Teen Patti table is full.' };
+
+    const preDealNextRound = this.state === 'AWAITING_VARIANT' || this.state === 'ROUND_COMPLETE';
+    this.playersClockwise.push(playerId);
+    this.players.set(playerId, {
+      playerId,
+      chips: this.tableConfig.startingBalance,
+      seen: false,
+      cardsViewed: false,
+      packed: !preDealNextRound,
+      sittingOut: !preDealNextRound,
+      committed: 0,
+      blindTurns: 0,
+      topUps: 0,
+      roundsWon: 0,
+    });
+    this.actionSeq += 1;
+    return { ok: true };
   }
 
   private friendlyAssistEnabled(): boolean {
@@ -847,11 +885,10 @@ export class TeenPattiGame {
   }
 
   /**
-   * Two-Reference Joker pre-betting choice. Both board cards are public; only
-   * this player's role choice is private. Everyone who received the same gate
-   * sequence may answer against that sequence, so one player's answer cannot
-   * make another player's simultaneous choice stale. Betting starts only once
-   * every still-seated player has assigned exactly one reference to Up/Down.
+   * Two-Reference Joker choice is requested only when this player's hand is
+   * about to be compared. The UI presents the two resulting joker sets; this
+   * stores which reference supplies Up/Down. Choices are one-time for the
+   * current round and remain private.
    */
   assignTwoReference(
     playerId: PlayerId,
@@ -859,32 +896,74 @@ export class TeenPattiGame {
     expectedSeq?: number,
   ): ActionResult {
     if (this.state !== 'AWAITING_REFERENCE_ASSIGNMENT' || teenPattiRoundJokerMode(this.roundVariant) !== 'TWO_REFERENCE') {
-      return { ok: false, error: 'This table is not waiting for Two-Reference Joker assignments.' };
+      return { ok: false, error: 'This table is not waiting for a Two-Reference Joker comparison choice.' };
     }
     if (expectedSeq !== undefined && expectedSeq !== this.actionSeq) {
-      return { ok: false, error: 'That Two-Reference Joker assignment is stale.' };
+      return { ok: false, error: 'That Two-Reference Joker choice is stale.' };
     }
     if (!this.players.has(playerId)) return { ok: false, error: 'You are not seated at this table.' };
+    if (!this.referenceAssignmentRequiredPlayerIds.has(playerId)) {
+      return { ok: false, error: 'Your hand is not part of the comparison waiting for joker selection.' };
+    }
     if (upDownReferenceIndex !== 0 && upDownReferenceIndex !== 1) {
-      return { ok: false, error: 'Choose exactly one board reference for Up/Down.' };
+      return { ok: false, error: 'Choose one of the two joker-set options.' };
     }
     if (this.twoReferenceAssignments.has(playerId)) {
-      return { ok: false, error: 'Your Two-Reference Joker roles are already locked for this hand.' };
+      return { ok: false, error: 'Your Two-Reference Joker set is already locked for this hand.' };
     }
 
     this.twoReferenceAssignments.set(playerId, { upDownReferenceIndex });
-    const everyoneAssigned = this.playersClockwise.every((id) => this.twoReferenceAssignments.has(id));
-    if (everyoneAssigned) {
-      this.state = 'BETTING';
-      this.currentTurn = this.pendingBettingTurn && this.players.has(this.pendingBettingTurn)
-        ? this.pendingBettingTurn
-        : seatingOrderFromDealer(this.playersClockwise, this.dealerId)[0];
-      this.pendingBettingTurn = null;
-      this.applyForcedSeenIfNeeded();
-      this.actionSeq += 1;
-    }
-    // Keep the sequence stable while independent players answer the same gate.
+    const everyoneRequiredAssigned = [...this.referenceAssignmentRequiredPlayerIds]
+      .every((id) => this.twoReferenceAssignments.has(id));
+    if (everyoneRequiredAssigned) this.resolvePendingReferenceComparison();
+    // Keep the sequence stable while independent involved players answer the
+    // same comparison gate. The comparison resolution advances it.
     return { ok: true };
+  }
+
+  private beginReferenceComparison(pending: PendingReferenceResolution, involvedPlayerIds: PlayerId[]): boolean {
+    if (teenPattiRoundJokerMode(this.roundVariant) !== 'TWO_REFERENCE') return false;
+    const required = involvedPlayerIds.filter((id) => !this.twoReferenceAssignments.has(id));
+    if (required.length === 0) return false;
+
+    this.pendingReferenceResolution = pending;
+    this.referenceAssignmentRequiredPlayerIds = new Set(required);
+    // At the instant their hand is about to be compared, each involved player
+    // must be able to see their own cards so the two joker-set options are an
+    // informed choice. This never reveals those cards to anyone else.
+    for (const id of required) {
+      const player = this.players.get(id);
+      if (player) {
+        player.cardsViewed = true;
+        player.seen = true;
+      }
+    }
+    this.state = 'AWAITING_REFERENCE_ASSIGNMENT';
+    this.currentTurn = null;
+    this.actionSeq += 1;
+    return true;
+  }
+
+  private resolvePendingReferenceComparison(): void {
+    const pending = this.pendingReferenceResolution;
+    if (!pending) return;
+    this.pendingReferenceResolution = null;
+    this.referenceAssignmentRequiredPlayerIds.clear();
+    this.state = 'BETTING';
+
+    if (pending.kind === 'SIDESHOW') {
+      this.currentTurn = pending.initiatorId;
+      this.resolveSideshowNow(pending.initiatorId, pending.opponentId);
+      return;
+    }
+    if (pending.kind === 'PAID_SHOWDOWN') {
+      this.currentTurn = pending.initiatorId;
+      this.resolvePaidShowdownNow(pending.initiatorId);
+      return;
+    }
+
+    this.currentTurn = null;
+    this.resolveShowdown(pending.playerIds, 'MUTUAL_OPEN_SHOW');
   }
 
   topUp(playerId: PlayerId, amount: number): ActionResult {
@@ -963,6 +1042,7 @@ export class TeenPattiGame {
     this.players.delete(playerId);
     delete this.hands[playerId];
     this.twoReferenceAssignments.delete(playerId);
+    this.referenceAssignmentRequiredPlayerIds.delete(playerId);
     this.discardSelections.delete(playerId);
     this.discardLegalSelections.delete(playerId);
     if (leavingIndex >= 0) this.playersClockwise.splice(leavingIndex, 1);
@@ -978,18 +1058,31 @@ export class TeenPattiGame {
     }
 
     if (this.state === 'AWAITING_REFERENCE_ASSIGNMENT') {
-      if (this.pendingBettingTurn === playerId) this.pendingBettingTurn = nextSeat;
-      if (this.playersClockwise.length === 1) {
-        this.pendingBettingTurn = null;
-        this.awardPot([this.playersClockwise[0]], null, false, 'LAST_STANDING');
-      } else if (this.playersClockwise.length >= 2 && this.playersClockwise.every((id) => this.twoReferenceAssignments.has(id))) {
-        this.state = 'BETTING';
-        this.currentTurn = this.pendingBettingTurn && this.players.has(this.pendingBettingTurn)
-          ? this.pendingBettingTurn
-          : seatingOrderFromDealer(this.playersClockwise, this.dealerId)[0];
-        this.pendingBettingTurn = null;
-        this.applyForcedSeenIfNeeded();
-        this.actionSeq += 1;
+      const active = this.activePlayers();
+      if (active.length === 1) {
+        this.awardPot(active, null, false, 'LAST_STANDING');
+      } else {
+        const pending = this.pendingReferenceResolution;
+        const comparisonLostPlayer = pending?.kind === 'SIDESHOW'
+          ? pending.initiatorId === playerId || pending.opponentId === playerId
+          : pending?.kind === 'PAID_SHOWDOWN'
+            ? pending.initiatorId === playerId
+            : pending?.kind === 'MUTUAL_OPEN_SHOW'
+              ? pending.playerIds.includes(playerId)
+              : false;
+        if (comparisonLostPlayer) {
+          // The comparison itself no longer exists. The explicit departure is
+          // already treated as a pack; resume ordinary betting with survivors.
+          this.pendingReferenceResolution = null;
+          this.referenceAssignmentRequiredPlayerIds.clear();
+          this.state = 'BETTING';
+          this.currentTurn = nextSeat && this.players.has(nextSeat) && !this.players.get(nextSeat)!.packed && !this.players.get(nextSeat)!.sittingOut
+            ? nextSeat
+            : active[0] ?? null;
+          this.actionSeq += 1;
+        } else if ([...this.referenceAssignmentRequiredPlayerIds].every((id) => this.twoReferenceAssignments.has(id))) {
+          this.resolvePendingReferenceComparison();
+        }
       }
     }
 
@@ -1047,12 +1140,11 @@ export class TeenPattiGame {
     if (this.currentTurn !== playerId) return { ok: false, error: 'It is not your turn.' };
 
     const active = this.activePlayers();
-    const compulsorySideshow = active.length > 2 && active.every((id) => this.players.get(id)!.seen);
-    if (compulsorySideshow && action.type !== 'SIDESHOW') {
-      return { ok: false, error: 'All remaining players are seen. The sideshow is compulsory.' };
-    }
-    if (!compulsorySideshow && action.type === 'SIDESHOW') {
-      return { ok: false, error: 'Sideshow is available only when all remaining players are seen.' };
+    const sideshowAvailable = active.length > 2 && active.every((id) => this.players.get(id)!.seen);
+    // All-seen makes sideshow AVAILABLE, never compulsory. Normal Chaal/Pack
+    // remain legal until the current player actually chooses Sideshow.
+    if (!sideshowAvailable && action.type === 'SIDESHOW') {
+      return { ok: false, error: 'Sideshow is available only when at least three remaining players are all seen.' };
     }
 
     switch (action.type) {
@@ -1122,26 +1214,35 @@ export class TeenPattiGame {
   private applySideshow(player: TeenPattiPlayer): ActionResult {
     const active = this.activePlayers();
     if (active.length <= 2 || !active.every((id) => this.players.get(id)!.seen)) {
-      return { ok: false, error: 'A compulsory sideshow requires at least three active seen players.' };
+      return { ok: false, error: 'Sideshow is available only with at least three active seen players.' };
     }
 
     const opponentId = this.previousActiveBefore(player.playerId);
+    if (this.beginReferenceComparison(
+      { kind: 'SIDESHOW', initiatorId: player.playerId, opponentId },
+      [player.playerId, opponentId],
+    )) return { ok: true };
+
+    return this.resolveSideshowNow(player.playerId, opponentId);
+  }
+
+  private resolveSideshowNow(initiatorId: PlayerId, opponentId: PlayerId): ActionResult {
     const comparison = compareTeenPattiEvaluatedHands(
-      evaluateTeenPattiHand(this.hands[player.playerId], this.roundVariant, this.variantReferenceCards, this.twoReferenceAssignments.get(player.playerId), this.discardSelections.get(player.playerId)),
+      evaluateTeenPattiHand(this.hands[initiatorId], this.roundVariant, this.variantReferenceCards, this.twoReferenceAssignments.get(initiatorId), this.discardSelections.get(initiatorId)),
       evaluateTeenPattiHand(this.hands[opponentId], this.roundVariant, this.variantReferenceCards, this.twoReferenceAssignments.get(opponentId), this.discardSelections.get(opponentId)),
       this.roundVariant
     );
     let packedPlayerId: PlayerId;
     let tied = false;
-    if (comparison < 0) packedPlayerId = player.playerId;
+    if (comparison < 0) packedPlayerId = initiatorId;
     else if (comparison > 0) packedPlayerId = opponentId;
     else {
       tied = true;
-      packedPlayerId = player.playerId; // agreed: exact tie -> initiator packs
+      packedPlayerId = initiatorId; // agreed: exact tie -> initiator packs
     }
     const revealFiveCardSideshow = getTeenPattiVariant(this.roundVariant.variantId).selection === 'DISCARD_TO_THREE';
     const revealedHands: ShowdownEntry[] | undefined = revealFiveCardSideshow
-      ? [player.playerId, opponentId].map((playerId) => {
+      ? [initiatorId, opponentId].map((playerId) => {
           const evaluated = evaluateTeenPattiHand(
             this.hands[playerId],
             this.roundVariant,
@@ -1162,13 +1263,13 @@ export class TeenPattiGame {
     this.clearFriendlyAssistForTarget(packedPlayerId);
     this.revolveJokersToPackedHand(packedPlayerId);
     this.lastSideshow = {
-      initiatorId: player.playerId,
+      initiatorId,
       opponentId,
       packedPlayerId,
       tied,
       revealedHands,
     };
-    this.finishTurn(player.playerId);
+    this.finishTurn(initiatorId);
     return { ok: true };
   }
 
@@ -1176,6 +1277,24 @@ export class TeenPattiGame {
     const active = this.activePlayers();
     if (active.length !== 2) {
       return { ok: false, error: 'Paid showdown is available only to the final two players.' };
+    }
+    const amount = this.currentBlind * TEEN_PATTI_RULES.SEEN_MULTIPLIER;
+    if (player.chips < amount) return { ok: false, error: 'Top-up required to initiate showdown.' };
+
+    if (this.beginReferenceComparison(
+      { kind: 'PAID_SHOWDOWN', initiatorId: player.playerId },
+      active,
+    )) return { ok: true };
+
+    return this.resolvePaidShowdownNow(player.playerId);
+  }
+
+  private resolvePaidShowdownNow(initiatorId: PlayerId): ActionResult {
+    const player = this.players.get(initiatorId);
+    if (!player) return { ok: false, error: 'The showdown initiator is no longer seated.' };
+    const active = this.activePlayers();
+    if (active.length !== 2 || !active.includes(initiatorId)) {
+      return { ok: false, error: 'Paid showdown is no longer available.' };
     }
     const amount = this.currentBlind * TEEN_PATTI_RULES.SEEN_MULTIPLIER;
     if (player.chips < amount) return { ok: false, error: 'Top-up required to initiate showdown.' };
@@ -1220,6 +1339,10 @@ export class TeenPattiGame {
       // same proposal sequence without racing one another. The completed
       // showdown advances the sequence when the round resolves.
       this.clearOpenShowRequest();
+      if (this.beginReferenceComparison(
+        { kind: 'MUTUAL_OPEN_SHOW', playerIds: [...active] },
+        active,
+      )) return { ok: true };
       this.resolveShowdown(active, 'MUTUAL_OPEN_SHOW');
       return { ok: true };
     }
@@ -1273,7 +1396,8 @@ export class TeenPattiGame {
     let cursor = playerId;
     for (let i = 0; i < this.playersClockwise.length; i++) {
       cursor = rotateClockwise(this.playersClockwise, cursor);
-      if (!this.players.get(cursor)!.packed) return cursor;
+      const candidate = this.players.get(cursor)!;
+      if (!candidate.packed && !candidate.sittingOut) return cursor;
     }
     return playerId;
   }
@@ -1283,7 +1407,8 @@ export class TeenPattiGame {
     if (index < 0) throw new Error(`${playerId} is not seated`);
     for (let offset = 1; offset <= this.playersClockwise.length; offset++) {
       const candidate = this.playersClockwise[(index - offset + this.playersClockwise.length) % this.playersClockwise.length];
-      if (!this.players.get(candidate)!.packed) return candidate;
+      const player = this.players.get(candidate)!;
+      if (!player.packed && !player.sittingOut) return candidate;
     }
     throw new Error('No active player anticlockwise');
   }
@@ -1351,6 +1476,8 @@ export class TeenPattiGame {
     this.pendingNextDealerId = winnerIds.length === 1 ? winnerIds[0] : null;
     this.friendlyAssistRequests.clear();
     this.friendlyAssistCoachLocks.clear();
+    this.pendingReferenceResolution = null;
+    this.referenceAssignmentRequiredPlayerIds.clear();
     this.pot = 0;
     this.currentTurn = null;
     this.clearOpenShowRequest();
@@ -1390,6 +1517,10 @@ export class TeenPattiGame {
         : describeTeenPattiRoundVariant(this.roundVariant),
       variantReferenceCards: this.variantReferenceCards.map((card) => ({ ...card })),
       twoReferenceAssignmentsComplete: this.twoReferenceAssignments.size,
+      referenceAssignmentRequiredPlayerIds: [...this.referenceAssignmentRequiredPlayerIds],
+      referenceAssignmentReason: this.pendingReferenceResolution
+        ? this.pendingReferenceResolution.kind === 'SIDESHOW' ? 'SIDESHOW' : 'SHOWDOWN'
+        : null,
       discardSelectionsComplete: this.discardSelections.size,
       initialDealerDraws: this.initialDealerDraws.map((round) => ({
         contenders: [...round.contenders],
@@ -1416,6 +1547,7 @@ export class TeenPattiGame {
           seen: player.seen,
           cardsViewed: player.cardsViewed,
           packed: player.packed,
+          sittingOut: player.sittingOut,
           committed: player.committed,
           blindTurns: player.blindTurns,
           topUps: player.topUps,

@@ -37,9 +37,9 @@ function finishTeenPattiRound(game: TeenPattiGame): void {
     }
     if (state.state === 'AWAITING_REFERENCE_ASSIGNMENT') {
       const sharedSequence = state.sequence;
-      for (const player of state.players) {
-        if (!game.getPrivateState(player.playerId)?.twoReferenceAssignment) {
-          expect(game.assignTwoReference(player.playerId, 0, sharedSequence).ok).toBe(true);
+      for (const playerId of state.referenceAssignmentRequiredPlayerIds) {
+        if (!game.getPrivateState(playerId)?.twoReferenceAssignment) {
+          expect(game.assignTwoReference(playerId, 0, sharedSequence).ok).toBe(true);
         }
       }
       continue;

@@ -73,12 +73,11 @@ function setFakeGame(myPlayerId = 'p1') {
     lastRoundResult: makeLastRoundResult(),
     gameState: { dealerId: 'p2', state: 'ROUND_COMPLETE' },
     myPlayerId,
-    startNextRound: vi.fn(),
+    goToHomeScreen: vi.fn(),
   };
 }
 
 function setFakeDismissedGame(myPlayerId = 'p1') {
-  const startNextRound = vi.fn();
   fakeGame = {
     room: makeRoom(),
     lastRoundResult: {
@@ -91,9 +90,8 @@ function setFakeDismissedGame(myPlayerId = 'p1') {
     },
     gameState: { dealerId: 'p3', state: 'DISMISSED_ROUND' },
     myPlayerId,
-    startNextRound,
+    goToHomeScreen: vi.fn(),
   };
-  return startNextRound;
 }
 
 afterEach(() => {
@@ -155,33 +153,26 @@ describe('RoundSummary: bounded shell structure actually renders (Bug 5)', () =>
     expect(shell.style.getPropertyValue('--js-vh')).toBe('');
   });
 
-  it('the Next round button (host) lives inside .rsum__actions, reachable outside the scroll region', async () => {
-    setFakeGame('p1'); // p1 is host
+  it('shows automatic next-round status instead of a host-only Deal/Next button', async () => {
+    setFakeGame('p1');
     const { RoundSummary } = await import('./RoundSummary');
     const { container } = render(<RoundSummary />);
 
     const actions = container.querySelector('.rsum__actions');
-    const button = container.querySelector('.rsum__next');
-    expect(button).not.toBeNull();
-    expect(actions!.contains(button)).toBe(true);
+    expect(actions?.textContent).toContain('Next round dealing automatically');
+    expect(container.querySelector('.rsum__next')).toBeNull();
+    expect(actions?.querySelector('.rsum__card-room')).not.toBeNull();
   });
 
-
-  it('Bug 6: a dismissed hand stays on the normal round-summary path and Next round calls the existing room action', async () => {
-    const startNextRound = setFakeDismissedGame('p1');
+  it('a dismissed hand stays on the result screen while the next deal advances automatically', async () => {
+    setFakeDismissedGame('p1');
     const { RoundSummary } = await import('./RoundSummary');
     const { container } = render(<RoundSummary />);
 
     expect(container.textContent).toContain('Hand dismissed');
     expect(container.textContent).toContain('Nobody scores this round');
-    // Dismissed rounds have no played-set breakdown; importantly, this is
-    // still the SAME result screen with the SAME Next round control rather
-    // than a leave/rejoin path.
     expect(container.querySelector('.rsum__sets')).toBeNull();
-
-    const button = container.querySelector('.rsum__next') as HTMLButtonElement;
-    expect(button).not.toBeNull();
-    button.click();
-    expect(startNextRound).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain('Next round dealing automatically');
+    expect(container.querySelector('.rsum__next')).toBeNull();
   });
 });

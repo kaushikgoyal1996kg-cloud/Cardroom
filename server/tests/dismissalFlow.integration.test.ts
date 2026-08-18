@@ -148,10 +148,10 @@ describe('Bug 6 - dismissal over a real socket', () => {
     const roomSockets = await ioServer.in(roomCode).fetchSockets();
     expect(roomSockets.some((socket) => socket.id === host.id)).toBe(true);
 
-    // Same host, same room, same socket can immediately start the next round.
-    const nextHand = once<{ hand: Card[] }>(host, 'hazari:yourHand');
-    const nextState = once<{ state: string }>(host, 'hazari:state');
-    host.emit('hazari:startNextRound');
+    // No host button is required. The authoritative server pauses briefly for
+    // the result, then deals the next ongoing Hazari round automatically.
+    const nextHand = once<{ hand: Card[] }>(host, 'hazari:yourHand', 7000);
+    const nextState = once<{ state: string }>(host, 'hazari:state', 7000);
     const [newHand, freshState] = await Promise.all([nextHand, nextState]);
     expect(newHand.hand).toHaveLength(13);
     expect(freshState.state).toBe('ARRANGING_HANDS');

@@ -7,6 +7,7 @@ import { PlayingCard } from '../../platform/components/PlayingCard';
 import { useVisualViewport } from '../../platform/lib/useVisualViewport';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useWakeLock } from '../../lib/useWakeLock';
+import { twoReferenceJokerSet } from './twoReferenceJokers';
 import './TeenPattiTable.css';
 
 interface TeenPattiTableProps {
@@ -46,10 +47,15 @@ export function TeenPattiTable({ dealing = false, onOpenRules }: TeenPattiTableP
     const byId = new Map(teenPattiState.players.map((player) => [player.playerId, player]));
     return room.players.map((roomPlayer) => {
       const player = byId.get(roomPlayer.playerId);
-      const statusLabel = teenPattiState.state === 'AWAITING_DISCARD' && player
+      const referenceChoiceRequired = !!player && teenPattiState.referenceAssignmentRequiredPlayerIds.includes(player.playerId);
+      const statusLabel = player?.sittingOut
+        ? 'Joins next round'
+        : teenPattiState.state === 'AWAITING_VARIANT' && player
+          ? 'Waiting for dealer'
+        : teenPattiState.state === 'AWAITING_DISCARD' && player
         ? player.discardLocked ? 'Discards locked' : 'Choosing discards'
         : teenPattiState.state === 'AWAITING_REFERENCE_ASSIGNMENT' && player
-          ? player.referenceAssigned ? 'Jokers locked' : 'Choosing jokers'
+          ? player.referenceAssigned ? 'Jokers chosen' : referenceChoiceRequired ? 'Choosing jokers' : 'Waiting for comparison'
         : player?.packed
           ? 'Packed'
           : player?.seen
@@ -79,9 +85,10 @@ export function TeenPattiTable({ dealing = false, onOpenRules }: TeenPattiTableP
     return <div className="waiting-screen"><LoadingSpinner message="Restoring your Teen Patti seat…" /></div>;
   }
 
-  const active = teenPattiState.players.filter((player) => !player.packed);
+  const active = teenPattiState.players.filter((player) => !player.packed && !player.sittingOut);
   const finalTwo = active.length === 2;
-  const compulsorySideshow = active.length > 2 && active.every((player) => player.seen);
+  const mutualShowAvailable = active.length >= 2;
+  const sideshowAvailable = active.length > 2 && active.every((player) => player.seen);
   const mutualShowOpen = !!teenPattiState.openShowRequestFrom;
   const mutualShowAccepted = new Set(teenPattiState.openShowAcceptedBy);
   const iAcceptedMutualShow = mutualShowAccepted.has(myPlayerId);
@@ -97,9 +104,11 @@ export function TeenPattiTable({ dealing = false, onOpenRules }: TeenPattiTableP
   const myCardsViewed = teenPattiPrivate?.cardsViewed ?? false;
   const myCards = teenPattiPrivate?.cards ?? [];
   const cardCount = Math.max(0, teenPattiPrivate?.cardCount ?? teenPattiState.variantDealCount);
+  const awaitingVariant = teenPattiState.state === 'AWAITING_VARIANT';
   const awaitingDiscard = teenPattiState.state === 'AWAITING_DISCARD';
   const awaitingReferenceAssignment = teenPattiState.state === 'AWAITING_REFERENCE_ASSIGNMENT';
   const myReferenceAssignment = teenPattiPrivate?.twoReferenceAssignment ?? null;
+  const referenceChoiceRequiredForMe = teenPattiState.referenceAssignmentRequiredPlayerIds.includes(myPlayerId);
   const discardState = teenPattiPrivate?.discardState ?? null;
   const lockedDiscardSlots = discardState?.selectedSlots ?? [];
   const shownDiscardSlots = discardState?.complete ? lockedDiscardSlots : draftDiscardSlots;
@@ -111,6 +120,11 @@ export function TeenPattiTable({ dealing = false, onOpenRules }: TeenPattiTableP
   });
   const referenceA = teenPattiState.variantReferenceCards[0];
   const referenceB = teenPattiState.variantReferenceCards[1];
+  const referenceOptionA = referenceA && referenceB ? twoReferenceJokerSet(referenceA.rank, referenceB.rank) : [];
+  const referenceOptionB = referenceA && referenceB ? twoReferenceJokerSet(referenceB.rank, referenceA.rank) : [];
+  const chosenReferenceJokers = myReferenceAssignment
+    ? myReferenceAssignment.upDownReferenceIndex === 0 ? referenceOptionA : referenceOptionB
+    : [];
   const friendlyAssist = teenPattiPrivate?.friendlyAssist ?? { enabled: false, coachLockedTargetPlayerId: null, outgoing: null, incoming: [] };
   const outgoingAssist = friendlyAssist.outgoing;
   const incomingAssist = friendlyAssist.incoming;
@@ -154,14 +168,16 @@ export function TeenPattiTable({ dealing = false, onOpenRules }: TeenPattiTableP
 
   const centreLabel = dealing
     ? undefined
+    : awaitingVariant
+      ? `${playerName(teenPattiState.nextVariantChooserId ?? teenPattiState.dealerId)} is choosing the next variant…`
     : awaitingDiscard
       ? `Choose discards · ${teenPattiState.discardSelectionsComplete}/${teenPattiState.players.length}`
       : awaitingReferenceAssignment
-      ? `Choose joker roles · ${teenPattiState.twoReferenceAssignmentsComplete}/${teenPattiState.players.length}`
+      ? referenceChoiceRequiredForMe ? `Choose jokers for ${teenPattiState.referenceAssignmentReason === 'SIDESHOW' ? 'sideshow' : 'showdown'}` : 'Waiting for joker choice…'
       : mutualShowOpen
       ? `Mutual Show · ${acceptedMutualCount}/${active.length}`
-      : compulsorySideshow && isMyTurn
-        ? 'Compulsory sideshow'
+      : sideshowAvailable && isMyTurn
+        ? 'Sideshow available'
         : isMyTurn
           ? 'Your turn'
           : teenPattiState.currentTurn
@@ -193,6 +209,9 @@ export function TeenPattiTable({ dealing = false, onOpenRules }: TeenPattiTableP
             <div>
               {teenPattiState.variantReferenceCards.map((card) => <PlayingCard key={card.id} card={card} size="sm" />)}
             </div>
+            {myReferenceAssignment && chosenReferenceJokers.length > 0 && (
+              <small className="tp-table-screen__reference-choice">Your chosen jokers: {chosenReferenceJokers.join(' · ')}</small>
+            )}
           </div>
         )}
         <div className="tp-table-screen__pot" aria-label={`Pot ${teenPattiState.pot}`}>
@@ -217,15 +236,19 @@ export function TeenPattiTable({ dealing = false, onOpenRules }: TeenPattiTableP
         />
       </section>
 
-      <section className={`tp-hand${me.packed ? ' is-packed' : ''}`} aria-label="Your Teen Patti cards">
+      <section className={`tp-hand${me.packed ? ' is-packed' : ''}${cardCount >= 4 ? ' has-many-cards' : ''}`} aria-label="Your Teen Patti cards">
         <div className="tp-hand__meta">
-          <span>{me.packed ? 'Packed' : me.seen ? 'Seen' : 'Blind'}</span>
+          <span>{awaitingVariant ? 'Next round' : me.sittingOut ? 'Sitting out' : me.packed ? 'Packed' : me.seen ? 'Seen' : 'Blind'}</span>
           <small>
-            {me.seen && !myCardsViewed
-              ? 'Betting as seen · cards still closed'
-              : myCardsViewed
-                ? 'Your cards'
-                : `${Math.max(0, 3 - me.blindTurns)} blind chance${Math.max(0, 3 - me.blindTurns) === 1 ? '' : 's'} left`}
+            {awaitingVariant
+              ? 'Dealer is choosing/configuring the variant'
+              : me.sittingOut
+                ? 'You enter automatically next round'
+              : me.seen && !myCardsViewed
+                ? 'Betting as seen · cards still closed'
+                : myCardsViewed
+                  ? 'Your cards'
+                  : `${Math.max(0, 3 - me.blindTurns)} blind chance${Math.max(0, 3 - me.blindTurns) === 1 ? '' : 's'} left`}
           </small>
         </div>
         <div className={`tp-hand__cards${discardState ? ' has-discards' : ''}`}>
@@ -303,7 +326,11 @@ export function TeenPattiTable({ dealing = false, onOpenRules }: TeenPattiTableP
       )}
 
       <footer className="tp-actions" aria-label="Teen Patti actions">
-        {!dealing && !privateSnapshotReady ? (
+        {awaitingVariant ? (
+          <p className="tp-actions__status" role="status" aria-live="polite">{playerName(teenPattiState.nextVariantChooserId ?? teenPattiState.dealerId)} is choosing/configuring the next variant…</p>
+        ) : me.sittingOut ? (
+          <p className="tp-actions__status" role="status">You joined this running table · you will enter automatically from the next round.</p>
+        ) : !dealing && !privateSnapshotReady ? (
           <p className="tp-actions__status" role="status" aria-live="polite">Syncing your private hand…</p>
         ) : awaitingDiscard && !dealing ? (
           <div className="tp-discard-choice" role="group" aria-label="Choose five-card discards">
@@ -321,20 +348,22 @@ export function TeenPattiTable({ dealing = false, onOpenRules }: TeenPattiTableP
             )}
           </div>
         ) : awaitingReferenceAssignment && !dealing ? (
-          <div className="tp-reference-choice" role="group" aria-label="Choose Two-Reference Joker roles">
+          <div className="tp-reference-choice" role="group" aria-label="Choose Two-Reference Joker set">
             <div className="tp-reference-choice__copy">
-              <strong>Choose your joker roles</strong>
-              <small>One board card supplies Up + Down. The other card’s own rank is Same. Your choice is private.</small>
+              <strong>{teenPattiState.referenceAssignmentReason === 'SIDESHOW' ? 'Choose your joker set for this sideshow' : 'Choose your joker set for this showdown'}</strong>
+              <small>This choice appears only when your hand is actually being compared — never just because you became Seen. Pick the joker set you want; your choice is private and remains locked for this hand.</small>
             </div>
-            {myReferenceAssignment ? (
-              <p className="tp-actions__substatus">Locked · waiting for {Math.max(0, teenPattiState.players.length - teenPattiState.twoReferenceAssignmentsComplete)} player{Math.max(0, teenPattiState.players.length - teenPattiState.twoReferenceAssignmentsComplete) === 1 ? '' : 's'}.</p>
+            {!referenceChoiceRequiredForMe ? (
+              <p className="tp-actions__substatus">Waiting for the player{teenPattiState.referenceAssignmentRequiredPlayerIds.length === 1 ? '' : 's'} whose hand needs a joker choice.</p>
+            ) : myReferenceAssignment ? (
+              <p className="tp-actions__substatus">Chosen jokers: <strong>{chosenReferenceJokers.join(' · ')}</strong> · waiting for the comparison.</p>
             ) : referenceA && referenceB ? (
               <div className="tp-reference-choice__buttons">
                 <button className="btn btn-primary" type="button" onClick={() => assignTeenPattiTwoReference(0)}>
-                  A: Up/Down · B: Same
+                  Option A · Jokers: {referenceOptionA.join(' · ')}
                 </button>
                 <button className="btn" type="button" onClick={() => assignTeenPattiTwoReference(1)}>
-                  B: Up/Down · A: Same
+                  Option B · Jokers: {referenceOptionB.join(' · ')}
                 </button>
               </div>
             ) : (
@@ -364,7 +393,7 @@ export function TeenPattiTable({ dealing = false, onOpenRules }: TeenPattiTableP
                       <strong>Friendly Assist finished</strong>
                       <small>You already watched {playerName(friendlyAssist.coachLockedTargetPlayerId)} this hand, so you cannot switch to another player’s cards.</small>
                     </div>
-                    <p className="tp-actions__status">Keep watching the table · a fresh assist choice is available next hand.</p>
+                    <p className="tp-actions__status">Keep watching the table · a fresh assist choice is available next round.</p>
                   </>
                 ) : (
                   <>
@@ -430,18 +459,9 @@ export function TeenPattiTable({ dealing = false, onOpenRules }: TeenPattiTableP
         ) : !isMyTurn ? (
           <div className="tp-actions__waiting">
             <p className="tp-actions__status">{teenPattiState.currentTurn ? `Waiting for ${turnName}…` : 'Resolving round…'}</p>
-            {active.length >= 2 && teenPattiState.currentTurn && (
+            {mutualShowAvailable && teenPattiState.currentTurn && (
               <button className="btn btn-ghost" type="button" onClick={() => act({ type: 'REQUEST_OPEN_SHOW' })}>Propose Mutual Show</button>
             )}
-          </div>
-        ) : compulsorySideshow ? (
-          <div className="tp-actions__buttons">
-            <button className="btn btn-primary tp-actions__primary" type="button" onClick={() => act({ type: 'SIDESHOW' })}>
-              Compulsory sideshow
-            </button>
-            <button className="btn btn-ghost" type="button" onClick={() => act({ type: 'REQUEST_OPEN_SHOW' })}>
-              Propose Mutual Show
-            </button>
           </div>
         ) : (
           <div className="tp-actions__buttons">
@@ -455,12 +475,17 @@ export function TeenPattiTable({ dealing = false, onOpenRules }: TeenPattiTableP
                 Chaal · {teenPattiState.seenAmount}
               </button>
             )}
+            {sideshowAvailable && me.seen && (
+              <button className="btn" type="button" onClick={() => act({ type: 'SIDESHOW' })}>
+                Sideshow
+              </button>
+            )}
             {!myCardsViewed && (
               <button className="btn" type="button" onClick={() => act({ type: 'SEE' })}>
                 See cards
               </button>
             )}
-            {active.length >= 2 && (
+            {mutualShowAvailable && (
               <button className="btn" type="button" onClick={() => act({ type: 'REQUEST_OPEN_SHOW' })}>
                 Propose Mutual Show
               </button>

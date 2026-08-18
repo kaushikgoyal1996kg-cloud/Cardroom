@@ -106,6 +106,22 @@
   .tp-table-screen__rules { grid-column: 2; grid-row: 2; min-height: var(--touch-min); margin-top: -.55rem; }
   .tp-hand { grid-template-columns: 5rem 1fr 5.6rem; gap: .25rem; }
   .tp-hand__meta small { max-width: 5rem; }
+
+  /* Four/five-card Teen Patti cannot share one narrow row with status + money:
+     on real Android phones the medium cards spill over Balance/P&L and the
+     action rail. Give the physical hand its own full-width row instead of
+     shrinking the shared PlayingCard component. */
+  .tp-hand.has-many-cards {
+    grid-template-columns: minmax(0,1fr) auto;
+    grid-template-areas:
+      'meta money'
+      'cards cards';
+    row-gap: .28rem;
+  }
+  .tp-hand.has-many-cards .tp-hand__meta { grid-area: meta; }
+  .tp-hand.has-many-cards .tp-hand__cards { grid-area: cards; width: 100%; overflow: visible; }
+  .tp-hand.has-many-cards .tp-hand__money { grid-area: money; }
+  .tp-hand.has-many-cards .tp-hand__meta small { max-width: none; }
   .tp-actions__buttons .btn { min-width: 6.5rem; padding-inline: .65rem; }
 }
 
@@ -419,4 +435,13 @@
   .tp-sideshow-note__hand { grid-template-columns: 4rem minmax(0,1fr); }
   .tp-sideshow-note__hand-copy small { display: none; }
   .tp-sideshow-note__card { margin-left: -.9rem; }
+}
+
+.tp-table-screen__reference-choice {
+  display: block;
+  margin-top: 0.2rem;
+  max-width: 12rem;
+  font-size: var(--text-xs);
+  color: var(--ink-100);
+  text-align: center;
 }

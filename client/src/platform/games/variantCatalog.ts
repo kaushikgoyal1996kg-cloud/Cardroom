@@ -14,7 +14,7 @@ export interface VariantCard {
 }
 
 export const TEEN_PATTI_VARIANT_CARDS: VariantCard[] = [
-  { id: 'CLASSIC', name: 'Classic', group: 'Core', meta: '3 cards · normal ranking', runtimeReady: true, description: 'Blind, seen, pack, compulsory sideshow and final show using the Card Room house rules.' },
+  { id: 'CLASSIC', name: 'Classic', group: 'Core', meta: '3 cards · normal ranking', runtimeReady: true, description: 'Blind, seen and pack using the Card Room house rules. Sideshow becomes optional when 3+ active players are all seen; Mutual Show may be proposed with any 2+ active players and resolves only on unanimous consent.' },
   { id: 'MUFLIS', name: 'Muflis / Lowball', group: 'Core', meta: '3 cards · reverse ranking', runtimeReady: true, description: 'The weakest normal Teen Patti hand wins. 2-3-5 has no special status.' },
   { id: 'BEST_OF_FOUR', name: 'Best of Four', group: 'Core', meta: '4 cards · best 3', runtimeReady: true, description: 'Deal four cards and evaluate the strongest three-card combination automatically.' },
 
@@ -31,7 +31,7 @@ export const TEEN_PATTI_VARIANT_CARDS: VariantCard[] = [
   { id: 'UP_DOWN_SAME', name: 'Up · Down · Same', group: 'Jokers', meta: '3 related ranks are wild', runtimeReady: true, description: 'The reference rank, one rank above and one rank below are wild, with wraparound.' },
   { id: 'UP_DOWN', name: 'Up · Down', group: 'Jokers', meta: 'adjacent ranks are wild', runtimeReady: true, description: 'The ranks immediately above and below the reference are wild; the reference itself is not.' },
   { id: 'DOWN_ONLY', name: 'Down Only', group: 'Jokers', meta: 'rank below is wild', runtimeReady: true, description: 'Only the rank immediately below the reference is wild, with wraparound.' },
-  { id: 'TWO_REFERENCE_JOKER', name: 'Two-Reference Joker', group: 'Jokers', meta: '2 references · private role choice', runtimeReady: true, description: 'Two cards are revealed. Before betting, each player privately assigns one to Up/Down and the other to Same-rank.' },
+  { id: 'TWO_REFERENCE_JOKER', name: 'Two-Reference Joker', group: 'Jokers', meta: '2 references · choose at comparison', runtimeReady: true, description: 'Two references stay visible. When your hand reaches a sideshow or show/showdown comparison, choose privately between the two resulting joker sets.' },
 
   { id: 'DISCARD_LOW_HIGH', name: 'Discard Low + High', group: 'Five-card', meta: '5 retained · discard 1 low + 1 high', runtimeReady: true, description: 'Keep all five cards, mark one lowest and one highest as discarded, then rank only the remaining three. Equal-ranked physical choices belong to the player.' },
   { id: 'DISCARD_TWO_LOWEST', name: 'Discard Two Lowest', group: 'Five-card', meta: '5 retained · discard 2 lowest', runtimeReady: true, description: 'Keep all five cards, mark the two lowest as discarded, then rank only the remaining three. Equal-ranked boundary choices belong to the player.' },

@@ -5,14 +5,13 @@ import { useVisualViewport } from '../../platform/lib/useVisualViewport';
 import './KittiResult.css';
 
 export function KittiRoundSummary() {
-  const { room, myPlayerId, lastKittiRoundResult, kittiState, startNextKittiRound, goToHomeScreen } = useGame();
+  const { room, myPlayerId, lastKittiRoundResult, kittiState, goToHomeScreen } = useGame();
   const { viewportHeight } = useVisualViewport();
   if (!room || !lastKittiRoundResult || !kittiState) {
     return <div className="waiting-screen"><LoadingSpinner message="Preparing round result…" /></div>;
   }
 
   const result = lastKittiRoundResult;
-  const isHost = room.hostId === myPlayerId;
   const nameOf = (id: string) => room.players.find((p) => p.playerId === id)?.name ?? 'Player';
   const standings = [...room.players].sort((a, b) => (result.roundsWon[b.playerId] ?? 0) - (result.roundsWon[a.playerId] ?? 0));
 
@@ -77,13 +76,7 @@ export function KittiRoundSummary() {
       </div>
 
       <footer className="kres__actions">
-        {isHost ? (
-          <button type="button" className="btn btn-primary" onClick={startNextKittiRound}>
-            {kittiState.suddenDeath ? 'Deal sudden-death round' : 'Deal next round'}
-          </button>
-        ) : (
-          <p>Waiting for the host to deal the next round…</p>
-        )}
+        <p role="status">{kittiState.suddenDeath ? 'Sudden-death round dealing automatically…' : 'Next round dealing automatically…'}</p>
         <button type="button" className="btn btn-ghost" onClick={goToHomeScreen}>Card Room</button>
       </footer>
     </main>

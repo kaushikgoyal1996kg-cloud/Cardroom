@@ -8,6 +8,11 @@ export interface VoiceIceServersAck {
   error?: string;
 }
 
+export interface RoomLeaveAck {
+  ok: boolean;
+  error?: string;
+}
+
 export interface RoomAck {
   ok: boolean;
   error?: string;
@@ -42,7 +47,7 @@ interface ClientToServerEvents {
     proposedCardIdSets?: [string[], string[], string[], string[]];
   }) => void;
   'hazari:startNextRound': () => void;
-  'room:leave': () => void;
+  'room:leave': (ack: (res: RoomLeaveAck) => void) => void;
   'room:leaveTable': () => void;
   'kitti:confirmArrangement': (payload: { cardIdGroups: [string[], string[], string[]] }) => void;
   'kitti:requestSuggestion': (ack: (res: KittiSuggestionAck) => void) => void;

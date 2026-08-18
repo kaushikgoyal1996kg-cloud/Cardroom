@@ -125,11 +125,11 @@ describe('authoritative in-game Round History hydration', () => {
       variantPolicy: { mode: 'FIXED', fixedVariant: 'CLASSIC' },
       variant: { variantId: 'CLASSIC' }, variantDecision: null, variantWasSurprise: false,
       variantName: 'Classic', nextVariantChooserId: null, variantDealCount: 3, variantHelp: 'Classic',
-      variantReferenceCards: [], twoReferenceAssignmentsComplete: 0, initialDealerDraws: [],
+      variantReferenceCards: [], twoReferenceAssignmentsComplete: 0, referenceAssignmentRequiredPlayerIds: [], referenceAssignmentReason: null, discardSelectionsComplete: 0, initialDealerDraws: [],
       lastSideshow: null, openShowRequestFrom: null, openShowAcceptedBy: [],
       players: [
-        { playerId: 'p1', chips: 1010, seen: false, cardsViewed: false, packed: false, committed: 10, blindTurns: 0, topUps: 0, roundsWon: 1, profitLoss: 10, referenceAssigned: false },
-        { playerId: 'p2', chips: 970, seen: false, cardsViewed: false, packed: false, committed: 10, blindTurns: 0, topUps: 0, roundsWon: 0, profitLoss: -30, referenceAssigned: false },
+        { playerId: 'p1', chips: 1010, seen: false, cardsViewed: false, packed: false, sittingOut: false, committed: 10, blindTurns: 0, topUps: 0, roundsWon: 1, profitLoss: 10, referenceAssigned: false, discardLocked: false },
+        { playerId: 'p2', chips: 970, seen: false, cardsViewed: false, packed: false, sittingOut: false, committed: 10, blindTurns: 0, topUps: 0, roundsWon: 0, profitLoss: -30, referenceAssigned: false, discardLocked: false },
       ],
       roundHistory: [authoritative], lastOutcome: null,
     }));
@@ -230,7 +230,7 @@ describe('authoritative in-game Round History hydration', () => {
       variantPolicy: { mode: 'FIXED', fixedVariant: 'CLASSIC' },
       variant: { variantId: 'CLASSIC' }, variantDecision: null, variantWasSurprise: false,
       variantName: 'Classic', nextVariantChooserId: null, variantDealCount: 3, variantHelp: 'Classic',
-      variantReferenceCards: [], twoReferenceAssignmentsComplete: 0, discardSelectionsComplete: 0, initialDealerDraws: [],
+      variantReferenceCards: [], twoReferenceAssignmentsComplete: 0, referenceAssignmentRequiredPlayerIds: [], referenceAssignmentReason: null, discardSelectionsComplete: 0, initialDealerDraws: [],
       lastSideshow: null, openShowRequestFrom: null, openShowAcceptedBy: [], players: [],
       roundHistory: [tpOutcome], lastOutcome: tpOutcome,
     }));

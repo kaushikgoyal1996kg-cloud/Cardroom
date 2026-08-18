@@ -11,12 +11,13 @@ const SET_LABELS = ['Set 1', 'Set 2', 'Set 3', 'Set 4'];
  *
  * Migration only: no scoring or round logic changed. Everything the legacy
  * screen showed is still here - per-set breakdown with the cards played,
- * round points, cumulative scores, next dealer, and the host's Next Round
+ * round points, cumulative scores, next dealer, and automatic next-round
  * control - reorganised so the round winner reads first and the detail sits
- * underneath rather than in a stack of panels.
+ * underneath rather than in a stack of panels. Ongoing rounds advance
+ * automatically; only a completed game needs a new-match decision.
  */
 export function RoundSummary() {
-  const { room, lastRoundResult, gameState, myPlayerId, startNextRound, goToHomeScreen } = useGame();
+  const { room, lastRoundResult, gameState, goToHomeScreen } = useGame();
   // A JS-measured viewport height, not just CSS `dvh` - see .rsum's own
   // comment in RoundSummary.css for why (Bug 5, 2026-08-15 THIRD
   // real-device retest: `dvh` alone was not reliable enough in Android
@@ -37,7 +38,6 @@ export function RoundSummary() {
   }
 
   const nameOf = (pid: string) => room.players.find((p) => p.playerId === pid)?.name ?? pid;
-  const isHost = room.players.find((p) => p.playerId === myPlayerId)?.isHost ?? false;
   const total = Object.values(lastRoundResult.pointsThisRound).reduce((a, b) => a + b, 0);
 
   // Highest score this round - presentation only. Hazari awards points per
@@ -169,15 +169,9 @@ export function RoundSummary() {
       </div>
 
       <div className="rsum__actions">
-        {isHost ? (
-          <button type="button" className="btn btn--primary rsum__next" onClick={startNextRound}>
-            Next round
-          </button>
-        ) : (
-          <p className="rsum__waiting" role="status">
-            Waiting for the host to deal the next round…
-          </p>
-        )}
+        <p className="rsum__waiting" role="status">
+          Next round dealing automatically…
+        </p>
         <button type="button" className="btn btn-ghost rsum__card-room" onClick={goToHomeScreen}>
           Card Room
         </button>

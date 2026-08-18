@@ -17,7 +17,7 @@ const FIVE_CARD_JOKERS: { id: TeenPattiFiveCardJokerId; name: string; note: stri
   { id: 'UP_DOWN_SAME', name: 'Up–Down–Same', note: 'Reference, one up and one down are wild' },
   { id: 'UP_DOWN', name: 'Up–Down', note: 'One rank above and below are wild' },
   { id: 'DOWN_ONLY', name: 'Down Only', note: 'One rank below the reference is wild' },
-  { id: 'TWO_REFERENCE_JOKER', name: 'Two-Reference', note: 'Players privately assign Up/Down vs Same' },
+  { id: 'TWO_REFERENCE_JOKER', name: 'Two-Reference', note: 'Choose between the two joker sets only at sideshow/showdown' },
 ];
 
 export function TeenPattiVariantChoice() {

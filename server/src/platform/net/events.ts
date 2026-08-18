@@ -29,7 +29,7 @@ export interface ClientToServerEvents {
   'room:playMoneyDecline': () => void;
   'room:playMoneyCancel': () => void;
   'room:chat': (payload: { message: string; kind: 'text' | 'emoji' | 'voice'; durationSec?: number }) => void;
-  'room:leave': () => void;
+  'room:leave': (ack: (res: RoomLeaveAck) => void) => void;
   'room:leaveTable': () => void;
 
   // Hazari
@@ -93,6 +93,11 @@ export interface VoiceIceServersAck {
   ok: boolean;
   iceServers: VoiceIceServerConfig[];
   relayAvailable: boolean;
+  error?: string;
+}
+
+export interface RoomLeaveAck {
+  ok: boolean;
   error?: string;
 }
 
@@ -320,6 +325,8 @@ export interface TeenPattiPublicStatePayload {
   variantHelp: string;
   variantReferenceCards: PlatformCard[];
   twoReferenceAssignmentsComplete: number;
+  referenceAssignmentRequiredPlayerIds: PlayerId[];
+  referenceAssignmentReason: 'SIDESHOW' | 'SHOWDOWN' | null;
   discardSelectionsComplete: number;
   initialDealerDraws: { contenders: PlayerId[]; draws: { playerId: PlayerId; card: PlatformCard }[] }[];
   lastSideshow: {
@@ -337,6 +344,7 @@ export interface TeenPattiPublicStatePayload {
     seen: boolean;
     cardsViewed: boolean;
     packed: boolean;
+    sittingOut: boolean;
     committed: number;
     blindTurns: number;
     topUps: number;

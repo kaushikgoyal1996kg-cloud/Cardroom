@@ -49,6 +49,14 @@
   transition: transform var(--dur-base) var(--ease-smooth);
 }
 
+/* The local/self seat is anchored close to the felt's bottom edge. Keeping
+   identity text below the avatar can put the name/score outside
+   `.table__felt { overflow:hidden }` on real Android viewports. Point the
+   identity inward instead: name/points above, avatar below. */
+.seat--bottom {
+  flex-direction: column-reverse;
+}
+
 /* ---- Avatar ------------------------------------------------------------ */
 
 .seat__avatar-wrap {

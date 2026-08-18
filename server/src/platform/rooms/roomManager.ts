@@ -105,7 +105,13 @@ export class RoomManager {
   joinRoom(roomCode: string, playerName: string, avatar?: string): { room: RoomState; playerId: PlayerId; token: string } {
     const room = this.rooms.get(roomCode);
     if (!room) throw new RoomManagerError('This room does not exist.');
-    if (room.status === 'IN_GAME') throw new RoomManagerError('Game has already started.');
+    // Teen Patti is an open table session: completely new players may take an
+    // empty seat while a hand is already running. The Teen Patti engine marks
+    // that seat as sitting out until the next round. Other games keep their
+    // existing lobby-only join rule.
+    if (room.status === 'IN_GAME' && room.gameId !== 'TEEN_PATTI') {
+      throw new RoomManagerError('Game has already started.');
+    }
     if (room.players.size >= maxPlayersFor(room.gameId)) throw new RoomManagerError('This room is full.');
 
     const playerId = playerIdGen();

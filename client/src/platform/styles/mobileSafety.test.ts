@@ -24,6 +24,7 @@ import TABLE_CSS from '../../games/hazari/HazariTable.css?raw';
 import KITTI_TABLE_CSS from '../../games/kitti/KittiTable.css?raw';
 import KITTI_ARR_CSS from '../../games/kitti/KittiArrangement.css?raw';
 import TEEN_PATTI_TABLE_CSS from '../../games/teenpatti/TeenPattiTable.css?raw';
+import TEEN_PATTI_TABLE_TSX from '../../games/teenpatti/TeenPattiTable.tsx?raw';
 import TEEN_PATTI_RULES_TSX from '../../games/teenpatti/TeenPattiRulesSheet.tsx?raw';
 import TEEN_PATTI_VARIANT_CHOICE_CSS from '../../games/teenpatti/TeenPattiVariantChoice.css?raw';
 import TEEN_PATTI_VARIANT_CHOICE_TSX from '../../games/teenpatti/TeenPattiVariantChoice.tsx?raw';
@@ -36,6 +37,7 @@ import POKER_TABLE_TSX from '../../games/poker/PokerTable.tsx?raw';
 import POKER_TABLE_CSS from '../../games/poker/PokerTable.css?raw';
 import GAME_STORE_TSX from '../../lib/GameStore.tsx?raw';
 import TABLE_CONTROLS_CSS from '../../components/TableControls.css?raw';
+import SEAT_CSS from '../components/Seat.css?raw';
 
 /**
  * Mobile correctness contracts.
@@ -890,5 +892,50 @@ describe('no essential action depends on hover', () => {
     expect(GLOBAL_CSS).toMatch(/:focus-visible/);
     expect(ARR_CSS).toMatch(/:focus-visible/);
     expect(TABLE_CSS + MODAL_CSS).toBeTruthy();
+  });
+});
+
+describe('dealer-choice privacy on the live table', () => {
+  it('shows Teen Patti variant controls only to the authoritative dealer/chooser', () => {
+    const routeStart = APP_TSX.indexOf("} else if (room.gameId === 'TEEN_PATTI') {");
+    const routeEnd = APP_TSX.indexOf("} else if (room.gameId === 'POKER') {", routeStart);
+    const teenRoute = APP_TSX.slice(routeStart, routeEnd);
+    expect(teenRoute).toContain("teenPattiState.nextVariantChooserId === myPlayerId");
+    expect(teenRoute).toContain('screen = <TeenPattiVariantChoice />');
+    expect(teenRoute).toContain('<TeenPattiTable');
+  });
+
+  it('keeps non-chooser Poker players on the table without rendering PokerVariantChoice', () => {
+    const waitingBlock = POKER_RUNTIME_TSX.slice(
+      POKER_RUNTIME_TSX.indexOf("if (state.state === 'AWAITING_VARIANT')"),
+      POKER_RUNTIME_TSX.indexOf("if (state.state === 'HAND_COMPLETE')"),
+    );
+    expect(waitingBlock).toContain('state.nextVariantChooserId === selfId');
+    expect(waitingBlock).toContain('<PokerVariantChoice');
+    expect(waitingBlock).toContain('poker-variant-waiting');
+    expect(waitingBlock).toContain('is choosing the next Poker variant');
+  });
+});
+
+describe('local bottom-seat identity stays visible', () => {
+  it('places the bottom player name/score inward above the avatar instead of below the clipped felt edge', () => {
+    const bottomSeat = rule(SEAT_CSS, '.seat--bottom');
+    expect(bottomSeat).toMatch(/flex-direction:\s*column-reverse/);
+  });
+});
+
+// Staging regression: multi-card Teen Patti + house-rule actions.
+describe('Teen Patti staging regressions', () => {
+  it('moves four/five-card hands onto their own full-width mobile row instead of covering HUD/actions', () => {
+    expect(TEEN_PATTI_TABLE_CSS).toMatch(/\.tp-hand\.has-many-cards\s*\{[^}]*grid-template-areas:[^}]*'meta money'[^}]*'cards cards'/s);
+    expect(TEEN_PATTI_TABLE_CSS).toMatch(/\.tp-hand\.has-many-cards \.tp-hand__cards\s*\{[^}]*grid-area:\s*cards;[^}]*width:\s*100%/s);
+    expect(TEEN_PATTI_TABLE_CSS, 'do not shrink the shared PlayingCard widget to solve the overlap').not.toMatch(/\.tp-hand\.has-many-cards[^}]*--pcard-w\s*:/s);
+  });
+
+  it('keeps Mutual Show available to any table with at least two active players while paid Showdown stays final-two only', () => {
+    expect(TEEN_PATTI_TABLE_TSX).toContain('const mutualShowAvailable = active.length >= 2');
+    expect(TEEN_PATTI_TABLE_TSX).toContain('{mutualShowAvailable &&');
+    expect(TEEN_PATTI_TABLE_TSX).toContain('{finalTwo &&');
+    expect(TEEN_PATTI_RULES_TSX).toMatch(/Available whenever (?:2\+|at least two) active players remain/);
   });
 });

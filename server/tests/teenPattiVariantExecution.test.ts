@@ -510,43 +510,7 @@ describe('Two-Reference Joker runtime', () => {
     expect(secondUpDown.wildCardIds).toEqual([]);
   });
 
-  it('reveals two board references, waits for every private assignment, then starts betting', () => {
-    const hands = {
-      p2: [c('4', 'SPADES'), c('9', 'HEARTS'), c('K', 'CLUBS')],
-      p1: [c('8', 'CLUBS'), c('5', 'HEARTS'), c('Q', 'DIAMONDS')],
-    };
-    const dealt = deckForHands(['p2', 'p1'], hands);
-    const refs = [c('5', 'DIAMONDS'), c('9', 'SPADES')];
-    const used = new Set([...Object.values(hands).flat(), ...refs].map((card) => card.id));
-    const deck = [...dealt.slice(0, 6), ...refs, ...createDeck().filter((card) => !used.has(card.id))];
-    const game = new TeenPattiGame('TP2R', ['p1', 'p2'], {
-      initialDealerId: 'p1', tableConfig, roundVariant: { variantId: 'TWO_REFERENCE_JOKER' },
-    });
-
-    game.dealNewRound(deck);
-    const gateSeq = game.sequence;
-    expect(game.getPublicState()).toMatchObject({
-      state: 'AWAITING_REFERENCE_ASSIGNMENT',
-      pot: 20,
-      currentTurn: null,
-      twoReferenceAssignmentsComplete: 0,
-      variantReferenceCards: refs,
-    });
-    expect(JSON.stringify(game.getPublicState())).not.toContain('upDownReferenceIndex');
-
-    expect(game.assignTwoReference('p2', 0, gateSeq).ok).toBe(true);
-    expect(game.sequence).toBe(gateSeq);
-    expect(game.getPrivateState('p2')?.twoReferenceAssignment).toEqual({ upDownReferenceIndex: 0 });
-    expect(game.getPrivateState('p1')?.twoReferenceAssignment).toBeNull();
-    expect(game.getPublicState().twoReferenceAssignmentsComplete).toBe(1);
-
-    expect(game.assignTwoReference('p1', 1, gateSeq).ok).toBe(true);
-    expect(game.getPublicState()).toMatchObject({ state: 'BETTING', currentTurn: 'p2', twoReferenceAssignmentsComplete: 2 });
-    expect(game.sequence).toBe(gateSeq + 1);
-    expect(game.assignTwoReference('p1', 0, gateSeq).ok).toBe(false);
-  });
-
-  it('keeps completed Two-Reference choices through a player leave and resumes with the remaining seats', () => {
+  it('does not ask for joker selection after the deal or merely because a player becomes Seen', () => {
     const hands = {
       p2: [c('4', 'SPADES'), c('9', 'HEARTS'), c('K', 'CLUBS')],
       p3: [c('6', 'CLUBS'), c('3', 'HEARTS'), c('Q', 'SPADES')],
@@ -556,19 +520,101 @@ describe('Two-Reference Joker runtime', () => {
     const refs = [c('5', 'DIAMONDS'), c('9', 'SPADES')];
     const used = new Set([...Object.values(hands).flat(), ...refs].map((card) => card.id));
     const deck = [...dealt.slice(0, 9), ...refs, ...createDeck().filter((card) => !used.has(card.id))];
-    const game = new TeenPattiGame('TP2RL', ['p1', 'p2', 'p3'], {
+    const game = new TeenPattiGame('TP2R', ['p1', 'p2', 'p3'], {
       initialDealerId: 'p1', tableConfig, roundVariant: { variantId: 'TWO_REFERENCE_JOKER' },
     });
 
     game.dealNewRound(deck);
-    const firstGate = game.sequence;
-    expect(game.assignTwoReference('p2', 0, firstGate).ok).toBe(true);
-    game.leaveTable('p3');
-    const refreshedGate = game.sequence;
-    expect(refreshedGate).toBeGreaterThan(firstGate);
+    expect(game.getPublicState()).toMatchObject({
+      state: 'BETTING',
+      currentTurn: 'p2',
+      twoReferenceAssignmentsComplete: 0,
+      referenceAssignmentRequiredPlayerIds: [],
+      referenceAssignmentReason: null,
+      variantReferenceCards: refs,
+    });
+
+    const seeSeq = game.sequence;
+    expect(game.act('p2', { type: 'SEE' }, seeSeq).ok).toBe(true);
+    expect(game.getPublicState()).toMatchObject({
+      state: 'BETTING',
+      currentTurn: 'p2',
+      twoReferenceAssignmentsComplete: 0,
+      referenceAssignmentRequiredPlayerIds: [],
+      referenceAssignmentReason: null,
+    });
+    expect(game.getPrivateState('p2')?.twoReferenceAssignment).toBeNull();
+  });
+
+  it('asks only the sideshow players to choose a joker set at comparison time and keeps each choice private', () => {
+    const hands = {
+      p2: [c('4', 'SPADES'), c('9', 'HEARTS'), c('K', 'CLUBS')],
+      p3: [c('6', 'CLUBS'), c('3', 'HEARTS'), c('Q', 'SPADES')],
+      p1: [c('8', 'CLUBS'), c('5', 'HEARTS'), c('Q', 'DIAMONDS')],
+    };
+    const dealt = deckForHands(['p2', 'p3', 'p1'], hands);
+    const refs = [c('5', 'DIAMONDS'), c('9', 'SPADES')];
+    const used = new Set([...Object.values(hands).flat(), ...refs].map((card) => card.id));
+    const deck = [...dealt.slice(0, 9), ...refs, ...createDeck().filter((card) => !used.has(card.id))];
+    const game = new TeenPattiGame('TP2RS', ['p1', 'p2', 'p3'], {
+      initialDealerId: 'p1', tableConfig, roundVariant: { variantId: 'TWO_REFERENCE_JOKER' },
+    });
+
+    game.dealNewRound(deck);
+    for (const id of ['p1', 'p2', 'p3']) game.getPlayer(id)!.seen = true;
+    const actionSeq = game.sequence;
+    expect(game.act('p2', { type: 'SIDESHOW' }, actionSeq).ok).toBe(true);
+
+    const gate = game.getPublicState();
+    expect(gate.state).toBe('AWAITING_REFERENCE_ASSIGNMENT');
+    expect(gate.referenceAssignmentReason).toBe('SIDESHOW');
+    expect(new Set(gate.referenceAssignmentRequiredPlayerIds)).toEqual(new Set(['p2', 'p1']));
+    expect(gate.referenceAssignmentRequiredPlayerIds).not.toContain('p3');
+    expect(game.getPrivateState('p2')?.cards).toHaveLength(3);
+    expect(game.getPrivateState('p1')?.cards).toHaveLength(3);
+    expect(game.getPrivateState('p3')?.twoReferenceAssignment).toBeNull();
+    expect(JSON.stringify(gate)).not.toContain('upDownReferenceIndex');
+
+    const gateSeq = game.sequence;
+    expect(game.assignTwoReference('p2', 0, gateSeq).ok).toBe(true);
+    expect(game.sequence).toBe(gateSeq);
     expect(game.getPrivateState('p2')?.twoReferenceAssignment).toEqual({ upDownReferenceIndex: 0 });
-    expect(game.assignTwoReference('p1', 1, refreshedGate).ok).toBe(true);
-    expect(game.getPublicState()).toMatchObject({ state: 'BETTING', currentTurn: 'p2', twoReferenceAssignmentsComplete: 2 });
+    expect(game.getPrivateState('p1')?.twoReferenceAssignment).toBeNull();
+
+    expect(game.assignTwoReference('p1', 1, gateSeq).ok).toBe(true);
+    expect(game.state).toBe('BETTING');
+    expect(game.lastSideshow).not.toBeNull();
+    expect(game.getPrivateState('p1')?.twoReferenceAssignment).toEqual({ upDownReferenceIndex: 1 });
+    expect(game.getPrivateState('p3')?.twoReferenceAssignment).toBeNull();
+  });
+
+  it('defers a final paid showdown until both involved players choose, then locks the chosen sets for the completed hand', () => {
+    const hands = {
+      p2: [c('4', 'SPADES'), c('9', 'HEARTS'), c('K', 'CLUBS')],
+      p1: [c('8', 'CLUBS'), c('5', 'HEARTS'), c('Q', 'DIAMONDS')],
+    };
+    const dealt = deckForHands(['p2', 'p1'], hands);
+    const refs = [c('5', 'DIAMONDS'), c('9', 'SPADES')];
+    const used = new Set([...Object.values(hands).flat(), ...refs].map((card) => card.id));
+    const deck = [...dealt.slice(0, 6), ...refs, ...createDeck().filter((card) => !used.has(card.id))];
+    const game = new TeenPattiGame('TP2RSHOW', ['p1', 'p2'], {
+      initialDealerId: 'p1', tableConfig, roundVariant: { variantId: 'TWO_REFERENCE_JOKER' },
+    });
+
+    game.dealNewRound(deck);
+    const potBefore = game.pot;
+    expect(game.act('p2', { type: 'SHOWDOWN' }, game.sequence).ok).toBe(true);
+    expect(game.state).toBe('AWAITING_REFERENCE_ASSIGNMENT');
+    expect(game.pot).toBe(potBefore); // showdown payment waits until choices exist
+    expect(game.getPublicState().referenceAssignmentReason).toBe('SHOWDOWN');
+
+    const gateSeq = game.sequence;
+    expect(game.assignTwoReference('p2', 0, gateSeq).ok).toBe(true);
+    expect(game.assignTwoReference('p1', 1, gateSeq).ok).toBe(true);
+    expect(game.state).toBe('ROUND_COMPLETE');
+    expect(game.lastOutcome?.reason).toBe('PAID_SHOWDOWN');
+    expect(game.getPrivateState('p2')?.twoReferenceAssignment).toEqual({ upDownReferenceIndex: 0 });
+    expect(game.getPrivateState('p1')?.twoReferenceAssignment).toEqual({ upDownReferenceIndex: 1 });
   });
 });
 

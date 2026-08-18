@@ -27,13 +27,13 @@ export function TeenPattiRulesSheet({ state, onClose }: TeenPattiRulesSheetProps
           <div><dt>Seen</dt><dd>2× current blind · {state.seenAmount} now</dd></div>
           <div><dt>Blind limit</dt><dd>3 turns, then betting continues as seen</dd></div>
           {(state.variant.variantId === 'TWO_REFERENCE_JOKER' || state.variant.fiveCardJoker === 'TWO_REFERENCE_JOKER') && (
-            <div><dt>Joker roles</dt><dd>Each player privately chooses one reference for Up/Down; the other reference’s own rank is Same. Betting starts after everyone locks a choice.</dd></div>
+            <div><dt>Joker choice</dt><dd>The two references stay visible while betting continues normally. Only when your hand is about to be compared in a sideshow or show/showdown do you privately choose between the two resulting joker sets; the chosen set is then locked for your hand.</dd></div>
           )}
           {state.variant.variantId.startsWith('DISCARD_') && (
             <div><dt>5-card discard</dt><dd>All five cards remain with you. Only the three non-discarded cards are ranked; all five are revealed at sideshow/showdown and discarded cards never break ties.</dd></div>
           )}
-          <div><dt>Sideshow</dt><dd>Compulsory when all remaining players are seen</dd></div>
-          <div><dt>Mutual Show</dt><dd>Any active player may propose a free show. Cards open only if every active player accepts; tied best hands split the pot equally.</dd></div>
+          <div><dt>Sideshow</dt><dd>Available only when at least three active players remain and all are seen. It is optional; normal Chaal remains available until someone chooses Sideshow.</dd></div>
+          <div><dt>Mutual Show</dt><dd>Available whenever 2+ active players remain. It is free and opens all active hands only if every active player accepts the same proposal; tied strongest hands split the pot. Paid Showdown remains final-two only.</dd></div>
         </dl>
         <button className="btn btn-primary" type="button" onClick={onClose}>Back to table</button>
       </div>

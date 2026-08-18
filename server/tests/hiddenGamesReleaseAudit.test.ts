@@ -23,9 +23,9 @@ function finishTeenRound(game: TeenPattiGame): void {
     }
     if (state.state === 'AWAITING_REFERENCE_ASSIGNMENT') {
       const sharedGateSequence = game.sequence;
-      for (const player of state.players) {
-        if (!game.getPrivateState(player.playerId)?.twoReferenceAssignment) {
-          expect(game.assignTwoReference(player.playerId, 0, sharedGateSequence).ok).toBe(true);
+      for (const playerId of state.referenceAssignmentRequiredPlayerIds) {
+        if (!game.getPrivateState(playerId)?.twoReferenceAssignment) {
+          expect(game.assignTwoReference(playerId, 0, sharedGateSequence).ok).toBe(true);
         }
       }
       continue;
@@ -74,17 +74,35 @@ describe('hidden-game release audit', () => {
     }
   });
 
-  it('keeps Two-Reference roles private to the assigning Teen Patti player', () => {
-    const game = new TeenPattiGame('AUDIT-REF', ['A', 'B'], {
+  it('defers Two-Reference choice until comparison and keeps each selected joker option private', () => {
+    const game = new TeenPattiGame('AUDIT-REF', ['A', 'B', 'C'], {
       initialDealerId: 'A',
       roundVariant: { variantId: 'TWO_REFERENCE_JOKER' },
     });
     game.startSession();
-    expect(game.state).toBe('AWAITING_REFERENCE_ASSIGNMENT');
-    expect(game.assignTwoReference('A', 1, game.sequence).ok).toBe(true);
-    expect(game.getPrivateState('A')?.twoReferenceAssignment).toEqual({ upDownReferenceIndex: 1 });
-    expect(game.getPrivateState('B')?.twoReferenceAssignment).toBeNull();
+
+    expect(game.state).toBe('BETTING');
+    expect(game.getPublicState().referenceAssignmentRequiredPlayerIds).toEqual([]);
+    expect(game.getPrivateState('A')?.twoReferenceAssignment).toBeNull();
+
+    // Being Seen is not the trigger. Sideshow/showdown comparison is.
+    for (const id of ['A', 'B', 'C']) game.getPlayer(id)!.seen = true;
+    const initiator = game.currentTurn!;
+    expect(game.act(initiator, { type: 'SIDESHOW' }, game.sequence).ok).toBe(true);
+    const gate = game.getPublicState();
+    expect(gate.state).toBe('AWAITING_REFERENCE_ASSIGNMENT');
+    expect(gate.referenceAssignmentReason).toBe('SIDESHOW');
+    expect(gate.referenceAssignmentRequiredPlayerIds).toHaveLength(2);
+
+    const [first, second] = gate.referenceAssignmentRequiredPlayerIds;
+    const gateSeq = game.sequence;
+    expect(game.assignTwoReference(first, 1, gateSeq).ok).toBe(true);
+    expect(game.getPrivateState(first)?.twoReferenceAssignment).toEqual({ upDownReferenceIndex: 1 });
+    expect(game.getPrivateState(second)?.twoReferenceAssignment).toBeNull();
     expect(JSON.stringify(game.getPublicState())).not.toContain('upDownReferenceIndex');
+
+    expect(game.assignTwoReference(second, 0, gateSeq).ok).toBe(true);
+    expect(game.getPrivateState(second)?.twoReferenceAssignment).toEqual({ upDownReferenceIndex: 0 });
   });
 
   it('runs every Poker variant at its maximum seat cap and keeps hole cards private until showdown', () => {

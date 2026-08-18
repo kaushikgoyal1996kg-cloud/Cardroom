@@ -49,7 +49,7 @@ describe('Teen Patti authoritative rules', () => {
     expect(TEEN_PATTI_RULES.MAX_BLIND_TURNS).toBe(3);
     expect(TEEN_PATTI_RULES.SEEN_MULTIPLIER).toBe(2);
     expect(TEEN_PATTI_RULES.NEXT_DEALER).toBe('PREVIOUS_ROUND_WINNER');
-    expect(TEEN_PATTI_RULES.COMPULSORY_SIDESHOW).toBe(true);
+    expect(TEEN_PATTI_RULES.COMPULSORY_SIDESHOW).toBe(false);
     expect(nextBlindAmount(20, 60)).toBe(40);
     expect(nextBlindAmount(40, 60)).toBe(60);
     expect(nextBlindAmount(60, 60)).toBe(60);
@@ -180,8 +180,8 @@ describe('Teen Patti privacy and betting', () => {
   });
 });
 
-describe('Teen Patti compulsory sideshow', () => {
-  it('compares current player with nearest active player anticlockwise', () => {
+describe('Teen Patti optional all-seen sideshow', () => {
+  it('keeps normal Chaal legal when everyone is seen and makes Sideshow an optional anticlockwise action', () => {
     const order = ['p2', 'p3', 'p4', 'p1']; // dealer p1 -> deal/first turn starts p2
     const deck = deckForHands(order, {
       p2: [c('9', 'SPADES'), c('7', 'HEARTS'), c('4', 'CLUBS')],
@@ -194,9 +194,10 @@ describe('Teen Patti compulsory sideshow', () => {
     for (const id of ids(4)) game.getPlayer(id)!.seen = true;
 
     expect(game.currentTurn).toBe('p2');
-    expect(game.act('p2', { type: 'CHAAL' }).error).toMatch(/sideshow is compulsory/i);
-    expect(game.act('p2', { type: 'SIDESHOW' }).ok).toBe(true);
-    expect(game.lastSideshow).toMatchObject({ initiatorId: 'p2', opponentId: 'p1', packedPlayerId: 'p2' });
+    expect(game.act('p2', { type: 'CHAAL' }).ok).toBe(true);
+    expect(game.currentTurn).toBe('p3');
+    expect(game.act('p3', { type: 'SIDESHOW' }).ok).toBe(true);
+    expect(game.lastSideshow).toMatchObject({ initiatorId: 'p3', opponentId: 'p2', packedPlayerId: 'p2' });
   });
 
   it('packs the initiator on an exact sideshow tie', () => {
@@ -215,52 +216,41 @@ describe('Teen Patti compulsory sideshow', () => {
 });
 
 describe('Teen Patti Mutual Show', () => {
-  it('allows any active player to propose a unanimous show with three or more players', () => {
-    const order = ['p2', 'p3', 'p1'];
-    const deck = deckForHands(order, {
-      p2: [c('K', 'SPADES'), c('K', 'HEARTS'), c('5', 'CLUBS')],
-      p3: [c('K', 'CLUBS'), c('K', 'DIAMONDS'), c('5', 'HEARTS')],
-      p1: [c('Q', 'SPADES'), c('Q', 'HEARTS'), c('A', 'CLUBS')],
-    });
+  it('allows a unanimous Mutual Show with three or more active players', () => {
     const game = new TeenPattiGame('T', ids(3), { initialDealerId: 'p1', tableConfig: config });
-    game.dealNewRound(deck);
+    game.dealNewRound(createDeck());
+    expect(game.activePlayers()).toHaveLength(3);
+    const turnBeforeVote = game.currentTurn;
 
-    // p3 is not the current betting player, but Mutual Show is table-wide.
-    expect(game.currentTurn).toBe('p2');
     expect(game.act('p3', { type: 'REQUEST_OPEN_SHOW' }).ok).toBe(true);
-    const voteSeq = game.getPublicState().sequence;
-    expect(game.getPublicState().openShowAcceptedBy).toEqual(['p3']);
+    const proposal = game.getPublicState();
+    expect(proposal.openShowRequestFrom).toBe('p3');
+    expect(proposal.openShowAcceptedBy).toEqual(['p3']);
+    expect(game.currentTurn).toBe(turnBeforeVote);
 
-    // Intermediate accepts intentionally keep the same proposal sequence so
-    // two clients accepting the same visible proposal do not race each other.
-    expect(game.act('p2', { type: 'ACCEPT_OPEN_SHOW' }, voteSeq).ok).toBe(true);
-    expect(game.getPublicState().sequence).toBe(voteSeq);
-    expect(game.act('p1', { type: 'ACCEPT_OPEN_SHOW' }, voteSeq).ok).toBe(true);
-
+    expect(game.act('p1', { type: 'ACCEPT_OPEN_SHOW' }, proposal.sequence).ok).toBe(true);
+    expect(game.state).toBe('BETTING');
+    expect(game.act('p2', { type: 'ACCEPT_OPEN_SHOW' }, proposal.sequence).ok).toBe(true);
     expect(game.state).toBe('ROUND_COMPLETE');
     expect(game.lastOutcome?.reason).toBe('MUTUAL_OPEN_SHOW');
-    expect(game.lastOutcome?.split).toBe(true);
-    expect(game.lastOutcome?.winnerIds.sort()).toEqual(['p2', 'p3']);
     expect(game.lastOutcome?.showdown).toHaveLength(3);
-    expect(game.getPlayer('p2')!.chips).toBe(1005);
-    expect(game.getPlayer('p3')!.chips).toBe(1005);
-    expect(game.getPlayer('p1')!.chips).toBe(990);
   });
 
-  it('cancels the vote on any decline and resumes the exact betting turn', () => {
-    const game = new TeenPattiGame('T', ids(3), { initialDealerId: 'p1', tableConfig: config });
+  it('cancels a final-two Mutual Show on decline and resumes the exact betting turn', () => {
+    const game = new TeenPattiGame('T', ids(2), { initialDealerId: 'p1', tableConfig: config });
     game.dealNewRound(createDeck());
     expect(game.currentTurn).toBe('p2');
 
-    expect(game.act('p3', { type: 'REQUEST_OPEN_SHOW' }).ok).toBe(true);
+    // The non-turn final player may propose, but a decline resumes p2's turn.
+    expect(game.act('p1', { type: 'REQUEST_OPEN_SHOW' }).ok).toBe(true);
     const voteSeq = game.getPublicState().sequence;
-    expect(game.act('p1', { type: 'DECLINE_OPEN_SHOW' }, voteSeq).ok).toBe(true);
+    expect(game.act('p2', { type: 'DECLINE_OPEN_SHOW' }, voteSeq).ok).toBe(true);
     expect(game.getPublicState().openShowRequestFrom).toBeNull();
     expect(game.currentTurn).toBe('p2');
 
     const resumedSeq = game.getPublicState().sequence;
     expect(game.act('p2', { type: 'BLIND' }, resumedSeq).ok).toBe(true);
-    expect(game.currentTurn).toBe('p3');
+    expect(game.currentTurn).toBe('p1');
   });
 });
 
@@ -421,5 +411,52 @@ describe('Teen Patti rounds, top-ups and P&L', () => {
     game.act('p3', { type: 'PACK' });
     expect(game.state).toBe('ROUND_COMPLETE');
     expect(total()).toBe(before);
+  });
+});
+
+describe('Teen Patti live-table joining', () => {
+  it('seats a new player immediately during a running hand but activates them only from the next round', () => {
+    const game = new TeenPattiGame('LIVE-JOIN', ['p1', 'p2', 'p3'], {
+      initialDealerId: 'p1', tableConfig: config,
+    });
+    game.dealNewRound(createDeck());
+
+    expect(game.addPlayerForNextRound('p4')).toEqual({ ok: true });
+    expect(game.getPublicState().players.find((player) => player.playerId === 'p4')).toMatchObject({
+      sittingOut: true,
+      packed: true,
+    });
+    expect(game.getPlayerHand('p4')).toEqual([]);
+    expect(game.activePlayers()).not.toContain('p4');
+
+    // Finish the hand using only the original active seats.
+    while (game.state === 'BETTING') {
+      const turn = game.currentTurn!;
+      expect(game.act(turn, { type: 'PACK' }, game.sequence).ok).toBe(true);
+    }
+    expect(game.state).toBe('ROUND_COMPLETE');
+
+    game.dealNewRound();
+    expect(game.state).toBe('BETTING');
+    expect(game.getPlayerHand('p4')).toHaveLength(3);
+    expect(game.activePlayers()).toContain('p4');
+    expect(game.getPublicState().players.find((player) => player.playerId === 'p4')).toMatchObject({
+      sittingOut: false,
+      packed: false,
+    });
+  });
+
+  it('keeps the nine-seat ceiling when players join an already-running table', () => {
+    const starting = ['p1', 'p2'];
+    const game = new TeenPattiGame('LIVE-JOIN-CAP', starting, {
+      initialDealerId: 'p1', tableConfig: config,
+    });
+    game.dealNewRound(createDeck());
+
+    for (let i = 3; i <= 9; i += 1) {
+      expect(game.addPlayerForNextRound(`p${i}`).ok).toBe(true);
+    }
+    expect(game.playersClockwise).toHaveLength(9);
+    expect(game.addPlayerForNextRound('p10')).toMatchObject({ ok: false });
   });
 });

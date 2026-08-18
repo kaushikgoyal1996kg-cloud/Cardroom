@@ -33,10 +33,8 @@ export interface PokerRuntimeViewProps {
   players: PokerRuntimeIdentity[];
   lastHandResult?: PokerHandOutcomePayload | null;
   dealing?: boolean;
-  canStartNextHand?: boolean;
   onChooseVariant: (variantId: PokerVariantId) => void;
   onAction: (action: PokerAction) => void;
-  onStartNextHand?: () => void;
   onTopUp?: (amount: number) => void;
   onBackToCardRoom?: () => void;
 }
@@ -55,10 +53,8 @@ export function PokerRuntimeView({
   players,
   lastHandResult,
   dealing = false,
-  canStartNextHand = false,
   onChooseVariant,
   onAction,
-  onStartNextHand,
   onTopUp,
   onBackToCardRoom,
 }: PokerRuntimeViewProps) {
@@ -113,21 +109,56 @@ export function PokerRuntimeView({
     </aside>
   ) : null;
 
+  const seats = pokerSeatPlayers(state, players);
+
   if (state.state === 'AWAITING_VARIANT') {
+    const isChooser = state.nextVariantChooserId === selfId;
+    if (isChooser) {
+      return (
+        <div className="poker-runtime poker-runtime--choice" style={viewportHeight ? ({ '--app-height': `${viewportHeight}px` } as React.CSSProperties) : undefined}>
+          <PokerVariantChoice
+            state={state}
+            selfId={selfId}
+            players={players.map(({ playerId, name }) => ({ playerId, name }))}
+            onChoose={onChooseVariant}
+          />
+          {bankroll}
+        </div>
+      );
+    }
+
+    const chooserName = players.find((player) => player.playerId === state.nextVariantChooserId)?.name ?? 'Dealer';
     return (
-      <div className="poker-runtime poker-runtime--choice" style={viewportHeight ? ({ '--app-height': `${viewportHeight}px` } as React.CSSProperties) : undefined}>
-        <PokerVariantChoice
-          state={state}
+      <div className="poker-runtime" style={viewportHeight ? ({ '--app-height': `${viewportHeight}px` } as React.CSSProperties) : undefined}>
+        <PokerTable
+          players={seats}
           selfId={selfId}
-          players={players.map(({ playerId, name }) => ({ playerId, name }))}
-          onChoose={onChooseVariant}
+          dealerId={state.dealerId}
+          activePlayerId={null}
+          variantName="Dealer Choice"
+          streetLabel={`${chooserName} is choosing`}
+          board={[]}
+          holeCards={[]}
+          holeCardCount={state.variant.holeCards}
+          dealing={false}
+          pot={0}
+          currentBet={0}
+          toCall={0}
+          legalActions={{ fold: false, check: false, call: false, raise: false, minRaiseTo: null, maxRaiseTo: null }}
+          betting={state.variant.betting}
+          stakesLabel="Waiting for the dealer to choose the next approved game"
+          showLocalPanel={false}
+          onFold={() => {}}
+          onCheck={() => {}}
+          onCall={() => {}}
+          onRaiseTo={() => {}}
         />
+        <p className="poker-variant-waiting" role="status">{chooserName} is choosing the next Poker variant…</p>
         {bankroll}
       </div>
     );
   }
 
-  const seats = pokerSeatPlayers(state, players);
   // A zero-stack seat sits out and receives no cards. A player who already
   // folded can still have been dealt this hand, and an all-in blind can have
   // stack 0 after posting, so preserve either funded/committed participation.
@@ -185,11 +216,7 @@ export function PokerRuntimeView({
               <small>{result.reason === 'SHOWDOWN' ? 'Showdown complete' : 'Last player standing'}</small>
             </div>
             <div className="poker-hand-result__actions">
-              {canStartNextHand && onStartNextHand ? (
-                <button type="button" onClick={onStartNextHand}>Next hand</button>
-              ) : (
-                <span className="poker-hand-result__waiting">Waiting for the host</span>
-              )}
+              <span className="poker-hand-result__waiting">Next hand starting automatically…</span>
               {onBackToCardRoom && <button type="button" className="is-secondary" onClick={onBackToCardRoom}>Card Room</button>}
             </div>
           </div>

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen, cleanup, fireEvent, act } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, act, within } from '@testing-library/react';
 
 /**
  * Android/PWA/browser Back-button coverage for the room-level screens
@@ -114,7 +114,7 @@ describe('Lobby: Back is guarded, never a silent exit', () => {
     render(<App />);
 
     fireBack();
-    fireEvent.click(screen.getByRole('button', { name: /^stay$/i }));
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: /^stay$/i }));
 
     expect(screen.queryByText(/leave this room/i)).toBeNull();
     expect(leaveSessionMock).not.toHaveBeenCalled();
@@ -126,7 +126,7 @@ describe('Lobby: Back is guarded, never a silent exit', () => {
     render(<App />);
 
     fireBack();
-    fireEvent.click(screen.getByRole('button', { name: /^leave$/i }));
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: /^leave$/i }));
 
     expect(leaveSessionMock).toHaveBeenCalledTimes(1);
     expect(leaveTableMock).not.toHaveBeenCalled();
@@ -159,7 +159,7 @@ describe('Active game (playing): Back is guarded with the bot-takeover warning',
     render(<App />);
 
     fireBack();
-    fireEvent.click(screen.getByRole('button', { name: /^leave$/i }));
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: /^leave$/i }));
 
     expect(leaveTableMock).toHaveBeenCalledTimes(1);
     expect(leaveSessionMock).not.toHaveBeenCalled();

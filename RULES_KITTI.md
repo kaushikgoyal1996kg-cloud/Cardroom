@@ -30,6 +30,15 @@ Status key: ✅ implemented · ⛔ not implemented
 
 ---
 
+## Ongoing round flow ✅
+
+- After a Kitti round result, the next scheduled round is **dealt automatically** after the short result pause.
+- If the match enters sudden death, each required sudden-death round also starts automatically.
+- The host does not have to press a Next/Deal button between rounds.
+- Automatic dealing stops at **MATCH_COMPLETE**; starting a completely new match remains an explicit table choice.
+
+---
+
 ## Arrangement ✅
 
 Three groups of three, ordered **strictly strongest → weakest**:

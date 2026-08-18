@@ -1355,46 +1355,64 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         return;
       }
     }
-    voiceManagerRef.current?.leave(false);
-    voiceManagerRef.current = null;
-    rejoinVoiceAfterReconnectRef.current = false;
-    rejoinVoiceMutedRef.current = false;
-    if (currentRoom) socketRef.current.emit('room:leave');
-    setInVoiceCall(false);
-    setVoiceMuted(false);
-    setVoiceParticipants([]);
-    setSpeakingPlayerIds([]);
-    requestReturnToCardRoom();
-    clearSession();
-    setRoom(null);
-    setMyPlayerId(null);
-    setMyHand([]);
-    setMyArrangedSets(null);
-    setGameState(null);
-    setLastRoundResult(null);
-    setWinnerInfo(null);
-    setKittiHand([]);
-    setKittiArrangedGroups(null);
-    setKittiDeciderHand([]);
-    setKittiState(null);
-    setLastKittiRoundResult(null);
-    setKittiRoundHistory([]);
-    setKittiWinnerInfo(null);
-    setTeenPattiSetup(null);
-    setTeenPattiPrivate(null);
-    setTeenPattiState(null);
-    teenPattiStateRef.current = null;
-    setLastTeenPattiRoundResult(null);
-    setTeenPattiRoundHistory([]);
-    teenPattiDealRoundRef.current = null;
-    setPokerSetup(null);
-    setPokerPrivate(null);
-    setPokerState(null);
-    pokerStateRef.current = null;
-    setLastPokerHandResult(null);
-    setPokerHandHistory([]);
-    pokerDealHandRef.current = null;
-    setViewMode('active');
+
+    const finalizeLocalLeave = () => {
+      voiceManagerRef.current?.leave(false);
+      voiceManagerRef.current = null;
+      rejoinVoiceAfterReconnectRef.current = false;
+      rejoinVoiceMutedRef.current = false;
+      setInVoiceCall(false);
+      setVoiceMuted(false);
+      setVoiceParticipants([]);
+      setSpeakingPlayerIds([]);
+      requestReturnToCardRoom();
+      clearSession();
+      setRoom(null);
+      setMyPlayerId(null);
+      setMyHand([]);
+      setMyArrangedSets(null);
+      setGameState(null);
+      setLastRoundResult(null);
+      setWinnerInfo(null);
+      setKittiHand([]);
+      setKittiArrangedGroups(null);
+      setKittiDeciderHand([]);
+      setKittiState(null);
+      setLastKittiRoundResult(null);
+      setKittiRoundHistory([]);
+      setKittiWinnerInfo(null);
+      setTeenPattiSetup(null);
+      setTeenPattiPrivate(null);
+      setTeenPattiState(null);
+      teenPattiStateRef.current = null;
+      setLastTeenPattiRoundResult(null);
+      setTeenPattiRoundHistory([]);
+      teenPattiDealRoundRef.current = null;
+      setPokerSetup(null);
+      setPokerPrivate(null);
+      setPokerState(null);
+      pokerStateRef.current = null;
+      setLastPokerHandResult(null);
+      setPokerHandHistory([]);
+      pokerDealHandRef.current = null;
+      setViewMode('active');
+    };
+
+    if (!currentRoom) {
+      finalizeLocalLeave();
+      return;
+    }
+
+    // Do not erase the local session until the authoritative server confirms
+    // that the seat/token has actually been removed. This prevents the player
+    // from believing they left while everybody else still sees a ghost seat.
+    socketRef.current.emit('room:leave', (res) => {
+      if (!res.ok) {
+        setGameError(res.error ?? 'Could not leave this room. Please try again.');
+        return;
+      }
+      finalizeLocalLeave();
+    });
   }, []);
 
   // Public and private game packets are emitted separately. React may paint

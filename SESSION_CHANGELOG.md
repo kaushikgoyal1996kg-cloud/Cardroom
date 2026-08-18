@@ -1505,3 +1505,16 @@ reintroducing the bug and confirming failure.
 - Updated variant help/catalog copy and regression expectations to match the authoritative K/Q/J-only rule.
 - No ranking semantics changed: Little remains the player's lowest remaining non-named rank, and duplicated Little ranks are all wild.
 
+
+## 2026-08-18 — Post-audit staging bug-fix checkpoint
+
+- Fixed explicit Leave ghost-player lifecycle by making `room:leave` ack only after authoritative seat/token removal, socket detach and room broadcast.
+- Fixed Hazari bottom/local seat identity clipping on real mobile tables.
+- Corrected Teen Patti all-Seen flow: Sideshow is optional; normal Chaal remains available.
+- Preserved the house Mutual Show rule for 2+ active players with unanimous consent; paid Showdown remains final-two only.
+- Deferred Two-Reference Joker choice until actual Sideshow/Show/Showdown comparison; UI offers the two resulting joker sets as Option A/B and confirms the private choice.
+- Allowed new players to join an already-running Teen Patti table up to 9 seats, sitting out the current hand and joining next round.
+- Added automatic ongoing deal progression for Hazari, Kitti, Teen Patti and Poker; removed host-required next-deal UI from active match/round result paths.
+- Kept dealer variant/configuration controls private to the authoritative dealer while other players remain on the table with a waiting status.
+- Fixed narrow-mobile Teen Patti 4/5-card hand overlap by giving multi-card hands a separate full-width hand row above actions without shrinking the shared card component.
+- Added/updated regression tests for these staging failures; full strict CI rerun is still required before this checkpoint can be promoted.
