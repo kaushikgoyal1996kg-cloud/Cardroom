@@ -363,6 +363,37 @@ describe('dealing ceremony follows the real dealer', () => {
     expect(firstRecipient(container)).toBe('p1');
   });
 
+  it('can start left of the dealer for Poker without changing the default', () => {
+    const { container } = render(
+      <CardTable
+        players={seats}
+        selfId="p1"
+        dealerId="p2"
+        dealing
+        dealCardsEach={2}
+        dealStart="LEFT_OF_DEALER"
+      />
+    );
+    expect(firstRecipient(container)).toBe('p3');
+  });
+
+  it('can visually skip a sitting-out Poker seat while preserving ring order', () => {
+    const { container } = render(
+      <CardTable
+        players={seats}
+        selfId="p1"
+        dealerId="p1"
+        dealing
+        dealCardsEach={2}
+        dealStart="LEFT_OF_DEALER"
+        dealPlayerIds={['p1', 'p3', 'p4']}
+      />
+    );
+    // p2 is left of p1 but sitting out; the first funded recipient is p3.
+    expect(firstRecipient(container)).toBe('p3');
+    expect(container.querySelectorAll('.table__dealt')).toHaveLength(6);
+  });
+
   it('deals first to p2 after the dealer rotates to p2', () => {
     const { container } = render(
       <CardTable players={seats} selfId="p1" dealerId="p2" dealing dealCardsEach={13} />

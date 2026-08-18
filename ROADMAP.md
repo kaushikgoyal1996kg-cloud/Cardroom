@@ -33,11 +33,13 @@ RoundSummary and WinnerScreen migrations, reliability tests.
 
 ## Current checkpoint
 
-The first Android test track is now intentionally narrow: **Hazari + Kitti are
-playable; Teen Patti + Poker are shown as Coming Soon.** Kitti has moved from a
-partial engine to an online playable core. The native Capacitor wrapper/source
-scaffolding is present, but an APK cannot be produced in this build environment
-because npm registry access and the Android SDK are unavailable here.
+The live Release 1.5.1 track remains intentionally safe: **Hazari + Kitti are
+playable; Teen Patti + Poker are shown as Coming Soon.** The WIP is much newer:
+Teen Patti has 19 hidden runtime-ready variants/social flows and Poker has a hidden
+authoritative network/runtime path for Texas, PLO4/5/6 and Short Deck. Neither
+hidden game may be enabled until the combined release gate below passes. The native
+Capacitor scaffolding is present, but this runtime cannot restore npm packages and
+does not provide the Android SDK.
 
 Production remains blocked. The old live Hazari app stays untouched. Real-device
 QA is still the release gate; repository tests must also be rerun on a machine
@@ -64,12 +66,20 @@ round/match flow, decider, reconnect, optional computer seats, bot-only
 arrangement Suggest and consensual virtual board are implemented. The remaining
 gate is full repository verification plus real-device 2–5 seat/full-match QA.
 
-### 4. Teen Patti development continues behind Coming Soon
-The Classic engine/session/lobby-setup groundwork exists, but the game stays
-`networkPlayable: false` until the full client table, variant execution,
-play-money/P&L flow, reconnect and mobile QA are complete.
+### 4. Finish the combined hidden-game release audit
+Teen Patti feature work is substantially complete behind the gate (22 runtime-ready
+variants, Surprise Me, Mutual Show, retained 5-card discards, Friendly Assist,
+history/stats/settlement). Poker's authoritative hidden runtime is also integrated.
+Finish cross-game lifecycle/reconnect/privacy/mobile checks and only resolve rule
+items that are explicitly locked; never invent a missing house rule.
 
-### 5. Production only after approval
+### 5. Run the real release gate
+On a machine with working npm/Android tooling: full server Vitest + build, full
+client Vitest + TypeScript + Vite build, Capacitor/Gradle build, then multi-phone
+portrait/landscape/reconnect/voice/TURN and all-variant regression. Fix every
+regression before changing either hidden game's `networkPlayable` gate.
+
+### 6. Production only after approval
 Do not replace the family build until the staged/native test track has passed.
 
 ---
@@ -99,11 +109,13 @@ Classic betting configuration now uses blind doubling capped at host max, seen =
 2× current blind, and three blind chances before forced seen betting. Dealer is
 the previous unique round winner. Variant descriptors are data-driven and
 explicitly mark unsupported runtime variants rather than silently falling back
-to Classic. Full live execution of non-Classic variants remains pending.
+to Classic. Runtime execution now exists for Classic, Muflis, Best of Four,
+Standard/Lowest/Highest Joker, AK47, Pairs Are Jokers, Random-Pack Joker,
+Revolving Joker, Up–Down–Same, Up–Down, Down Only and Closest to N; unfinished house variants stay disabled rather than approximated.
 
 **T2 — Classic betting/session engine — core implemented, full suite pending.**
 Compulsory sideshow, anticlockwise opponent selection, initiator-packs-on-tie,
-final-two mutual open show, card privacy and stable result→next-dealer timing are
+unanimous Mutual Show for 2+ active players (including 3+), card privacy and stable result→next-dealer timing are
 in the engine. This still needs the repository suite and broader multiplayer QA.
 
 **T3 — Server controller and protocol — groundwork implemented behind gate.**
@@ -117,19 +129,25 @@ seats, private face-down cards until explicit See, blind/seen/chaal/pack,
 compulsory sideshow, final-two show controls, in-round help and a round summary.
 It remains unreleased while lifecycle/mobile QA is incomplete.
 
-**T5 — Variant execution and UI — pending.**
-Dealer selection must be locked before information is revealed. Every player
-needs an in-round “How to play this variant” panel.
+**T5 — Variant execution and UI — substantially implemented behind gate.**
+Dealer selection is locked before information is revealed. Single Variant and
+Variant Table policies support Dealer Choice, Fixed Rotation or **Surprise Me**;
+Dealer Choice waits before boot/cards. The host chooses the runtime-ready variant pool; a dedicated Surprise Me Table makes a server-owned random selection from that pool every hand, and Dealer Choice may also invoke Surprise Me from the same approved pool. Two-Reference Joker, 2 Cards · Assume the Third and the three retained **5-card discard families** are runtime-ready behind the gate. Every player gets server-authored in-round “How to Play” text. The hidden catalogue now has **22 runtime-ready variants**. Five-card families pause before boot/deal for the round dealer to select the compatible joker rule; equal-ranked physical discard candidates belong to the player, all five cards remain retained, and discarded cards never rank or break ties. Closest to N uses the same dealer configuration gate for target + reorder declaration, including when Surprise Me selects it. **K Little, Q Little and J Little** are separate runtime-ready options; the generic Named Rank + Little picker is no longer used.
 
-**T6 — Play-money/P&L product flow — partial across engine/protocol/UI.**
-Host-configured balances, unanimous setup acceptance, live P&L and top-up now
-exist. The remaining critical gap is Teen Patti-specific settle-on-leave /
-dynamic player lifecycle; do not substitute Hazari's bot-takeover leave path.
-No real-money path is permitted.
+**Friendly Assist / Watch & Suggest** is implemented as an optional host-enabled private-table social layer: only folded players may request access, the target must consent, one target may be coached per hand, cards/suggestions stay private, and suggestions never execute actions.
+
+**T6 — Play-money/P&L product flow — substantially implemented behind gate.**
+Host-configured balances, unanimous setup acceptance, live P&L, unlimited positive
+top-up and Teen Patti-specific permanent settle-on-leave now exist. Leaving a live
+round behaves as a pack while committed play-money remains in the pot; the seat is
+released rather than converted to Hazari's bot-takeover path. Full integration and
+mobile QA remain pending. No real-money path is permitted.
 
 **T7 — reconnect, integration and mobile — partial groundwork, release QA pending.**
-Round-result reconnect restoration exists, but active-session leave/reconnect,
-multi-device integration and 2–9 seat real-device QA remain blockers. Teen Patti
+Round-result/state restoration and authoritative leave exist, and betting actions
+now require the exact server sequence to reject delayed/double-tapped stale input.
+Full active-session reconnect scenarios, multi-device integration, complete normal
+repository suites/builds and 2–9 seat real-device QA remain blockers. Teen Patti
 cannot leave Coming Soon until these pass.
 
 ---

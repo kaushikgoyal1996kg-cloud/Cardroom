@@ -291,6 +291,31 @@ normal Chrome tab and the installed standalone PWA - they can differ.
 
 ---
 
+
+## 13. Combined Teen Patti + Poker pre-enable gate
+
+Added for the post-1.5.1 combined update. Teen Patti and Poker must remain
+`networkPlayable: false` until every applicable item below is green on the
+actual release candidate.
+
+- [ ] Teen Patti: create/join private table with 2, 5 and 9 real seats; no cross-game room/state leakage
+- [ ] Teen Patti: Dealer Choice, Fixed Rotation and dedicated Surprise Me all use only the host-approved variant pool
+- [ ] Teen Patti: delayed/double-tapped Dealer Choice and **Deal next round** commands are rejected as stale and do not deduct boot/deal twice
+- [ ] Teen Patti: Mutual Show with 3+ players pauses the exact turn, unanimous accept reveals all active hands, decline resumes the same turn, exact best ties split the pot
+- [ ] Teen Patti: Revolving Joker replaces (does not accumulate) joker references after manual pack, sideshow loss and leave-as-pack
+- [ ] Teen Patti: 5-card rounds retain all five cards, equal-ranked physical discard choice belongs to the player, blind selection stays facedown, and sideshow/showdown reveals all five while ranking only the active three
+- [ ] Teen Patti: Friendly Assist reveals nothing before consent, permits one coached target per folded player per hand, suggestions never auto-act, revoke works, and reconnect restores only valid consent
+- [ ] Teen Patti: Round History and Table Stats remain correct during the next live round and after reconnect
+- [ ] Poker: Texas, PLO4, PLO5, PLO6 and Short Deck each complete multiple hands with correct seat cap, blinds/ante, board, pot/side-pot and showdown behavior
+- [ ] Poker: Dealer Choice waits before forced bets/cards; delayed chooser and **Deal next hand** commands are rejected as stale
+- [ ] Poker: fold-down hand history exposes no private hole cards; showdown history exposes only legitimately revealed cards
+- [ ] Poker: “Your seat is still connected” → **Leave & settle** uses Poker settlement even when detailed Poker state has not rehydrated yet
+- [ ] Teen Patti/Poker: a settled/departed participant still has a human-readable name in older history rows after reconnect
+- [ ] Teen Patti/Poker: current-table Stats show the correct game/player balances, P/L/top-ups and cumulative rounds/hands won; never Hazari/Kitti fallback data
+- [ ] Teen Patti/Poker: portrait + short landscape keep the radial utility hub, hand/action rail, Friendly Assist/errors and result panels from overlapping
+- [ ] Voice/chat/TURN remain table-scoped when Hazari, Kitti, Teen Patti and Poker rooms run at the same time
+
+
 ## Before you switch the family over
 
 Move to production only when:

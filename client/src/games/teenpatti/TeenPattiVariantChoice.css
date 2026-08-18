@@ -1,0 +1,146 @@
+.tp-variant-choice {
+  height: var(--js-vh, 100dvh);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  display: grid;
+  place-items: center;
+  /* The radial table hub stays available while the dealer chooses/configures
+     the next hand. Reserve its fixed top-right footprint instead of allowing
+     the variant cards or target controls to sit underneath it. */
+  padding:
+    max(var(--space-4), env(safe-area-inset-top))
+    calc(max(var(--space-3), env(safe-area-inset-right)) + var(--top-fab-reserve))
+    max(var(--space-4), env(safe-area-inset-bottom))
+    max(var(--space-3), env(safe-area-inset-left));
+  background: radial-gradient(circle at 50% 26%, rgba(58,74,53,.18), transparent 38%), var(--room-950);
+}
+.tp-variant-choice__card {
+  width: min(100%, 42rem);
+  display: grid;
+  gap: var(--space-3);
+  padding: clamp(1rem, 3vw, 1.6rem);
+  border: 1px solid var(--wood-700);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(180deg, rgba(200,164,92,.035), transparent 32%), var(--room-900);
+  box-shadow: var(--shadow-lg);
+}
+.tp-variant-choice__eyebrow,
+.tp-variant-choice h1,
+.tp-variant-choice__intro { margin: 0; }
+.tp-variant-choice__eyebrow { color: var(--brass-400); font-size: var(--text-xs); letter-spacing: var(--tracking-wider); text-transform: uppercase; }
+.tp-variant-choice h1 { color: var(--ink-100); font: 500 clamp(1.45rem, 5vw, 2.15rem)/1.05 var(--font-display); }
+.tp-variant-choice__intro { color: var(--ink-400); font-size: var(--text-sm); line-height: 1.5; }
+.tp-variant-choice__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; max-height: 52dvh; overflow-y: auto; overscroll-behavior: contain; }
+.tp-variant-choice__grid button { min-width: 0; min-height: 6.1rem; display: grid; align-content: center; gap: .24rem; padding: .7rem; border: 1px solid rgba(200,164,92,.13); border-radius: 12px; background: rgba(255,255,255,.018); color: var(--ink-300); text-align: left; cursor: pointer; }
+.tp-variant-choice__grid button strong { color: inherit; font: 500 .82rem/1.15 var(--font-display); }
+.tp-variant-choice__grid button span { color: var(--brass-400); font-size: .56rem; }
+.tp-variant-choice__grid button small { color: var(--ink-500); font-size: .56rem; line-height: 1.35; }
+.tp-variant-choice__grid button.is-active { border-color: rgba(211,178,108,.68); color: var(--ink-100); background: linear-gradient(155deg,rgba(80,58,35,.58),rgba(22,18,14,.8)); box-shadow: inset 0 0 0 1px rgba(211,178,108,.08); }
+.tp-variant-choice__grid button:disabled { cursor: default; }
+.tp-variant-choice__deal { width: 100%; min-height: var(--touch-min); }
+.tp-variant-choice__safety { color: var(--ink-600); font-size: .56rem; text-align: center; }
+.tp-variant-choice__error { border: 1px solid rgba(210,95,85,.35); border-radius: var(--radius-md); background: var(--room-900); color: var(--danger-300, #e9a8a2); padding: .65rem .8rem; }
+@media (max-width: 390px) { .tp-variant-choice__grid { grid-template-columns: 1fr; } }
+@media (orientation: landscape) and (max-height: 30rem) {
+  .tp-variant-choice { place-items: stretch center; padding-block: max(.5rem, env(safe-area-inset-top)) max(.5rem, env(safe-area-inset-bottom)); }
+  .tp-variant-choice__card { width: min(100%, 58rem); grid-template-columns: minmax(13rem, .75fr) minmax(20rem, 1.25fr); grid-template-rows: auto auto 1fr auto; gap: .45rem .75rem; padding: .7rem .85rem; }
+  .tp-variant-choice__eyebrow, .tp-variant-choice h1, .tp-variant-choice__intro, .tp-variant-choice__safety { grid-column: 1; }
+  .tp-variant-choice__grid { grid-column: 2; grid-row: 1 / span 4; grid-template-columns: repeat(2, minmax(0,1fr)); max-height: calc(var(--js-vh, 100dvh) - 1.4rem); }
+  .tp-variant-choice__grid button { min-height: 4.2rem; }
+  .tp-variant-choice__grid button small { display: none; }
+  .tp-variant-choice__deal { grid-column: 1; }
+}
+
+.tp-variant-choice__config {
+  display: grid;
+  gap: .65rem;
+  padding: .75rem;
+  border: 1px solid rgba(200,164,92,.22);
+  border-radius: 12px;
+  background: linear-gradient(155deg, rgba(47,71,57,.24), rgba(19,15,12,.58));
+}
+.tp-variant-choice__config-heading { display:flex; align-items:end; justify-content:space-between; gap:.8rem; }
+.tp-variant-choice__config-heading > div { display:grid; gap:.1rem; }
+.tp-variant-choice__config-heading span { color:var(--brass-500); font-size:.5rem; letter-spacing:.1em; text-transform:uppercase; }
+.tp-variant-choice__config-heading strong { color:var(--ink-100); font:500 .92rem/1.1 var(--font-display); }
+.tp-variant-choice__config-heading small { color:var(--ink-500); font-size:.52rem; }
+.tp-variant-choice__target { display:grid; grid-template-columns:minmax(7rem,.7fr) minmax(8rem,1fr); align-items:center; gap:.6rem; color:var(--ink-300); font-size:.62rem; }
+.tp-variant-choice__target input { min-width:0; min-height:var(--touch-min); border:1px solid rgba(200,164,92,.24); border-radius:9px; padding:0 .7rem; background:rgba(0,0,0,.22); color:var(--ink-100); font:600 .9rem/1 var(--font-body); font-variant-numeric:tabular-nums; }
+.tp-variant-choice__reorder { display:grid; grid-template-columns:minmax(7rem,.7fr) minmax(0,1fr); align-items:center; gap:.6rem; color:var(--ink-300); font-size:.62rem; }
+.tp-variant-choice__reorder > div { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.35rem; }
+.tp-variant-choice__reorder button { min-height:var(--touch-min); border:1px solid rgba(200,164,92,.16); border-radius:9px; background:rgba(255,255,255,.02); color:var(--ink-400); font:inherit; cursor:pointer; }
+.tp-variant-choice__reorder button.is-active { border-color:rgba(211,178,108,.65); background:rgba(94,70,42,.4); color:var(--ink-100); }
+.tp-variant-choice__config-note { color:var(--danger-300,#e9a8a2); font-size:.53rem; line-height:1.35; }
+
+@media (max-width: 390px) {
+  .tp-variant-choice__target,
+  .tp-variant-choice__reorder { grid-template-columns:1fr; gap:.3rem; }
+}
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .tp-variant-choice__config { grid-column:1; padding:.5rem .6rem; gap:.35rem; }
+  .tp-variant-choice__config-heading small { display:none; }
+  .tp-variant-choice__target,
+  .tp-variant-choice__reorder { grid-template-columns:6rem 1fr; gap:.35rem; }
+  .tp-variant-choice__target input,
+  .tp-variant-choice__reorder button { min-height:2.3rem; }
+}
+
+/* Dealer-triggered Surprise Me is intentionally distinct from a named variant:
+   the dealer chooses randomness, while the server owns the actual result. */
+.tp-variant-choice__grid button.tp-variant-choice__surprise {
+  border-color: rgba(211,178,108,.42);
+  background:
+    radial-gradient(circle at 84% 18%, rgba(211,178,108,.14), transparent 34%),
+    linear-gradient(145deg, rgba(72,54,33,.5), rgba(18,16,13,.9));
+}
+.tp-variant-choice__grid button.tp-variant-choice__surprise strong { color: var(--brass-200, #e6c98c); }
+.tp-variant-choice__grid button.tp-variant-choice__surprise span { letter-spacing: .08em; text-transform: uppercase; }
+
+.tp-variant-choice__five-note {
+  margin: 0;
+  color: var(--ink-400);
+  font-size: .58rem;
+  line-height: 1.4;
+}
+.tp-variant-choice__joker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .35rem;
+  max-height: 12rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.tp-variant-choice__joker-grid button {
+  min-width: 0;
+  min-height: 3.2rem;
+  display: grid;
+  align-content: center;
+  gap: .12rem;
+  border: 1px solid rgba(200,164,92,.16);
+  border-radius: 9px;
+  padding: .45rem .55rem;
+  background: rgba(255,255,255,.018);
+  color: var(--ink-400);
+  text-align: left;
+  cursor: pointer;
+}
+.tp-variant-choice__joker-grid button strong { color: inherit; font-size: .62rem; }
+.tp-variant-choice__joker-grid button small { color: var(--ink-500); font-size: .5rem; line-height: 1.25; }
+.tp-variant-choice__joker-grid button.is-active {
+  border-color: rgba(211,178,108,.65);
+  background: rgba(94,70,42,.4);
+  color: var(--ink-100);
+}
+@media (max-width: 390px) {
+  .tp-variant-choice__joker-grid { grid-template-columns: 1fr; max-height: 14rem; }
+}
+@media (orientation: landscape) and (max-height: 30rem) {
+  .tp-variant-choice__joker-grid { grid-template-columns: repeat(2,minmax(0,1fr)); max-height: 7.2rem; }
+  .tp-variant-choice__joker-grid button { min-height: 2.55rem; }
+  .tp-variant-choice__five-note { display: none; }
+}
+
+

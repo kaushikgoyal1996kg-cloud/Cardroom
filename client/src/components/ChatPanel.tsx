@@ -13,9 +13,21 @@ import './ChatPanel.css';
 
 const QUICK_REACTIONS = ['👍', '😂', '🔥', '👏', '😮', '😢', '🎉', '🤔'];
 
-export function ChatPanel() {
+interface ChatPanelProps {
+  open?: boolean;
+  onClose?: () => void;
+  showLauncher?: boolean;
+}
+
+export function ChatPanel({ open: controlledOpen, onClose, showLauncher = true }: ChatPanelProps = {}) {
   const { room, myPlayerId, chatMessages, unreadChatCount, markChatRead, sendChat } = useGame();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+
+  function closePanel() {
+    if (onClose) onClose();
+    else setInternalOpen(false);
+  }
   // Lifts the panel above the mobile keyboard so the composer stays visible.
   const { keyboardOpen, keyboardHeight } = useVisualViewport();
   const [text, setText] = useState('');
@@ -138,24 +150,26 @@ export function ChatPanel() {
 
   return (
     <>
-      <button className="chat-toggle fab" onClick={() => setOpen((o) => !o)} aria-label="Toggle chat">
-        <ChromeIcon name="chat" />
-        {!open && unreadChatCount > 0 && (
-          <span className="chat-toggle__badge">
-            {Math.min(unreadChatCount, 9)}
-            {unreadChatCount > 9 ? '+' : ''}
-          </span>
-        )}
-      </button>
+      {showLauncher && (
+        <button className="chat-toggle fab" onClick={() => setInternalOpen((o) => !o)} aria-label="Toggle chat">
+          <ChromeIcon name="chat" />
+          {!open && unreadChatCount > 0 && (
+            <span className="chat-toggle__badge">
+              {Math.min(unreadChatCount, 9)}
+              {unreadChatCount > 9 ? '+' : ''}
+            </span>
+          )}
+        </button>
+      )}
 
       {open && (
         <div
-          className={`chat-panel panel${keyboardOpen ? ' is-keyboard-open' : ''}`}
+          className={`chat-panel panel${showLauncher ? '' : ' is-table-utility'}${keyboardOpen ? ' is-keyboard-open' : ''}`}
           style={{ '--keyboard-height': `${keyboardHeight}px` } as React.CSSProperties}
         >
           <div className="chat-panel__header">
             <span>Table Chat</span>
-            <button className="chat-panel__close" onClick={() => setOpen(false)} aria-label="Close chat">
+            <button className="chat-panel__close" onClick={closePanel} aria-label="Close chat">
               <ChromeIcon name="close" />
             </button>
           </div>

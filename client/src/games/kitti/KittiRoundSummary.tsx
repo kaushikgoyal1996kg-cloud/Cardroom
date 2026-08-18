@@ -5,7 +5,7 @@ import { useVisualViewport } from '../../platform/lib/useVisualViewport';
 import './KittiResult.css';
 
 export function KittiRoundSummary() {
-  const { room, myPlayerId, lastKittiRoundResult, kittiState, startNextKittiRound } = useGame();
+  const { room, myPlayerId, lastKittiRoundResult, kittiState, startNextKittiRound, goToHomeScreen } = useGame();
   const { viewportHeight } = useVisualViewport();
   if (!room || !lastKittiRoundResult || !kittiState) {
     return <div className="waiting-screen"><LoadingSpinner message="Preparing round result…" /></div>;
@@ -84,6 +84,7 @@ export function KittiRoundSummary() {
         ) : (
           <p>Waiting for the host to deal the next round…</p>
         )}
+        <button type="button" className="btn btn-ghost" onClick={goToHomeScreen}>Card Room</button>
       </footer>
     </main>
   );

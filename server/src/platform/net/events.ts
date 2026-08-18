@@ -1,9 +1,12 @@
 import type { Card, DismissalReason, PlayerId, RoundResult, SubRoundResult } from '../../games/hazari/types.js';
 import type { Card as PlatformCard } from '../cards/index.js';
 import type { KittiRoundResult } from '../../games/kitti/engine.js';
-import type { PlayerSettlement as TeenPattiPlayerSettlement, RoundOutcome as TeenPattiRoundOutcome, TeenPattiAction } from '../../games/teenpatti/engine.js';
+import type { PlayerSettlement as TeenPattiPlayerSettlement, RoundOutcome as TeenPattiRoundOutcome, TeenPattiAction, TeenPattiFriendlyAssistPrivateState, TeenPattiFriendlySuggestion } from '../../games/teenpatti/engine.js';
 import type { TeenPattiLobbySetupPublic } from '../../games/teenpatti/lobbySetup.js';
-import type { TeenPattiRoundVariantConfig, TeenPattiTableConfig } from '../../games/teenpatti/rules.js';
+import type { TeenPattiRoundVariantConfig, TeenPattiTableConfig, TeenPattiTwoReferenceAssignment, TeenPattiVariantTablePolicy } from '../../games/teenpatti/rules.js';
+import type { PokerAction, PokerHandOutcome, PokerPlayerSettlement, PokerPrivateState, PokerPublicState } from '../../games/poker/engine.js';
+import type { PokerLobbySetupPublic } from '../../games/poker/lobbySetup.js';
+import type { PokerTableConfig, PokerVariantId } from '../../games/poker/rules.js';
 import type { PublicRoomInfo, TableSummary } from '../rooms/types.js';
 import type { GameId } from '../games/registry.js';
 
@@ -48,12 +51,29 @@ export interface ClientToServerEvents {
   'kitti:startNextRound': () => void;
 
   // Teen Patti
-  'teenpatti:proposeSetup': (payload: { tableConfig: TeenPattiTableConfig; roundVariant: TeenPattiRoundVariantConfig }, ack: (res: TeenPattiSetupAck) => void) => void;
+  'teenpatti:proposeSetup': (payload: { tableConfig: TeenPattiTableConfig; roundVariant: TeenPattiRoundVariantConfig; variantPolicy: TeenPattiVariantTablePolicy }, ack: (res: TeenPattiSetupAck) => void) => void;
   'teenpatti:acceptSetup': (payload: { revision: number }, ack: (res: TeenPattiSetupAck) => void) => void;
-  'teenpatti:action': (payload: { action: TeenPattiAction; expectedSeq?: number }) => void;
-  'teenpatti:topUp': (payload: { amount: number }) => void;
-  'teenpatti:startNextRound': () => void;
+  'teenpatti:chooseRoundVariant': (payload: { roundVariant: TeenPattiRoundVariantConfig; expectedSeq: number }) => void;
+  'teenpatti:chooseSurpriseRound': (payload: { expectedSeq: number }) => void;
+  'teenpatti:assignTwoReference': (payload: { upDownReferenceIndex: 0 | 1; expectedSeq: number }) => void;
+  'teenpatti:chooseDiscards': (payload: { discardedSlots: number[]; expectedSeq: number }) => void;
+  'teenpatti:friendlyAssistRequest': (payload: { targetPlayerId: PlayerId; expectedRoundNumber: number }) => void;
+  'teenpatti:friendlyAssistRespond': (payload: { requestId: string; accept: boolean }) => void;
+  'teenpatti:friendlyAssistRevoke': (payload: { requestId: string }) => void;
+  'teenpatti:friendlyAssistSuggest': (payload: { requestId: string; suggestion: TeenPattiFriendlySuggestion }) => void;
+  'teenpatti:action': (payload: { action: TeenPattiAction; expectedSeq: number }) => void;
+  'teenpatti:topUp': (payload: { amount: number; expectedSeq: number }) => void;
+  'teenpatti:startNextRound': (payload: { expectedSeq: number }) => void;
   'teenpatti:leaveTable': (ack: (res: TeenPattiLeaveAck) => void) => void;
+
+  // Poker (network remains gated until the controller is fully verified)
+  'poker:proposeSetup': (payload: { config: PokerTableConfig }, ack: (res: PokerSetupAck) => void) => void;
+  'poker:acceptSetup': (payload: { revision: number }, ack: (res: PokerSetupAck) => void) => void;
+  'poker:chooseVariant': (payload: { variantId: PokerVariantId; expectedSeq: number }) => void;
+  'poker:action': (payload: { action: PokerAction; expectedSeq: number }) => void;
+  'poker:topUp': (payload: { amount: number; expectedSeq: number }) => void;
+  'poker:startNextHand': (payload: { expectedSeq: number }) => void;
+  'poker:leaveTable': (ack: (res: PokerLeaveAck) => void) => void;
 
   // Voice/WebRTC signaling
   'voice:getIceServers': (ack: (res: VoiceIceServersAck) => void) => void;
@@ -128,6 +148,19 @@ export interface TeenPattiLeaveAck {
   tableEnded?: boolean;
 }
 
+export interface PokerSetupAck {
+  ok: boolean;
+  error?: string;
+  setup?: PokerLobbySetupPublic;
+}
+
+export interface PokerLeaveAck {
+  ok: boolean;
+  error?: string;
+  settlement?: PokerPlayerSettlement;
+  tableEnded?: boolean;
+}
+
 // ============================================================================
 // SERVER -> CLIENT events
 // ============================================================================
@@ -162,6 +195,14 @@ export interface ServerToClientEvents {
     settlements: TeenPattiPlayerSettlement[];
   }) => void;
 
+  // Poker private/public state. These events are typed before Poker is
+  // network-enabled so reconnect/action plumbing can be verified behind the gate.
+  'poker:setup': (payload: { setup: PokerLobbySetupPublic | null }) => void;
+  'poker:private': (payload: PokerPrivateState) => void;
+  'poker:state': (publicState: PokerPublicState) => void;
+  'poker:handComplete': (payload: { result: PokerHandOutcome }) => void;
+  'poker:tableEnded': (payload: { reason: 'NOT_ENOUGH_PLAYERS'; settlements: PokerPlayerSettlement[] }) => void;
+
   // Voice
   'voice:participants': (payload: { playerIds: PlayerId[] }) => void;
   'voice:peerJoined': (payload: { playerId: PlayerId }) => void;
@@ -186,6 +227,9 @@ export interface HaazariPublicStatePayload {
   dealerId: PlayerId;
   roundNumber: number;
   cumulativeScores: Record<PlayerId, number>;
+  /** Completed rounds to date. Public and reconnect-safe so in-game Round History
+   *  is authoritative instead of depending on one-off client events. */
+  roundHistory: RoundResult[];
   currentSetIndex: number;
   currentLeader: PlayerId | null;
   currentPlayOrder: PlayerId[] | null;
@@ -228,6 +272,8 @@ export interface KittiPublicStatePayload {
   deciderPlayerIds: PlayerId[];
   roundWinnerId: PlayerId | null;
   roundsWon: Record<PlayerId, number>;
+  /** Completed rounds to date. Public and reconnect-safe for the in-game history sheet. */
+  roundHistory: KittiRoundResult[];
   matchWinnerId: PlayerId | null;
   initialDealerDraws: {
     contenders: PlayerId[];
@@ -237,10 +283,19 @@ export interface KittiPublicStatePayload {
 
 
 export interface TeenPattiPrivateStatePayload {
+  roundNumber: number;
+  sequence: number;
   cards: PlatformCard[];
   cardCount: number;
   cardsViewed: boolean;
   seen: boolean;
+  friendlyAssist: TeenPattiFriendlyAssistPrivateState;
+  twoReferenceAssignment: TeenPattiTwoReferenceAssignment | null;
+  discardState: {
+    complete: boolean;
+    selectedSlots: number[];
+    legalSelections: number[][];
+  } | null;
 }
 
 export interface TeenPattiPublicStatePayload {
@@ -255,11 +310,27 @@ export interface TeenPattiPublicStatePayload {
   currentTurn: PlayerId | null;
   sequence: number;
   tableConfig: TeenPattiTableConfig;
+  variantPolicy: TeenPattiVariantTablePolicy;
   variant: TeenPattiRoundVariantConfig;
+  variantDecision: 'CHOOSE_VARIANT' | 'CONFIGURE_VARIANT' | null;
+  variantWasSurprise: boolean;
+  variantName: string;
+  nextVariantChooserId: PlayerId | null;
+  variantDealCount: number;
   variantHelp: string;
+  variantReferenceCards: PlatformCard[];
+  twoReferenceAssignmentsComplete: number;
+  discardSelectionsComplete: number;
   initialDealerDraws: { contenders: PlayerId[]; draws: { playerId: PlayerId; card: PlatformCard }[] }[];
-  lastSideshow: { initiatorId: PlayerId; opponentId: PlayerId; packedPlayerId: PlayerId; tied: boolean } | null;
+  lastSideshow: {
+    initiatorId: PlayerId;
+    opponentId: PlayerId;
+    packedPlayerId: PlayerId;
+    tied: boolean;
+    revealedHands?: { playerId: PlayerId; cards: PlatformCard[]; discardedCardIds?: string[]; description: string }[];
+  } | null;
   openShowRequestFrom: PlayerId | null;
+  openShowAcceptedBy: PlayerId[];
   players: {
     playerId: PlayerId;
     chips: number;
@@ -269,7 +340,11 @@ export interface TeenPattiPublicStatePayload {
     committed: number;
     blindTurns: number;
     topUps: number;
+    roundsWon: number;
     profitLoss: number;
+    referenceAssigned: boolean;
+    discardLocked: boolean;
   }[];
+  roundHistory: TeenPattiRoundOutcome[];
   lastOutcome: TeenPattiRoundOutcome | null;
 }

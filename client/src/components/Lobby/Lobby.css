@@ -222,7 +222,7 @@
 
 .tables-browser__row-actions .btn {
   padding: 6px 14px;
-  min-height: 34px;
+  min-height: var(--touch-min);
 }
 
 .landing__invite-note {
@@ -236,7 +236,7 @@
 
 
 
-/* ==========================================================================
+/* ========================================================================== 
    Multi-game shared invitation — invite links skip Welcome, but no longer
    fall back to the old Hazari-only landing page.
    ========================================================================== */
@@ -283,17 +283,21 @@
   text-align: center;
 }
 .invite-card__seal {
-  width: 3.5rem;
-  height: 3.5rem;
+  width: 3.8rem;
+  height: 3.8rem;
   display: grid;
   place-items: center;
-  border: 1px solid var(--brass-600);
-  border-radius: 50%;
-  background: linear-gradient(145deg, #3a291c, #15100c 72%);
-  box-shadow: inset 0 0 0 4px rgba(8,6,4,.55), 0 8px 20px rgba(0,0,0,.4);
-  color: var(--brass-300);
-  font: 500 .92rem/1 var(--font-display);
-  letter-spacing: .08em;
+  overflow: hidden;
+  border: 1px solid rgba(200,164,92,.62);
+  border-radius: .95rem;
+  background: #0a0e0c;
+  box-shadow: 0 9px 24px rgba(0,0,0,.42);
+}
+.invite-card__seal img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 .invite-card__eyebrow {
   margin: var(--space-1) 0 0;
@@ -372,7 +376,7 @@
 @media (orientation: landscape) and (max-height: 30rem) {
   .invite-arrival { align-items: start; overflow-y: auto; padding-top: calc(var(--safe-top) + var(--space-2)); }
   .invite-card { padding: 1rem 1.25rem; }
-  .invite-card__seal { width: 2.6rem; height: 2.6rem; }
+  .invite-card__seal { width: 2.85rem; height: 2.85rem; border-radius: .72rem; }
   .invite-card h1 { font-size: 1.75rem; }
   .invite-card__code-block { margin-block: .2rem; padding-block: .45rem; }
 }

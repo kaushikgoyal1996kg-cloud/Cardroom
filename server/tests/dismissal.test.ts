@@ -17,11 +17,37 @@ const sixPairHand: Card[] = [
   c('8', 'SPADES'),
 ];
 
+const trialButNoSequenceHand: Card[] = [
+  c('A', 'SPADES'), c('A', 'HEARTS'), c('A', 'DIAMONDS'),
+  c('5', 'SPADES'), c('5', 'HEARTS'),
+  c('8', 'SPADES'), c('8', 'HEARTS'),
+  c('J', 'SPADES'), c('J', 'HEARTS'),
+  c('3', 'CLUBS'), c('6', 'CLUBS'), c('10', 'DIAMONDS'), c('K', 'CLUBS'),
+];
+
 const normalHand: Card[] = [
   c('A', 'SPADES'), c('K', 'HEARTS'), c('Q', 'DIAMONDS'), c('J', 'CLUBS'), c('9', 'SPADES'),
   c('7', 'HEARTS'), c('5', 'DIAMONDS'), c('3', 'CLUBS'), c('2', 'SPADES'), c('4', 'HEARTS'),
   c('6', 'DIAMONDS'), c('8', 'CLUBS'), c('10', 'SPADES'),
 ];
+
+describe('No-sequence dismissal with a Trial', () => {
+  it('is eligible because Trial/Trail is not a Sequence', () => {
+    const eligibility = getDismissalEligibility(trialButNoSequenceHand);
+    expect(eligibility.eligible).toBe(true);
+    expect(eligibility.reasons).toContain('NO_SEQUENCE');
+    expect(eligibility.reasons).not.toContain('SIX_PAIRS');
+  });
+
+  it('is accepted before arrangement because raw-deal eligibility is authoritative', () => {
+    const outcome = processDismissalRequest(
+      { playerId: 'P1', claimedReason: 'NO_SEQUENCE' },
+      trialButNoSequenceHand,
+      undefined,
+    );
+    expect(outcome.accepted).toBe(true);
+  });
+});
 
 describe('getDismissalEligibility', () => {
   it('is eligible via SIX_PAIRS on the raw hand', () => {

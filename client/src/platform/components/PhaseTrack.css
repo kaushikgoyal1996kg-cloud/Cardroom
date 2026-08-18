@@ -1,0 +1,87 @@
+.phase-track {
+  --phase-line: rgba(200, 164, 92, .24);
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.phase-track__step {
+  position: relative;
+  min-width: 2.65rem;
+  display: grid;
+  justify-items: center;
+  gap: .18rem;
+  color: var(--ink-600);
+}
+
+.phase-track__step + .phase-track__step::before {
+  content: '';
+  position: absolute;
+  top: .65rem;
+  right: 50%;
+  width: 100%;
+  height: 1px;
+  background: var(--phase-line);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.phase-track__node {
+  position: relative;
+  z-index: 1;
+  width: 1.3rem;
+  height: 1.3rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(200, 164, 92, .24);
+  border-radius: 50%;
+  background: rgba(11, 10, 8, .96);
+  color: var(--ink-500);
+  font: 650 .56rem/1 var(--font-numeric);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
+}
+
+.phase-track__label {
+  max-width: 4.4rem;
+  overflow: hidden;
+  color: currentColor;
+  font-size: .52rem;
+  letter-spacing: .1em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.phase-track__step.is-done { color: rgba(220, 192, 134, .62); }
+.phase-track__step.is-done .phase-track__node {
+  border-color: rgba(200, 164, 92, .42);
+  color: var(--brass-300);
+  background: rgba(73, 54, 31, .46);
+}
+.phase-track__step.is-active { color: var(--brass-300); }
+.phase-track__step.is-active .phase-track__node {
+  border-color: rgba(226, 198, 137, .84);
+  color: #1a140d;
+  background: linear-gradient(180deg, #e3c783, var(--brass-500));
+  box-shadow: 0 0 0 3px rgba(200,164,92,.08), 0 0 15px rgba(200,164,92,.14);
+}
+
+.phase-track--compact .phase-track__step { min-width: 2.25rem; }
+.phase-track--compact .phase-track__label { display: none; }
+
+@media (max-width: 23.75rem) {
+  .phase-track__step { min-width: 2.25rem; }
+  .phase-track__label { display: none; }
+}
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .phase-track__step { min-width: 2.15rem; }
+  .phase-track__label { display: none; }
+  .phase-track__node { width: 1.15rem; height: 1.15rem; }
+  .phase-track__step + .phase-track__step::before { top: .575rem; }
+}

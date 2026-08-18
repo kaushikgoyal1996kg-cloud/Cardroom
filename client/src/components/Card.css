@@ -79,27 +79,33 @@
 .hz-card__back-pattern {
   position: absolute;
   inset: 4px;
-  border: 1px solid rgba(201, 162, 39, 0.5);
+  overflow: hidden;
+  border: 1px solid rgba(201, 162, 39, 0.58);
   border-radius: 6px;
-  /* Peacock-eye motif - same concentric-ring mark as the app icon and
-     PeacockMotif brand element, so every card reinforces the identity
-     instead of a generic dot-grid pattern. Percentage-based radii scale
-     cleanly across all three card sizes. */
   background:
-    radial-gradient(
-      circle at center,
-      transparent 35%,
-      rgba(201, 162, 39, 0.6) 36%,
-      rgba(201, 162, 39, 0.6) 39%,
-      transparent 40%
-    ),
-    radial-gradient(
-      circle at center,
-      transparent 19%,
-      rgba(232, 203, 107, 0.75) 20%,
-      rgba(232, 203, 107, 0.75) 23%,
-      transparent 24%
-    ),
-    radial-gradient(circle at center, rgba(232, 203, 107, 0.9) 0%, rgba(232, 203, 107, 0.9) 9%, transparent 10%);
-  background-repeat: no-repeat;
+    linear-gradient(45deg, transparent 46%, rgba(232,203,107,.09) 47% 53%, transparent 54%),
+    linear-gradient(-45deg, transparent 46%, rgba(232,203,107,.09) 47% 53%, transparent 54%),
+    linear-gradient(180deg, rgba(10,35,27,.96), rgba(5,18,14,.98));
+  background-size: 12px 12px, 12px 12px, auto;
+  box-shadow: inset 0 0 0 2px rgba(7,22,17,.86), inset 0 0 0 3px rgba(201,162,39,.14);
+}
+
+.hz-card__back-pattern::before {
+  content: '♠';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -52%;
+  display: grid;
+  place-items: center;
+  width: 48%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(232,203,107,.55);
+  border-radius: 30% 30% 42% 42%;
+  background: rgba(9,28,22,.92);
+  color: rgba(232,203,107,.88);
+  font-family: Georgia, serif;
+  font-size: 1.45em;
+  line-height: 1;
+  box-shadow: 0 0 0 2px rgba(9,28,22,.85), 0 0 0 3px rgba(201,162,39,.11);
 }

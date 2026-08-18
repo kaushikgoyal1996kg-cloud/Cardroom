@@ -1,0 +1,400 @@
+.poker-runtime {
+  position: relative;
+  width: 100%;
+  height: var(--app-height, 100dvh);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.poker-hand-result {
+  position: fixed;
+  z-index: 36;
+  top: max(calc(var(--safe-top) + .55rem), .65rem);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(calc(100vw - var(--safe-left) - var(--safe-right) - 1rem), 34rem);
+  max-height: min(46dvh, 22rem);
+  min-width: 0;
+  display: grid;
+  gap: .5rem;
+  padding: .55rem .62rem;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid rgba(200,164,92,.38);
+  border-radius: .82rem;
+  background:
+    repeating-linear-gradient(92deg, rgba(255,255,255,.012) 0 1px, transparent 1px 8px),
+    linear-gradient(180deg, var(--wood-800), var(--wood-900));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 .55rem 1.45rem rgba(0,0,0,.34);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(200,164,92,.38) transparent;
+}
+
+.poker-hand-result__summary {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+}
+
+.poker-hand-result__actions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .35rem;
+}
+
+.poker-hand-result__copy {
+  min-width: 0;
+  display: grid;
+  gap: .06rem;
+}
+
+.poker-hand-result__copy span,
+.poker-hand-result__copy small,
+.poker-hand-result__waiting {
+  color: var(--ink-400);
+  font-size: .62rem;
+  letter-spacing: .035em;
+}
+
+.poker-hand-result__copy strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-100);
+  font-size: .82rem;
+}
+
+.poker-hand-result button {
+  flex: 0 0 auto;
+  min-height: var(--touch-min);
+  padding: .35rem .8rem;
+  border: 1px solid rgba(220,192,134,.56);
+  border-radius: .58rem;
+  background: linear-gradient(180deg, var(--felt-600), var(--felt-800));
+  color: var(--ink-100);
+  font: inherit;
+  font-size: .72rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.poker-hand-result button:focus-visible {
+  outline: 2px solid var(--brass-300);
+  outline-offset: 2px;
+}
+
+.poker-hand-result button.is-secondary {
+  border-color: rgba(200,164,92,.28);
+  background: linear-gradient(180deg, #30251d, #1a1511);
+  color: var(--ink-300);
+}
+
+.poker-hand-result__pots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.2rem, 1fr));
+  gap: .34rem;
+}
+
+.poker-hand-result__pots > span {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: .04rem .34rem;
+  padding: .34rem .42rem;
+  border: 1px solid rgba(200,164,92,.2);
+  border-radius: .55rem;
+  background: rgba(4,16,12,.28);
+}
+
+.poker-hand-result__pots small {
+  color: var(--ink-400);
+  font-size: .56rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.poker-hand-result__pots strong {
+  color: var(--brass-200, #dcc086);
+  font-size: .76rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.poker-hand-result__pots em {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-300, var(--ink-400));
+  font-size: .57rem;
+  font-style: normal;
+}
+
+.poker-hand-result__showdown {
+  display: grid;
+  gap: .28rem;
+}
+
+.poker-hand-result__showdown > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(5.2rem, 1fr) auto;
+  align-items: center;
+  gap: .45rem;
+  padding: .3rem .38rem;
+  border: 1px solid rgba(200,164,92,.14);
+  border-radius: .58rem;
+  background: rgba(3,12,9,.18);
+}
+
+.poker-hand-result__showdown > div.is-winner {
+  border-color: rgba(220,192,134,.48);
+  background: linear-gradient(90deg, rgba(49,104,75,.24), rgba(3,12,9,.18));
+  box-shadow: inset .16rem 0 0 rgba(220,192,134,.54);
+}
+
+.poker-hand-result__showdown > div > span:first-child {
+  min-width: 0;
+  display: grid;
+  gap: .04rem;
+  overflow: hidden;
+  color: var(--ink-100);
+  font-size: .68rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.poker-hand-result__showdown > div > span:first-child small {
+  overflow: hidden;
+  color: var(--ink-400);
+  font-size: .54rem;
+  font-weight: 500;
+  letter-spacing: .025em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.poker-hand-result__cards {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  padding-right: .15rem;
+}
+
+.poker-hand-result__cards > * + * {
+  margin-left: -1.12rem;
+}
+
+@media (orientation: portrait) and (max-width: 520px) {
+  .poker-hand-result {
+    top: max(calc(var(--safe-top) + .45rem), .52rem);
+    width: min(calc(100vw - var(--safe-left) - var(--safe-right) - .8rem), 30rem);
+    max-height: min(43dvh, 19rem);
+  }
+
+  .poker-hand-result__showdown > div {
+    grid-template-columns: minmax(4.5rem, .8fr) minmax(8.5rem, 1.2fr);
+  }
+
+  .poker-hand-result__cards > * + * {
+    margin-left: -1.18rem;
+  }
+
+  .poker-hand-result__summary { align-items: flex-start; }
+  .poker-hand-result__actions { max-width: 8.5rem; }
+  .poker-hand-result__actions button { flex: 1 1 auto; }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .poker-hand-result {
+    top: max(calc(var(--safe-top) + .25rem), .3rem);
+    left: max(calc(var(--safe-left) + .45rem), .5rem);
+    transform: none;
+    width: min(30rem, calc(100vw - var(--safe-left) - var(--safe-right) - 8rem));
+    max-height: calc(var(--app-height, 100dvh) - var(--safe-top) - var(--safe-bottom) - 5rem);
+    padding: .38rem .46rem;
+    gap: .32rem;
+  }
+
+  .poker-hand-result__summary { gap: .45rem; }
+  .poker-hand-result__actions { gap: .26rem; }
+  .poker-hand-result__actions button { padding-inline: .58rem; }
+  .poker-hand-result__pots { grid-template-columns: repeat(auto-fit, minmax(6.3rem, 1fr)); }
+  .poker-hand-result__showdown { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .poker-hand-result__showdown > div { grid-template-columns: minmax(3.6rem, .75fr) minmax(6rem, 1.25fr); }
+  .poker-hand-result__cards > * + * { margin-left: -1.25rem; }
+}
+
+/* Between-hand bankroll controls deliberately read as table furniture, not a
+   cashier. They only add virtual play chips and are never shown mid-hand. */
+.poker-bankroll {
+  position: fixed;
+  z-index: 35;
+  right: max(var(--safe-right), .55rem);
+  bottom: max(calc(var(--safe-bottom) + .55rem), .65rem);
+  width: min(calc(100vw - var(--safe-left) - var(--safe-right) - 1.1rem), 24rem);
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 1fr) auto;
+  gap: .46rem .55rem;
+  align-items: center;
+  padding: .55rem .62rem;
+  border: 1px solid rgba(200,164,92,.34);
+  border-radius: .82rem;
+  background:
+    repeating-linear-gradient(92deg, rgba(255,255,255,.012) 0 1px, transparent 1px 8px),
+    linear-gradient(180deg, var(--wood-800), var(--wood-900));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 .55rem 1.45rem rgba(0,0,0,.34);
+}
+
+.poker-runtime--choice .poker-bankroll {
+  bottom: max(calc(var(--safe-bottom) + .5rem), .6rem);
+}
+
+.poker-bankroll__copy {
+  min-width: 0;
+  display: grid;
+  gap: .04rem;
+}
+
+.poker-bankroll__copy span,
+.poker-bankroll__custom span {
+  color: var(--ink-400);
+  font-size: .59rem;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+.poker-bankroll__copy strong {
+  color: var(--ink-100);
+  font-size: .88rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.poker-bankroll__copy small {
+  color: var(--ink-400);
+  font-size: .57rem;
+  line-height: 1.2;
+}
+
+.poker-bankroll__presets {
+  display: flex;
+  justify-content: flex-end;
+  gap: .24rem;
+}
+
+.poker-bankroll__presets button,
+.poker-bankroll__add {
+  min-height: var(--touch-min);
+  border: 1px solid rgba(200,164,92,.31);
+  border-radius: .54rem;
+  background: linear-gradient(180deg, var(--wood-700), var(--wood-900));
+  color: var(--ink-100);
+  font: inherit;
+  font-size: .68rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.poker-bankroll__presets button {
+  min-width: 3.2rem;
+  padding: .2rem .42rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.poker-bankroll__presets button.is-active {
+  border-color: rgba(220,192,134,.64);
+  background: linear-gradient(180deg, var(--felt-600), var(--felt-800));
+}
+
+.poker-bankroll__custom {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(4.6rem, 1fr);
+  align-items: center;
+  gap: .4rem;
+}
+
+.poker-bankroll__custom input {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--touch-min);
+  padding: .25rem .42rem;
+  border: 1px solid rgba(200,164,92,.3);
+  border-radius: .5rem;
+  background: var(--felt-950, #07110e);
+  color: var(--ink-100);
+  font: inherit;
+  font-size: .72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.poker-bankroll__add {
+  padding: .28rem .68rem;
+  border-color: rgba(220,192,134,.56);
+  background: linear-gradient(180deg, var(--felt-600), var(--felt-800));
+  white-space: nowrap;
+}
+
+.poker-bankroll__presets button:focus-visible,
+.poker-bankroll__custom input:focus-visible,
+.poker-bankroll__add:focus-visible {
+  outline: 2px solid var(--brass-300);
+  outline-offset: 2px;
+}
+
+@media (orientation: portrait) and (max-width: 520px) {
+  .poker-bankroll {
+    left: max(var(--safe-left), .45rem);
+    right: max(var(--safe-right), .45rem);
+    width: auto;
+    grid-template-columns: 1fr auto;
+    bottom: max(calc(var(--safe-bottom) + .45rem), .5rem);
+  }
+  .poker-bankroll__presets {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .poker-bankroll__presets button { min-width: 0; }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .poker-bankroll {
+    right: max(calc(var(--safe-right) + 3.4rem), 3.7rem);
+    bottom: max(var(--safe-bottom), .25rem);
+    width: min(31rem, calc(100vw - var(--safe-left) - var(--safe-right) - 8rem));
+    grid-template-columns: minmax(7rem, 1fr) auto minmax(7.5rem, .9fr) auto;
+    padding: .3rem .42rem;
+  }
+  .poker-bankroll__copy small { display: none; }
+  .poker-bankroll__presets button,
+  .poker-bankroll__add,
+  .poker-bankroll__custom input { min-height: var(--touch-min); }
+}
+
+/* The chooser keeps a dedicated lower rail clear for the between-hand chip
+   control. This prevents the secondary top-up surface from covering Dealer
+   Choice cards or the primary Deal button on short phones. */
+.poker-runtime--choice .poker-variant-choice {
+  padding-bottom: max(calc(var(--safe-bottom) + 6.15rem), 6.45rem);
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .poker-runtime--choice .poker-variant-choice {
+    padding-bottom: max(calc(var(--safe-bottom) + 3.85rem), 4.1rem);
+  }
+}
+
+.poker-bankroll__add:disabled {
+  opacity: .58;
+  cursor: default;
+}

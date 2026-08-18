@@ -163,6 +163,11 @@ describe('dismissal voids the whole round for everyone', () => {
     expect(game.dealerId).not.toBe(dealerBefore);
     expect(game.roundHistory[0].dismissed).toBe(true);
     expect(game.roundHistory[0].pointsThisRound).toEqual({ P1: 0, P2: 0, P3: 0, P4: 0 });
+    // Round History must remain available from authoritative public state
+    // during the next live round / after reconnect, not only from a transient
+    // roundComplete event received by this browser session.
+    expect(game.getPublicState().roundHistory).toHaveLength(1);
+    expect(game.getPublicState().roundHistory[0]).toMatchObject({ roundNumber: 1, dismissed: true });
   });
 
   it('rejects dismissal from an ineligible player', () => {
@@ -262,7 +267,7 @@ describe('getPublicState().playersConfirmedArrangement', () => {
 
 describe('requestDismissal - NO_SEQUENCE claim BEFORE confirming (the proposedSets fix)', () => {
   // 13 cards with no 3 ranks ever consecutive and no rank appearing 3+
-  // times - so no sequence, pure sequence, or trail can exist anywhere in
+  // times - so no Sequence or Pure Sequence can exist anywhere in
   // this hand, in ANY possible arrangement.
   const noSequenceHand = [
     { rank: 'A' as const, suit: 'SPADES' as const, id: 'SPADES_A' },
@@ -287,19 +292,14 @@ describe('requestDismissal - NO_SEQUENCE claim BEFORE confirming (the proposedSe
     [noSequenceHand[9], noSequenceHand[10], noSequenceHand[11], noSequenceHand[12]],
   ];
 
-  it('REPRODUCES THE BUG: fails with "not eligible" when claimed with no arrangement confirmed and no proposed sets given', () => {
+  it('allows NO_SEQUENCE dismissal immediately from the raw dealt hand', () => {
     const game = new HaazariGame('ROOM1', PLAYERS, 'P1');
     dealFixtureRound(game);
     (game as any).hands['P1'] = noSequenceHand;
 
-    // Exactly what the old client code did: claim NO_SEQUENCE with nothing
-    // confirmed and no proposal - this used to be the only path available.
     const outcome = game.requestDismissal('P1', 'NO_SEQUENCE');
-    expect(outcome.ok).toBe(false);
-    // (This hand also happens to satisfy SIX_PAIRS, so the exact message
-    // varies - either "not eligible" or "does not apply to your hand" -
-    // the point is NO_SEQUENCE specifically is refused without a
-    // confirmed/proposed arrangement to check it against.)
+    expect(outcome.ok).toBe(true);
+    expect(game.state).toBe('DISMISSED_ROUND');
   });
 
   it('THE FIX: succeeds when the draft arrangement is submitted alongside the claim', () => {

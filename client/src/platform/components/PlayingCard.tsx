@@ -82,6 +82,7 @@ export const PlayingCard = memo(function PlayingCard({
     highlighted && 'is-highlighted',
     disabled && 'is-disabled',
     interactive && 'is-interactive',
+    card && `is-${SUIT_NAME[card.suit]}`,
   ]
     .filter(Boolean)
     .join(' ');

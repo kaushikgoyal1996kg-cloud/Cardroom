@@ -50,7 +50,7 @@
   .kitti-reveal { place-items: center; }
 }
 
-/* ==========================================================================
+/* ========================================================================== 
    Premium release pass — active Kitti table. Shared CardTable stays the hero;
    the rack should read as a quiet wooden card rail, not three app panels.
    ========================================================================== */
@@ -94,8 +94,7 @@
   background: linear-gradient(180deg, rgba(23,18,14,.96), #080706);
 }
 .kitti-reveal {
-  background: rgba(3,5,4,.7);
-  backdrop-filter: blur(2px);
+  background: rgba(3,5,4,.8);
 }
 .kitti-reveal__sheet {
   border-color: rgba(200,164,92,.42);
@@ -145,4 +144,106 @@
   .kitti-waiting__header { padding-block: .3rem; }
   .kitti-waiting__footer { padding-top: .4rem; padding-bottom: calc(var(--safe-bottom) + .4rem); }
   .kitti-waiting__footer p { display: none; }
+}
+
+/* ========================================================================== 
+   All-games premium shell — phase / hand progress / match status share one
+   shallow rail. The middle progress cue replaces excess status copy and keeps
+   the active table readable at a glance.
+   ========================================================================== */
+.kitti-table-screen__bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+}
+.kitti-table-screen__bar > .phase-track { justify-self: center; }
+.kitti-table-screen__scoreline { justify-self: end; }
+
+/* Three already-arranged hands are a card rail, not a scrollable settings
+   list. On narrow portrait phones the label moves above the cards and each
+   hand occupies exactly one third of the available width. */
+@media (max-width: 24.375rem) and (orientation: portrait) {
+  .kitti-table-screen__bar { column-gap: .25rem; }
+  .kitti-table-screen__scoreline > span { font-size: .56rem; }
+  .kitti-table-screen__eyebrow { font-size: .5rem; }
+  .kitti-table-screen__title { font-size: .9rem; }
+  .kitti-table-screen__rack {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-height: none;
+    overflow: visible;
+    gap: .28rem;
+  }
+  .kitti-mini-hand {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: .18rem;
+    padding: .32rem .18rem;
+  }
+  .kitti-mini-hand__label {
+    min-width: 0;
+    width: 100%;
+    align-items: center;
+    text-align: center;
+  }
+  .kitti-mini-hand__label small {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .kitti-mini-hand__cards {
+    justify-content: center;
+    width: 100%;
+  }
+  .kitti-mini-hand__cards > * + * { margin-left: -.72rem; }
+  .kitti-mini-hand__done {
+    top: .18rem;
+    right: .22rem;
+    font-size: .44rem;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .kitti-table-screen__bar {
+    min-height: 2.35rem;
+    padding-left: calc(var(--safe-left) + .7rem);
+    padding-right: calc(var(--safe-right) + var(--top-fab-reserve));
+  }
+  .kitti-table-screen__eyebrow { display: none; }
+  .kitti-table-screen__title { font-size: .9rem; }
+  .kitti-table-screen__scoreline > span { display: none; }
+}
+
+/* ========================================================================== 
+   Short-landscape table recovery — the local hand rail should not steal the
+   felt. Keep the three arranged hands readable in a slimmer side rail and let
+   the shared physical table use the vertical room that is available because
+   Kitti's hand rail is no longer underneath it in this orientation.
+   ========================================================================== */
+.kitti-mini-hand__cards > * + * { margin-left: -.28rem; }
+
+/* Narrow portrait needs a tighter fan; keep this after the shared overlap so
+   it is not accidentally softened by source order. */
+@media (max-width: 24.375rem) and (orientation: portrait) {
+  .kitti-mini-hand__cards > * + * { margin-left: -.72rem; }
+}
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .kitti-table-screen {
+    grid-template-columns: minmax(0, 1fr) clamp(12.25rem, 30vw, 17rem);
+  }
+  .kitti-table-screen__table .table {
+    max-height: min(76dvh, 20rem);
+  }
+  .kitti-table-screen__rack {
+    padding-inline: .35rem;
+  }
+  .kitti-mini-hand {
+    grid-template-columns: minmax(3.6rem, auto) minmax(0, 1fr);
+    padding-inline: .35rem;
+  }
+  .kitti-mini-hand__label { min-width: 0; }
+  .kitti-mini-hand__cards {
+    justify-content: center;
+    overflow: visible;
+  }
 }

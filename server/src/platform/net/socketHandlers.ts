@@ -3,7 +3,7 @@ import { RoomManager, RoomManagerError } from '../rooms/roomManager.js';
 import { hasPendingBotAction, performOneBotAction } from '../../games/hazari/botController.js';
 import { hasPendingKittiBotAction, performOneKittiBotAction } from '../../games/kitti/botController.js';
 import { HaazariGame } from '../../games/hazari/gameEngine.js';
-import { createGameSession, asHazari, asKitti, asTeenPatti } from '../games/sessions.js';
+import { createGameSession, asHazari, asKitti, asTeenPatti, asPoker } from '../games/sessions.js';
 import { isGameId, type GameId } from '../games/registry.js';
 import { suggestArrangement, suggestArrangementOptions } from '../../games/hazari/arrangement.js';
 import { getArrangementAssistEligibility } from '../../games/hazari/arrangementAssist.js';
@@ -13,6 +13,8 @@ import type { Card as PlatformCard } from '../cards/index.js';
 import type { KittiGame, KittiGroups } from '../../games/kitti/engine.js';
 import { suggestKittiArrangement } from '../../games/kitti/arrangement.js';
 import type { TeenPattiGame } from '../../games/teenpatti/engine.js';
+import type { PokerGame } from '../../games/poker/engine.js';
+import { acceptPokerLobbySetup, createPokerLobbySetup, isPokerLobbySetup, pokerSetupAcceptedByAll, publicPokerLobbySetup } from '../../games/poker/lobbySetup.js';
 import { createTeenPattiLobbySetup, isTeenPattiLobbySetup, publicTeenPattiLobbySetup, teenPattiSetupAcceptedByAll } from '../../games/teenpatti/lobbySetup.js';
 import type { ClientToServerEvents, ServerToClientEvents, HaazariPublicStatePayload, KittiPublicStatePayload, TeenPattiPublicStatePayload } from './events.js';
 import { getVoiceIceServers } from './turnConfig.js';
@@ -102,6 +104,7 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
         ack({ ok: true, roomCode: room.roomCode, playerId, token, room: rooms.toPublic(room) });
         broadcastRoom(io, rooms, room.roomCode);
         broadcastTeenPattiSetup(io, room);
+        broadcastPokerSetup(io, room);
       } catch (err) {
         ack({ ok: false, error: errMessage(err) });
       }
@@ -113,11 +116,13 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
         const name = sanitizeName(playerName);
         const code = roomCode.trim().toUpperCase();
         const { room, playerId, token } = rooms.joinRoom(code, name, avatar);
+        reconcilePokerSetupAfterSeatChange(room);
         rooms.bindSocket(room.roomCode, playerId, socket.id);
         joinSocketToRoom(socket, room.roomCode, playerId);
         ack({ ok: true, roomCode: room.roomCode, playerId, token, room: rooms.toPublic(room) });
         broadcastRoom(io, rooms, room.roomCode);
         broadcastTeenPattiSetup(io, room);
+        broadcastPokerSetup(io, room);
       } catch (err) {
         ack({ ok: false, error: errMessage(err) });
       }
@@ -129,11 +134,13 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
         const name = sanitizeName(playerName);
         const game = resolveGameId(gameId);
         const { room, playerId, token } = rooms.quickMatch(name, game, avatar);
+        reconcilePokerSetupAfterSeatChange(room);
         rooms.bindSocket(room.roomCode, playerId, socket.id);
         joinSocketToRoom(socket, room.roomCode, playerId);
         ack({ ok: true, roomCode: room.roomCode, playerId, token, room: rooms.toPublic(room) });
         broadcastRoom(io, rooms, room.roomCode);
         broadcastTeenPattiSetup(io, room);
+        broadcastPokerSetup(io, room);
       } catch (err) {
         ack({ ok: false, error: errMessage(err) });
       }
@@ -180,6 +187,14 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
         } else {
           broadcastTeenPattiSetup(io, room);
         }
+        const poker = asPoker(room.game);
+        if (poker) {
+          sendPokerPrivateState(io, poker, playerId);
+          sendPokerPublicState(io, room.roomCode, poker);
+          restorePokerResultState(socket, poker);
+        } else {
+          broadcastPokerSetup(io, room);
+        }
       } catch (err) {
         ack({ ok: false, error: errMessage(err) });
       }
@@ -220,7 +235,7 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
       });
     });
 
-    socket.on('teenpatti:proposeSetup', ({ tableConfig, roundVariant }, ack) => {
+    socket.on('teenpatti:proposeSetup', ({ tableConfig, roundVariant, variantPolicy }, ack) => {
       try {
         const { roomCode, playerId } = socket.data;
         if (!roomCode || !playerId) throw new Error('Not currently in a room.');
@@ -229,7 +244,7 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
         if (room.status !== 'LOBBY') throw new Error('Table setup is locked after the game starts.');
         if (room.hostId !== playerId) throw new Error('Only the host can propose the Teen Patti table setup.');
         const previousRevision = isTeenPattiLobbySetup(room.gameSetup) ? room.gameSetup.revision : 0;
-        const setup = createTeenPattiLobbySetup(playerId, tableConfig, roundVariant, previousRevision + 1);
+        const setup = createTeenPattiLobbySetup(playerId, tableConfig, roundVariant, previousRevision + 1, variantPolicy);
         room.gameSetup = setup;
         broadcastTeenPattiSetup(io, room);
         // Keep the narrowed concrete value rather than reading the opaque
@@ -258,10 +273,45 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
       }
     });
 
+    socket.on('poker:proposeSetup', ({ config }, ack) => {
+      try {
+        const { roomCode, playerId } = socket.data;
+        if (!roomCode || !playerId) throw new Error('Not currently in a room.');
+        const room = rooms.getRoomOrThrow(roomCode);
+        if (room.gameId !== 'POKER') throw new Error('That setup applies only to Poker.');
+        if (room.status !== 'LOBBY') throw new Error('Poker table setup is locked after play starts.');
+        if (room.hostId !== playerId) throw new Error('Only the host can propose the Poker table setup.');
+        const previousRevision = isPokerLobbySetup(room.gameSetup) ? room.gameSetup.revision : 0;
+        const setup = createPokerLobbySetup(playerId, config, [...room.players.keys()], previousRevision + 1);
+        room.gameSetup = setup;
+        broadcastPokerSetup(io, room);
+        ack({ ok: true, setup: publicPokerLobbySetup(setup) });
+      } catch (err) {
+        ack({ ok: false, error: errMessage(err) });
+      }
+    });
+
+    socket.on('poker:acceptSetup', ({ revision }, ack) => {
+      try {
+        const { roomCode, playerId } = socket.data;
+        if (!roomCode || !playerId) throw new Error('Not currently in a room.');
+        const room = rooms.getRoomOrThrow(roomCode);
+        if (room.gameId !== 'POKER' || room.status !== 'LOBBY') throw new Error('There is no Poker lobby setup to accept.');
+        if (!room.players.has(playerId)) throw new Error('You are not seated at this table.');
+        if (!isPokerLobbySetup(room.gameSetup)) throw new Error('The host has not proposed Poker table settings yet.');
+        if (revision !== room.gameSetup.revision) throw new Error('Those settings have changed. Review the latest proposal before accepting.');
+        acceptPokerLobbySetup(room.gameSetup, playerId, revision);
+        broadcastPokerSetup(io, room);
+        ack({ ok: true, setup: publicPokerLobbySetup(room.gameSetup) });
+      } catch (err) {
+        ack({ ok: false, error: errMessage(err) });
+      }
+    });
+
     socket.on('room:start', () => {
       withRoom(socket, rooms, (room, playerId) => {
         const playerIds = [...room.players.keys()];
-        let teenPattiOptions: Parameters<typeof createGameSession>[3] = {};
+        let sessionOptions: Parameters<typeof createGameSession>[3] = {};
         if (room.gameId === 'TEEN_PATTI') {
           if (!isTeenPattiLobbySetup(room.gameSetup)) {
             throw new Error('The host must propose Teen Patti table settings before starting.');
@@ -269,12 +319,21 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
           if (!teenPattiSetupAcceptedByAll(room.gameSetup, playerIds)) {
             throw new Error('Every player must accept the Teen Patti table settings before starting.');
           }
-          teenPattiOptions = {
+          sessionOptions = {
             teenPatti: {
               tableConfig: room.gameSetup.tableConfig,
               roundVariant: room.gameSetup.roundVariant,
+              variantPolicy: room.gameSetup.variantPolicy,
             },
           };
+        } else if (room.gameId === 'POKER') {
+          if (!isPokerLobbySetup(room.gameSetup)) {
+            throw new Error('The host must propose Poker table settings before starting.');
+          }
+          if (!pokerSetupAcceptedByAll(room.gameSetup, playerIds)) {
+            throw new Error('Every player must accept the Poker table settings before starting.');
+          }
+          sessionOptions = { poker: { tableConfig: room.gameSetup.config } };
         }
         rooms.startGame(room.roomCode, playerId);
         // The factory decides which engine to build from the room's own
@@ -283,7 +342,7 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
         // BEFORE locking the optional board, so a construction/deal failure
         // can never debit virtual P/L for a match that did not actually start.
         try {
-          room.game = createGameSession(room.gameId, room.roomCode, playerIds, teenPattiOptions);
+          room.game = createGameSession(room.gameId, room.roomCode, playerIds, sessionOptions);
 
           const hazari = asHazari(room.game);
           if (hazari) {
@@ -313,6 +372,15 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
             broadcastRoom(io, rooms, room.roomCode);
             sendTeenPattiPublicState(io, room.roomCode, teenPatti);
             sendAllTeenPattiPrivateState(io, teenPatti);
+            return;
+          }
+
+          const poker = asPoker(room.game);
+          if (poker) {
+            poker.dealHand();
+            broadcastRoom(io, rooms, room.roomCode);
+            sendPokerPublicState(io, room.roomCode, poker);
+            sendAllPokerPrivateState(io, poker);
           }
         } catch (err) {
           // Starting is transactional: never strand a lobby in IN_GAME when
@@ -394,7 +462,8 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
       withRoom(socket, rooms, (room, playerId) => {
         const roomCode = room.roomCode;
         const wasInCall = room.voiceCallParticipants.has(playerId);
-        const leavingTeenPattiHost = room.gameId === 'TEEN_PATTI' && room.status === 'LOBBY' && room.hostId === playerId;
+        const leavingSetupOwner = room.status === 'LOBBY' && room.hostId === playerId
+          && (room.gameId === 'TEEN_PATTI' || room.gameId === 'POKER');
         const remaining = rooms.leaveSession(roomCode, playerId);
         // Detach before any broadcast so this client cannot receive a stale
         // room:update after it has cleared its local session (same class of
@@ -404,9 +473,10 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
           // A Teen Patti proposal belongs to the proposing host. If that host
           // leaves before Start, the new host must explicitly propose settings
           // so nobody inherits consent from a departed host.
-          if (leavingTeenPattiHost) remaining.gameSetup = undefined;
+          if (leavingSetupOwner) remaining.gameSetup = undefined;
           broadcastRoom(io, rooms, roomCode);
           broadcastTeenPattiSetup(io, remaining);
+          broadcastPokerSetup(io, remaining);
         }
         if (wasInCall) io.to(roomCode).emit('voice:peerLeft', { playerId });
       });
@@ -764,7 +834,130 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
     // ------------------------------------------------------------------
     // TEEN PATTI - authoritative Classic controller
     // ------------------------------------------------------------------
+    socket.on('teenpatti:chooseRoundVariant', ({ roundVariant, expectedSeq }) => {
+      if (!Number.isSafeInteger(expectedSeq) || expectedSeq < 0) {
+        socket.emit('game:error', { message: 'Teen Patti round decision is missing the current table sequence.' });
+        return;
+      }
+      withTeenPattiGame(socket, rooms, (game, playerId) => {
+        const result = game.chooseRoundVariant(playerId, roundVariant, expectedSeq);
+        if (!result.ok) {
+          socket.emit('game:error', { message: result.error ?? 'Teen Patti variant selection rejected.' });
+          return;
+        }
+        sendTeenPattiPublicState(io, roomCodeOf(socket), game);
+        sendAllTeenPattiPrivateState(io, game);
+      });
+    });
+
+    socket.on('teenpatti:chooseSurpriseRound', ({ expectedSeq }) => {
+      if (!Number.isSafeInteger(expectedSeq) || expectedSeq < 0) {
+        socket.emit('game:error', { message: 'Teen Patti Surprise Me decision is missing the current table sequence.' });
+        return;
+      }
+      withTeenPattiGame(socket, rooms, (game, playerId) => {
+        const result = game.chooseSurpriseRoundVariant(playerId, expectedSeq);
+        if (!result.ok) {
+          socket.emit('game:error', { message: result.error ?? 'Teen Patti Surprise Me selection rejected.' });
+          return;
+        }
+        sendTeenPattiPublicState(io, roomCodeOf(socket), game);
+        sendAllTeenPattiPrivateState(io, game);
+      });
+    });
+
+    socket.on('teenpatti:assignTwoReference', ({ upDownReferenceIndex, expectedSeq }) => {
+      if (!Number.isSafeInteger(expectedSeq) || expectedSeq < 0) {
+        socket.emit('game:error', { message: 'Two-Reference Joker assignment is missing the current table sequence.' });
+        return;
+      }
+      withTeenPattiGame(socket, rooms, (game, playerId) => {
+        const result = game.assignTwoReference(playerId, upDownReferenceIndex, expectedSeq);
+        if (!result.ok) {
+          socket.emit('game:error', { message: result.error ?? 'Two-Reference Joker assignment rejected.' });
+          return;
+        }
+        sendTeenPattiPublicState(io, roomCodeOf(socket), game);
+        sendAllTeenPattiPrivateState(io, game);
+      });
+    });
+
+    socket.on('teenpatti:chooseDiscards', ({ discardedSlots, expectedSeq }) => {
+      if (!Number.isSafeInteger(expectedSeq) || expectedSeq < 0) {
+        socket.emit('game:error', { message: 'Five-card discard choice is missing the current table sequence.' });
+        return;
+      }
+      if (!Array.isArray(discardedSlots) || discardedSlots.some((slot) => !Number.isInteger(slot))) {
+        socket.emit('game:error', { message: 'Five-card discard choice is malformed.' });
+        return;
+      }
+      withTeenPattiGame(socket, rooms, (game, playerId) => {
+        const result = game.chooseDiscards(playerId, discardedSlots, expectedSeq);
+        if (!result.ok) {
+          socket.emit('game:error', { message: result.error ?? 'Five-card discard choice rejected.' });
+          return;
+        }
+        sendTeenPattiPublicState(io, roomCodeOf(socket), game);
+        sendAllTeenPattiPrivateState(io, game);
+      });
+    });
+
+    socket.on('teenpatti:friendlyAssistRequest', ({ targetPlayerId, expectedRoundNumber }) => {
+      withTeenPattiGame(socket, rooms, (game, playerId) => {
+        if (!Number.isInteger(expectedRoundNumber)) {
+          socket.emit('game:error', { message: 'Friendly Assist request is missing its hand number.' });
+          return;
+        }
+        const result = game.requestFriendlyAssist(playerId, targetPlayerId, expectedRoundNumber);
+        if (!result.ok) {
+          socket.emit('game:error', { message: result.error ?? 'Friendly Assist request rejected.' });
+          return;
+        }
+        sendAllTeenPattiPrivateState(io, game);
+      });
+    });
+
+    socket.on('teenpatti:friendlyAssistRespond', ({ requestId, accept }) => {
+      withTeenPattiGame(socket, rooms, (game, playerId) => {
+        const result = game.respondFriendlyAssist(playerId, requestId, accept);
+        if (!result.ok) {
+          socket.emit('game:error', { message: result.error ?? 'Friendly Assist response rejected.' });
+          return;
+        }
+        // Accepting while blind changes the target to seen betting status, so
+        // refresh both the public table and every private assist surface.
+        sendTeenPattiPublicState(io, roomCodeOf(socket), game);
+        sendAllTeenPattiPrivateState(io, game);
+      });
+    });
+
+    socket.on('teenpatti:friendlyAssistRevoke', ({ requestId }) => {
+      withTeenPattiGame(socket, rooms, (game, playerId) => {
+        const result = game.revokeFriendlyAssist(playerId, requestId);
+        if (!result.ok) {
+          socket.emit('game:error', { message: result.error ?? 'Friendly Assist revoke rejected.' });
+          return;
+        }
+        sendAllTeenPattiPrivateState(io, game);
+      });
+    });
+
+    socket.on('teenpatti:friendlyAssistSuggest', ({ requestId, suggestion }) => {
+      withTeenPattiGame(socket, rooms, (game, playerId) => {
+        const result = game.suggestFriendlyAssist(playerId, requestId, suggestion);
+        if (!result.ok) {
+          socket.emit('game:error', { message: result.error ?? 'Friendly Assist suggestion rejected.' });
+          return;
+        }
+        sendAllTeenPattiPrivateState(io, game);
+      });
+    });
+
     socket.on('teenpatti:action', ({ action, expectedSeq }) => {
+      if (!Number.isSafeInteger(expectedSeq) || expectedSeq < 0) {
+        socket.emit('game:error', { message: 'Teen Patti action is missing the current table sequence.' });
+        return;
+      }
       withTeenPattiGame(socket, rooms, (game, playerId) => {
         const result = game.act(playerId, action, expectedSeq);
         if (!result.ok) {
@@ -781,22 +974,34 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
       });
     });
 
-    socket.on('teenpatti:topUp', ({ amount }) => {
+    socket.on('teenpatti:topUp', ({ amount, expectedSeq }) => {
       withTeenPattiGame(socket, rooms, (game, playerId) => {
+        if (!Number.isSafeInteger(expectedSeq) || expectedSeq !== game.sequence) {
+          socket.emit('game:error', { message: 'That Teen Patti top-up is stale. Wait for the latest table state.' });
+          return;
+        }
         const result = game.topUp(playerId, amount);
         if (!result.ok) {
           socket.emit('game:error', { message: result.error ?? 'Top-up rejected.' });
           return;
         }
         sendTeenPattiPublicState(io, roomCodeOf(socket), game);
+        // topUp advances the global Teen Patti sequence. Refresh every private
+        // snapshot too so no client retains legal/private state tagged to the
+        // previous sequence while rendering the new public table.
+        sendAllTeenPattiPrivateState(io, game);
       });
     });
 
-    socket.on('teenpatti:startNextRound', () => {
+    socket.on('teenpatti:startNextRound', ({ expectedSeq }) => {
       withTeenPattiGame(socket, rooms, (game, playerId) => {
         const room = rooms.getRoomOrThrow(roomCodeOf(socket));
         if (room.hostId !== playerId) {
           socket.emit('game:error', { message: 'Only the host can start the next round.' });
+          return;
+        }
+        if (!Number.isSafeInteger(expectedSeq) || expectedSeq !== game.sequence) {
+          socket.emit('game:error', { message: 'That next-round request is stale. Wait for the latest Teen Patti table state.' });
           return;
         }
         if (game.state !== 'ROUND_COMPLETE') {
@@ -850,6 +1055,125 @@ export function registerSocketHandlers(io: IO, rooms: RoomManager): void {
           sendTeenPattiPublicState(io, roomCode, game);
           sendAllTeenPattiPrivateState(io, game);
           if (leaveResult.roundEnded) maybeAnnounceTeenPattiRoundEnd(io, roomCode, game);
+        }
+
+        if (wasInCall) io.to(roomCode).emit('voice:peerLeft', { playerId });
+        ack({ ok: true, settlement: leaveResult.settlement, tableEnded });
+      } catch (err) {
+        ack({ ok: false, error: errMessage(err) });
+      }
+    });
+
+    // ------------------------------------------------------------------
+    // POKER - hidden authoritative controller. Registry gating still prevents
+    // live Poker room creation until this path and its UI are fully verified.
+    // ------------------------------------------------------------------
+    socket.on('poker:chooseVariant', ({ variantId, expectedSeq }) => {
+      withPokerGame(socket, rooms, (game, playerId) => {
+        try {
+          if (!Number.isSafeInteger(expectedSeq)) {
+            throw new Error('Poker variant choice is missing the current table sequence.');
+          }
+          game.chooseNextVariant(playerId, variantId, expectedSeq);
+          sendPokerPublicState(io, roomCodeOf(socket), game);
+          sendAllPokerPrivateState(io, game);
+        } catch (err) {
+          socket.emit('game:error', { message: errMessage(err) });
+        }
+      });
+    });
+
+    socket.on('poker:action', ({ action, expectedSeq }) => {
+      withPokerGame(socket, rooms, (game, playerId) => {
+        if (!Number.isSafeInteger(expectedSeq)) {
+          socket.emit('game:error', { message: 'Poker action is missing the current table sequence.' });
+          return;
+        }
+        const result = game.act(playerId, action, expectedSeq);
+        if (!result.ok) {
+          socket.emit('game:error', { message: result.error ?? 'Poker action rejected.' });
+          return;
+        }
+        sendPokerPublicState(io, roomCodeOf(socket), game);
+        sendAllPokerPrivateState(io, game);
+        maybeAnnouncePokerHandEnd(io, roomCodeOf(socket), game);
+      });
+    });
+
+    socket.on('poker:topUp', ({ amount, expectedSeq }) => {
+      withPokerGame(socket, rooms, (game, playerId) => {
+        try {
+          if (!Number.isSafeInteger(expectedSeq) || expectedSeq !== game.sequence) {
+            throw new Error('That Poker top-up is stale. Wait for the latest table state.');
+          }
+          game.topUp(playerId, amount);
+          sendPokerPublicState(io, roomCodeOf(socket), game);
+          // Poker top-up also advances the table-wide sequence. Every seated
+          // player's legal-actions snapshot is therefore stale, not just the
+          // player who added chips. Refresh all private channels atomically.
+          sendAllPokerPrivateState(io, game);
+        } catch (err) {
+          socket.emit('game:error', { message: errMessage(err) });
+        }
+      });
+    });
+
+    socket.on('poker:startNextHand', ({ expectedSeq }) => {
+      withPokerGame(socket, rooms, (game, playerId) => {
+        const room = rooms.getRoomOrThrow(roomCodeOf(socket));
+        if (room.hostId !== playerId) {
+          socket.emit('game:error', { message: 'Only the host can start the next poker hand.' });
+          return;
+        }
+        try {
+          if (!Number.isSafeInteger(expectedSeq) || expectedSeq !== game.sequence) {
+            throw new Error('That next-hand request is stale. Wait for the latest Poker table state.');
+          }
+          game.dealHand();
+          sendPokerPublicState(io, room.roomCode, game);
+          sendAllPokerPrivateState(io, game);
+        } catch (err) {
+          socket.emit('game:error', { message: errMessage(err) });
+        }
+      });
+    });
+
+    socket.on('poker:leaveTable', (ack) => {
+      try {
+        const { roomCode, playerId } = socket.data;
+        if (!roomCode || !playerId) throw new Error('Not currently in a room.');
+        const room = rooms.getRoomOrThrow(roomCode);
+        if (room.gameId !== 'POKER' || room.status !== 'IN_GAME') {
+          throw new Error('There is no active Poker table to leave.');
+        }
+        const game = asPoker(room.game);
+        if (!game) throw new Error('Poker has not started yet.');
+        const wasInCall = room.voiceCallParticipants.has(playerId);
+
+        const leaveResult = game.leaveTable(playerId);
+        const remainingRoom = rooms.releaseActiveSeat(roomCode, playerId);
+        leaveSocketFromRoom(socket, roomCode, playerId);
+
+        if (!remainingRoom) {
+          ack({ ok: true, settlement: leaveResult.settlement, tableEnded: true });
+          return;
+        }
+
+        const tableEnded = leaveResult.remainingPlayerIds.length < 2;
+        if (tableEnded) {
+          const settlements = game.seatedPlayerIds.map((id) => game.getSettlement(id));
+          io.to(roomCode).emit('poker:tableEnded', {
+            reason: 'NOT_ENOUGH_PLAYERS',
+            settlements,
+          });
+          rooms.returnActiveSessionToLobby(roomCode);
+          broadcastRoom(io, rooms, roomCode);
+          broadcastPokerSetup(io, rooms.getRoomOrThrow(roomCode));
+        } else {
+          broadcastRoom(io, rooms, roomCode);
+          sendPokerPublicState(io, roomCode, game);
+          sendAllPokerPrivateState(io, game);
+          if (leaveResult.handEnded) maybeAnnouncePokerHandEnd(io, roomCode, game);
         }
 
         if (wasInCall) io.to(roomCode).emit('voice:peerLeft', { playerId });
@@ -1022,6 +1346,68 @@ function withGame(socket: Sock, rooms: RoomManager, fn: (game: HaazariGame, play
   }
 }
 
+
+/** Runs fn only for a running Poker session. */
+function withPokerGame(
+  socket: Sock,
+  rooms: RoomManager,
+  fn: (game: PokerGame, playerId: PlayerId) => void
+): void {
+  try {
+    const { roomCode, playerId } = socket.data;
+    if (!roomCode || !playerId) throw new Error('Not currently in a room.');
+    const room = rooms.getRoomOrThrow(roomCode);
+    assertCurrentSeatSocket(room, playerId, socket.id);
+    if (!room.game) throw new Error('Game has not started yet.');
+    const poker = asPoker(room.game);
+    if (!poker) throw new Error('That action does not apply to this game.');
+    fn(poker, playerId);
+  } catch (err) {
+    socket.emit('game:error', { message: errMessage(err) });
+  }
+}
+
+function reconcilePokerSetupAfterSeatChange(room: ReturnType<RoomManager['getRoomOrThrow']>): void {
+  if (room.gameId !== 'POKER' || room.status !== 'LOBBY' || !isPokerLobbySetup(room.gameSetup)) return;
+  const cap = publicPokerLobbySetup(room.gameSetup).seatCap;
+  // The room registry uses Poker's broad 9-seat ceiling because the concrete
+  // variant is not known at room creation time. If a later join exceeds the
+  // strictest already-proposed variant cap (e.g. a seventh player joins a
+  // 6+ table), invalidate the proposal rather than letting an impossible
+  // consent revision survive until Start.
+  if (room.players.size > cap) room.gameSetup = undefined;
+}
+
+function broadcastPokerSetup(io: IO, room: ReturnType<RoomManager['getRoomOrThrow']>): void {
+  if (room.gameId !== 'POKER') return;
+  io.to(room.roomCode).emit('poker:setup', {
+    setup: isPokerLobbySetup(room.gameSetup) ? publicPokerLobbySetup(room.gameSetup) : null,
+  });
+}
+
+function sendPokerPublicState(io: IO, roomCode: string, game: PokerGame): void {
+  io.to(roomCode).emit('poker:state', game.getPublicState());
+}
+
+function sendPokerPrivateState(io: IO, game: PokerGame, playerId: PlayerId): void {
+  io.to(privateChannel(game.roomCode, playerId)).emit('poker:private', game.getPrivateState(playerId));
+}
+
+function sendAllPokerPrivateState(io: IO, game: PokerGame): void {
+  for (const playerId of game.seatedPlayerIds) sendPokerPrivateState(io, game, playerId);
+}
+
+function maybeAnnouncePokerHandEnd(io: IO, roomCode: string, game: PokerGame): void {
+  if (game.state === 'HAND_COMPLETE' && game.lastOutcome) {
+    io.to(roomCode).emit('poker:handComplete', { result: game.lastOutcome });
+  }
+}
+
+function restorePokerResultState(socket: Sock, game: PokerGame): void {
+  if (game.state === 'HAND_COMPLETE' && game.lastOutcome) {
+    socket.emit('poker:handComplete', { result: game.lastOutcome });
+  }
+}
 
 /** Runs fn only for a running Teen Patti session. */
 function withTeenPattiGame(
@@ -1218,6 +1604,7 @@ function sendPublicGameState(io: IO, roomCode: string, game: HaazariGame): void 
     dealerId: s.dealerId,
     roundNumber: s.roundNumber,
     cumulativeScores: s.cumulativeScores,
+    roundHistory: s.roundHistory,
     currentSetIndex: s.currentSetIndex,
     currentLeader: s.currentLeader,
     currentPlayOrder: s.currentPlayOrder,

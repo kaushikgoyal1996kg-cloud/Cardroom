@@ -1,0 +1,180 @@
+.poker-variant-choice {
+  width: 100%;
+  height: var(--app-height, 100dvh);
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  /* Dealer Choice shares the screen with the radial Voice/Chat/Settings
+     hub. Keep the chooser rail out of that fixed top-right footprint. */
+  padding:
+    max(var(--safe-top), .55rem)
+    calc(max(var(--safe-right), .55rem) + var(--top-fab-reserve))
+    max(var(--safe-bottom), .55rem)
+    max(var(--safe-left), .55rem);
+  background:
+    radial-gradient(circle at 50% 28%, rgba(41, 91, 70, .18), transparent 34%),
+    linear-gradient(180deg, var(--wood-900), #080706 72%);
+}
+
+.poker-variant-choice__rail {
+  width: min(100%, 58rem);
+  max-height: 100%;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  border: 1px solid rgba(200, 164, 92, .28);
+  border-radius: 1.1rem;
+  padding: clamp(.75rem, 2.4vw, 1.25rem);
+  background:
+    repeating-linear-gradient(93deg, rgba(255,255,255,.012) 0 1px, transparent 1px 9px),
+    linear-gradient(180deg, var(--wood-800), var(--wood-900));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.035),
+    inset 0 -1px 0 rgba(0,0,0,.45),
+    0 1.3rem 3.8rem rgba(0,0,0,.42);
+}
+
+.poker-variant-choice__heading {
+  display: flex;
+  justify-content: space-between;
+  gap: .8rem;
+  align-items: flex-start;
+}
+
+.poker-variant-choice__heading p,
+.poker-variant-choice__intro,
+.poker-variant-choice__safety,
+.poker-variant-choice__grid p {
+  margin: 0;
+  color: var(--ink-400);
+}
+
+.poker-variant-choice__heading p {
+  font-size: .67rem;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+}
+
+.poker-variant-choice__heading h1 {
+  margin: .18rem 0 0;
+  color: var(--ink-100);
+  font-size: clamp(1.2rem, 4vw, 1.8rem);
+  line-height: 1.05;
+}
+
+.poker-variant-choice__dealer {
+  flex: 0 0 auto;
+  border: 1px solid rgba(200,164,92,.3);
+  border-radius: 999px;
+  padding: .34rem .62rem;
+  color: var(--brass-300);
+  background: var(--felt-900);
+  font-size: .67rem;
+}
+
+.poker-variant-choice__intro {
+  margin-top: .7rem;
+  max-width: 46rem;
+  font-size: .8rem;
+  line-height: 1.45;
+}
+
+.poker-variant-choice__grid {
+  margin-top: .9rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.4rem, 1fr));
+  gap: .48rem;
+}
+
+.poker-variant-choice__grid button {
+  min-width: 0;
+  min-height: 8.7rem;
+  text-align: left;
+  display: grid;
+  align-content: start;
+  gap: .26rem;
+  border: 1px solid rgba(200,164,92,.21);
+  border-radius: .78rem;
+  padding: .68rem;
+  color: var(--ink-100);
+  background: linear-gradient(180deg, rgba(23,54,43,.72), rgba(8,25,20,.85));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.poker-variant-choice__grid button.is-active {
+  border-color: rgba(220,192,134,.72);
+  box-shadow:
+    inset 0 0 0 1px rgba(220,192,134,.2),
+    0 .3rem 1.1rem rgba(0,0,0,.24);
+}
+
+.poker-variant-choice__grid button:disabled {
+  cursor: default;
+  opacity: .76;
+}
+
+.poker-variant-choice__short {
+  width: fit-content;
+  border-radius: 999px;
+  padding: .16rem .42rem;
+  background: rgba(200,164,92,.12);
+  color: var(--brass-300);
+  font-size: .6rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.poker-variant-choice__grid strong { font-size: .88rem; }
+.poker-variant-choice__grid small { color: var(--ink-300); font-size: .65rem; }
+.poker-variant-choice__grid p { font-size: .7rem; line-height: 1.35; }
+
+.poker-variant-choice__deal {
+  width: min(100%, 20rem);
+  min-height: var(--touch-min);
+  margin: .85rem auto 0;
+  display: block;
+  border: 1px solid rgba(220,192,134,.68);
+  border-radius: .72rem;
+  color: var(--ink-100);
+  background: linear-gradient(180deg, var(--felt-600), var(--felt-800));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 .45rem 1.1rem rgba(0,0,0,.28);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.poker-variant-choice__deal:focus-visible,
+.poker-variant-choice__grid button:focus-visible {
+  outline: 2px solid var(--brass-300);
+  outline-offset: 2px;
+}
+
+.poker-variant-choice__safety {
+  display: block;
+  margin-top: .55rem;
+  text-align: center;
+  font-size: .6rem;
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .poker-variant-choice { place-items: stretch center; }
+  .poker-variant-choice__rail { width: min(100%, 68rem); border-radius: .82rem; padding: .55rem .7rem; }
+  .poker-variant-choice__intro { margin-top: .34rem; font-size: .7rem; }
+  .poker-variant-choice__grid { margin-top: .45rem; grid-template-columns: repeat(5, minmax(7.8rem, 1fr)); gap: .32rem; }
+  .poker-variant-choice__grid button { min-height: 6.3rem; padding: .45rem; gap: .16rem; }
+  .poker-variant-choice__grid p { display: none; }
+  .poker-variant-choice__deal { margin-top: .45rem; min-height: 2.5rem; }
+  .poker-variant-choice__safety { margin-top: .25rem; }
+}
+
+@media (max-width: 430px) and (orientation: portrait) {
+  .poker-variant-choice__heading { align-items: center; }
+  .poker-variant-choice__dealer { max-width: 7.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .poker-variant-choice__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .poker-variant-choice__grid button { min-height: 8.1rem; }
+}

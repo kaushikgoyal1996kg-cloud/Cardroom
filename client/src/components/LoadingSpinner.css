@@ -27,11 +27,13 @@
   border-radius: 50%;
   animation: cardroom-loader-turn 1.1s linear infinite;
 }
-.loading-spinner__seal span {
-  color: var(--brass-300);
-  font: 500 calc(var(--loader-size, 56px) * .24)/1 var(--font-display);
-  letter-spacing: .08em;
-  transform: translateX(.04em);
+.loading-spinner__seal img {
+  width: 72%;
+  height: 72%;
+  display: block;
+  object-fit: cover;
+  border: 1px solid rgba(200,164,92,.38);
+  border-radius: calc(var(--loader-size, 56px) * .13);
 }
 .loading-spinner__message {
   margin: 0;

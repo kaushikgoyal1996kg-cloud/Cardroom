@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import APP_CSS from '../../App.css?raw';
+import APP_TSX from '../../App.tsx?raw';
 import CHAT_CSS from '../../components/ChatPanel.css?raw';
 import VOICE_CSS from '../../components/VoiceCallPanel.css?raw';
 import MODAL_CSS from '../../components/RulesModal.css?raw';
@@ -20,6 +21,21 @@ import SETTINGS_TSX from '../../components/SettingsModal.tsx?raw';
 import HISTORY_TSX from '../../components/RoundHistoryModal.tsx?raw';
 import GLOBAL_CSS from '../../styles/global.css?raw';
 import TABLE_CSS from '../../games/hazari/HazariTable.css?raw';
+import KITTI_TABLE_CSS from '../../games/kitti/KittiTable.css?raw';
+import KITTI_ARR_CSS from '../../games/kitti/KittiArrangement.css?raw';
+import TEEN_PATTI_TABLE_CSS from '../../games/teenpatti/TeenPattiTable.css?raw';
+import TEEN_PATTI_RULES_TSX from '../../games/teenpatti/TeenPattiRulesSheet.tsx?raw';
+import TEEN_PATTI_VARIANT_CHOICE_CSS from '../../games/teenpatti/TeenPattiVariantChoice.css?raw';
+import TEEN_PATTI_VARIANT_CHOICE_TSX from '../../games/teenpatti/TeenPattiVariantChoice.tsx?raw';
+import TEEN_PATTI_RESULT_CSS from '../../games/teenpatti/TeenPattiResult.css?raw';
+import TEEN_PATTI_RESULT_TSX from '../../games/teenpatti/TeenPattiRoundSummary.tsx?raw';
+import POKER_VARIANT_CHOICE_CSS from '../../games/poker/PokerVariantChoice.css?raw';
+import POKER_RUNTIME_CSS from '../../games/poker/PokerRuntimeView.css?raw';
+import POKER_RUNTIME_TSX from '../../games/poker/PokerRuntimeView.tsx?raw';
+import POKER_TABLE_TSX from '../../games/poker/PokerTable.tsx?raw';
+import POKER_TABLE_CSS from '../../games/poker/PokerTable.css?raw';
+import GAME_STORE_TSX from '../../lib/GameStore.tsx?raw';
+import TABLE_CONTROLS_CSS from '../../components/TableControls.css?raw';
 
 /**
  * Mobile correctness contracts.
@@ -292,6 +308,152 @@ describe('the per-set reveal sheet has its own bounded scroll structure, separat
     const overlay = ruleBody(TABLE_CSS, '.reveal');
     expect(overlay).toMatch(/position:\s*fixed/);
     expect(overlay).toMatch(/inset:\s*0/);
+  });
+});
+
+// ============================================================================
+// Premium table chrome contracts
+// ============================================================================
+
+describe('premium table chrome stays compact and non-glass', () => {
+  it('active game overlays and the shared table utility hub do not use backdrop blur', () => {
+    for (const [name, css] of [
+      ['Hazari', TABLE_CSS],
+      ['Kitti', KITTI_TABLE_CSS],
+      ['Teen Patti', TEEN_PATTI_TABLE_CSS],
+      ['Table controls', TABLE_CONTROLS_CSS],
+      ['Shared rules modal', MODAL_CSS],
+      ['Legacy shared play surfaces', PLAY_CSS],
+    ] as const) {
+      expect(css, `${name}: glass/backdrop blur must not return`).not.toMatch(/(?:-webkit-)?backdrop-filter:\s*blur\(/);
+    }
+  });
+
+  it('the shared table launcher and radial actions preserve full touch targets', () => {
+    const launcher = rule(TABLE_CONTROLS_CSS, '.table-controls__launcher');
+    const action = rule(TABLE_CONTROLS_CSS, '.table-controls__action');
+    for (const [name, block] of [['launcher', launcher], ['action', action]] as const) {
+      expect(block, `${name}: width must use the shared touch minimum`).toMatch(/width:\s*max\(var\(--touch-min\)/);
+      expect(block, `${name}: height must use the shared touch minimum`).toMatch(/height:\s*max\(var\(--touch-min\)/);
+    }
+  });
+
+  it('Chat, Voice, Settings and Exit are radial actions, not four independently fixed table buttons', () => {
+    expect(TABLE_CONTROLS_CSS).toMatch(/\.table-controls__wheel\s*\{/);
+    for (const action of ['chat', 'voice', 'settings', 'exit']) {
+      expect(TABLE_CONTROLS_CSS, `${action}: missing radial coordinate`).toMatch(
+        new RegExp(`\\.table-controls__action--${action}\\s*\\{[^}]*--wheel-(?:x|y):`)
+      );
+    }
+  });
+
+
+  it('Kitti short-landscape keeps medium cards and fits them by overlap instead of shrinking them', () => {
+    expect(KITTI_ARR_CSS, 'do not override the shared PlayingCard width inside Kitti arrangement').not.toMatch(/--pcard-w\s*:/);
+    const landscape = KITTI_ARR_CSS.slice(KITTI_ARR_CSS.lastIndexOf('@media (orientation: landscape) and (max-height: 30rem)'));
+    expect(landscape).toMatch(/grid-template-columns:\s*repeat\(5,\s*2\.4rem\)/);
+  });
+
+  it('Kitti short-landscape gives the felt more room than the old oversized side rail', () => {
+    const landscape = KITTI_TABLE_CSS.slice(KITTI_TABLE_CSS.lastIndexOf('@media (orientation: landscape) and (max-height: 30rem)'));
+    expect(landscape).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s*clamp\(12\.25rem,\s*30vw,\s*17rem\)/);
+    expect(landscape).toMatch(/\.kitti-table-screen__table \.table\s*\{[^}]*max-height:\s*min\(76dvh,\s*20rem\)/);
+  });
+
+  it('Teen Patti utility and top-up controls keep a full touch target on narrow phones', () => {
+    expect(TEEN_PATTI_TABLE_CSS).toMatch(/\.tp-hand__money button\s*\{[^}]*min-height:\s*var\(--touch-min\)/);
+    const narrow = TEEN_PATTI_TABLE_CSS.slice(TEEN_PATTI_TABLE_CSS.indexOf('@media (max-width: 430px)'));
+    expect(narrow).toMatch(/\.tp-table-screen__rules\s*\{[^}]*min-height:\s*var\(--touch-min\)/);
+  });
+
+  it('Teen Patti Friendly Assist never sits inside the player hand/action rail', () => {
+    expect(TEEN_PATTI_TABLE_CSS).toMatch(/--tp-player-rail-reserve:\s*10rem/);
+    expect(TEEN_PATTI_TABLE_CSS).toMatch(/\.tp-friendly-incoming\s*\{[^}]*bottom:\s*calc\(var\(--safe-bottom\) \+ var\(--tp-player-rail-reserve\)/);
+    const landscape = TEEN_PATTI_TABLE_CSS.slice(TEEN_PATTI_TABLE_CSS.indexOf('@media (orientation: landscape) and (max-height: 30rem)'));
+    expect(landscape).toMatch(/--tp-side-rail:\s*clamp\(17rem,\s*34vw,\s*23rem\)/);
+    expect(landscape).toMatch(/\.tp-friendly-incoming\s*\{[^}]*left:\s*calc\(var\(--safe-left\)[^}]*right:\s*calc\(var\(--safe-right\) \+ var\(--tp-side-rail\)/);
+  });
+
+  it('hub-launched Chat and Voice panels anchor below the circular utility control instead of the old bottom FAB stack', () => {
+    expect(CHAT_CSS).toMatch(/\.chat-panel\.is-table-utility\s*\{[^}]*top:\s*calc\(env\(safe-area-inset-top/);
+    expect(VOICE_CSS).toMatch(/\.voice-call-panel\.is-table-utility\s*\{[^}]*top:\s*calc\(env\(safe-area-inset-top/);
+  });
+
+  it('Teen Patti Settings → Rules reuses the server-fed in-round variant sheet instead of a stale static guide', () => {
+    expect(APP_TSX).toMatch(/room\.gameId === 'TEEN_PATTI' && teenPattiState/);
+    expect(APP_TSX).toMatch(/<TeenPattiRulesSheet state=\{teenPattiState\}/);
+    expect(TEEN_PATTI_RULES_TSX).toMatch(/state\.variantName/);
+    expect(TEEN_PATTI_RULES_TSX).toMatch(/state\.variantHelp/);
+    expect(TEEN_PATTI_RULES_TSX).toMatch(/state\.variantDealCount/);
+  });
+
+  it('Teen Patti dealer-choice screen is a real reconnect-safe route with mobile bounds', () => {
+    expect(APP_TSX).toMatch(/state === 'AWAITING_VARIANT'/);
+    expect(APP_TSX).toMatch(/<TeenPattiVariantChoice \/>/);
+    expect(TEEN_PATTI_VARIANT_CHOICE_TSX).toMatch(/nextVariantChooserId/);
+    expect(TEEN_PATTI_VARIANT_CHOICE_TSX).toMatch(/variantPolicy\.variants/);
+    expect(TEEN_PATTI_VARIANT_CHOICE_CSS).toMatch(/height:\s*var\(--js-vh,\s*100dvh\)/);
+    expect(TEEN_PATTI_VARIANT_CHOICE_TSX).toMatch(/useVisualViewport/);
+    expect(TEEN_PATTI_VARIANT_CHOICE_TSX).toMatch(/'--js-vh': `\$\{viewportHeight\}px`/);
+    expect(TEEN_PATTI_VARIANT_CHOICE_CSS).toMatch(/max-height:\s*52dvh/);
+    expect(TEEN_PATTI_VARIANT_CHOICE_CSS).toMatch(/env\(safe-area-inset-bottom\)/);
+  });
+
+
+
+  it('Teen Patti live/result shells use the real VisualViewport height instead of trusting Android PWA dvh alone', () => {
+    expect(TEEN_PATTI_TABLE_CSS).toMatch(/height:\s*var\(--js-vh,\s*100dvh\)/);
+    expect(TEEN_PATTI_TABLE_CSS).toMatch(/max-height:\s*calc\(var\(--js-vh,\s*100dvh\)/);
+    expect(APP_TSX).toMatch(/<TeenPattiTable/);
+    expect(TEEN_PATTI_RESULT_CSS).toMatch(/height:\s*var\(--js-vh,\s*100dvh\)/);
+    expect(TEEN_PATTI_RESULT_CSS).toMatch(/max-height:\s*var\(--js-vh,\s*100dvh\)/);
+    expect(TEEN_PATTI_RESULT_TSX).toMatch(/useVisualViewport/);
+    expect(TEEN_PATTI_RESULT_TSX).toMatch(/'--js-vh': `\$\{viewportHeight\}px`/);
+  });
+
+  it('Poker runtime supplies the JS VisualViewport height expected by its --app-height CSS contract', () => {
+    expect(POKER_RUNTIME_CSS).toMatch(/height:\s*var\(--app-height,\s*100dvh\)/);
+    expect(POKER_RUNTIME_TSX).toMatch(/useVisualViewport/);
+    expect(POKER_RUNTIME_TSX).toMatch(/'--app-height': `\$\{viewportHeight\}px`/);
+  });
+
+  it('Teen Patti keeps the felt mounted while a matching private snapshot is between packets', () => {
+    const teenRoute = APP_TSX.slice(APP_TSX.indexOf("room.gameId === 'TEEN_PATTI'"), APP_TSX.indexOf("room.gameId === 'POKER'"));
+    expect(teenRoute).toMatch(/state === 'BETTING'[\s\S]*<TeenPattiTable/);
+    expect(teenRoute).not.toMatch(/AWAITING_REFERENCE_ASSIGNMENT'\) && teenPattiPrivate/);
+    expect(TEEN_PATTI_TABLE_CSS).toMatch(/\.tp-actions__status/);
+  });
+
+  it('Poker hand-complete retires the live hand/action rail before bankroll/result furniture appears', () => {
+    expect(POKER_RUNTIME_TSX).toMatch(/showLocalPanel=\{state\.state !== 'HAND_COMPLETE'\}/);
+    expect(POKER_TABLE_TSX).toMatch(/showLocalPanel && <section className="poker-local"/);
+    expect(POKER_TABLE_CSS).toMatch(/\.poker-table-screen\.is-result \.table\s*\{[^}]*padding-bottom:/);
+  });
+
+  it('hidden-game lobby setup changes are never socket-buffered through reconnect restoration', () => {
+    for (const marker of [
+      'Reconnect before changing Teen Patti table settings.',
+      'Reconnect before accepting Teen Patti table settings.',
+      'Reconnect before changing Poker table settings.',
+      'Reconnect before accepting Poker table settings.',
+    ]) {
+      expect(GAME_STORE_TSX).toContain(marker);
+    }
+    expect(GAME_STORE_TSX.match(/if \(actionsGatedRef\.current\)/g)?.length ?? 0).toBeGreaterThanOrEqual(20);
+  });
+
+  it('dealer-choice screens reserve the shared circular hub instead of letting it cover configuration controls', () => {
+    expect(TEEN_PATTI_VARIANT_CHOICE_CSS).toMatch(/var\(--top-fab-reserve\)/);
+    expect(POKER_VARIANT_CHOICE_CSS).toMatch(/var\(--top-fab-reserve\)/);
+  });
+
+  it('result/loading screens retire table utilities while dealer-choice remains a guarded active-game screen', () => {
+    expect(APP_TSX).toMatch(/screenKey !== 'round-summary'/);
+    expect(APP_TSX).toMatch(/screenKey !== 'winner'/);
+    expect(APP_TSX).toMatch(/screenKey !== 'loading'/);
+    expect(APP_TSX).toMatch(/case 'variant-choice':[\s\S]*room\?\.gameId === 'TEEN_PATTI'/);
+    expect(APP_TSX).toMatch(/activeRoomSurfaceKey/);
+    expect(APP_TSX).toMatch(/setActiveTableUtility\(null\);[\s\S]*setShowRules\(false\);[\s\S]*setShowStats\(false\);[\s\S]*setShowRoundHistory\(false\);/);
   });
 });
 

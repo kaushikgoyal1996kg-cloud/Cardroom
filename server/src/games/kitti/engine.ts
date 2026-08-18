@@ -589,6 +589,21 @@ export class KittiGame {
       deciderPlayerIds: [...this.deciderPlayerIds],
       roundWinnerId: this.roundWinnerId,
       roundsWon: { ...this.roundsWon },
+      roundHistory: this.roundHistory.map((round) => ({
+        ...round,
+        participants: [...round.participants],
+        hands: round.hands.map((hand) => ({
+          ...hand,
+          played: hand.played.map((play) => ({ ...play, cards: play.cards.map((card) => ({ ...card })) })),
+          tiedPlayerIds: [...hand.tiedPlayerIds],
+        })),
+        decider: round.decider ? {
+          ...round.decider,
+          played: round.decider.played.map((play) => ({ ...play, cards: play.cards.map((card) => ({ ...card })) })),
+          tiedPlayerIds: [...round.decider.tiedPlayerIds],
+        } : undefined,
+        roundsWon: { ...round.roundsWon },
+      })),
       matchWinnerId: this.matchWinnerId,
       initialDealerDraws: this.initialDealerDraws.map((round) => ({
         contenders: [...round.contenders],

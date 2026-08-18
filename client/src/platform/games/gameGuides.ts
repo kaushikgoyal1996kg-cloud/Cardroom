@@ -47,7 +47,7 @@ const HAZARI_GUIDE: GameGuide = {
       body: 'Your four sets must be ordered from strongest to weakest: Set 1 ≥ Set 2 ≥ Set 3 ≥ Set 4. The server checks the arrangement before accepting it.',
       points: [
         'Sets 1–3 contain three cards each.',
-        'Set 4 contains four cards and uses Hazari’s dedicated four-card ranking.',
+        'Set 4 contains four cards, but its strength is the best three-card Teen Patti hand available from those four cards.',
         'Rank / Suit / Dealt sorting only reorders your loose cards; it never chooses your sets.',
       ],
     },
@@ -63,12 +63,12 @@ const HAZARI_GUIDE: GameGuide = {
     },
     {
       eyebrow: 'The four-card set',
-      title: 'Set 4 has its own ranking.',
-      body: 'The four-card set is compared as a four-card hand rather than by simply choosing three of its cards.',
+      title: 'Set 4 uses its best three cards.',
+      body: 'Set 4 contains four cards, but only its strongest three-card Teen Patti combination counts for ranking.',
       points: [
-        'Four of a Kind > Straight Flush > Flush > Straight.',
-        'Then Three of a Kind + kicker > Two Pair > One Pair > High Card.',
-        'Rank-based tiebreaks decide strength within the same category.',
+        'Check all four possible groups of three and keep the strongest one.',
+        'The unused fourth card does not improve the hand or break an exact tie.',
+        'So Set 3 may exactly equal Set 4 and the arrangement is still valid.',
       ],
     },
     {

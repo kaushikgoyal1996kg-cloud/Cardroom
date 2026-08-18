@@ -255,3 +255,24 @@ export function dealingOrderFromDealer(
   if (idx === -1) return [...playersClockwise];
   return [...playersClockwise.slice(idx), ...playersClockwise.slice(0, idx)];
 }
+
+/**
+ * Poker-style dealing order: the first card goes to the first active seat
+ * clockwise AFTER the dealer/button, then continues clockwise.
+ *
+ * This is intentionally separate from `dealingOrderFromDealer`. Hazari,
+ * Kitti and Teen Patti are locked to their existing dealer-first ceremony;
+ * Poker's authoritative engine starts left of the button. Keeping separate
+ * helpers makes it much harder for a shared-table refactor to change one
+ * game's dealing semantics by accident.
+ */
+export function dealingOrderLeftOfDealer(
+  playersClockwise: string[],
+  dealerId: string | null
+): string[] {
+  if (!dealerId) return [...playersClockwise];
+  const idx = playersClockwise.indexOf(dealerId);
+  if (idx === -1) return [...playersClockwise];
+  const first = (idx + 1) % playersClockwise.length;
+  return [...playersClockwise.slice(first), ...playersClockwise.slice(0, first)];
+}

@@ -51,18 +51,16 @@ function tripleScore(i: number, j: number, k: number, values: number[], suits: n
   return packScore(0, a, b, c);
 }
 
-/** Packed score for the 4-card set: best 3-of-4 sub-combo + excluded card as kicker.
- *  Relies on tripleScore() always leaving the 4th (r3) base-16 digit as 0,
- *  so adding the kicker value (0-14, fits in one base-16 digit) directly
- *  onto the packed integer is equivalent to appending it as a tiebreak
- *  element. */
+/** Packed score for Set 4: strongest 3-card combination from its four cards.
+ *  The unused fourth card is deliberately ignored for all tiebreaks. */
 function fourScore(idx: [number, number, number, number], values: number[], suits: number[]): number {
   const [a, b, c, d] = idx;
-  const s1 = tripleScore(b, c, d, values, suits) + values[a];
-  const s2 = tripleScore(a, c, d, values, suits) + values[b];
-  const s3 = tripleScore(a, b, d, values, suits) + values[c];
-  const s4 = tripleScore(a, b, c, values, suits) + values[d];
-  return Math.max(s1, s2, s3, s4);
+  return Math.max(
+    tripleScore(b, c, d, values, suits),
+    tripleScore(a, c, d, values, suits),
+    tripleScore(a, b, d, values, suits),
+    tripleScore(a, b, c, values, suits),
+  );
 }
 
 const SUIT_CODE: Record<Card['suit'], number> = { SPADES: 0, HEARTS: 1, DIAMONDS: 2, CLUBS: 3 };

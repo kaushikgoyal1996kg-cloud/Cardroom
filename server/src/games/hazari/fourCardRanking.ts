@@ -1,5 +1,4 @@
 import type { Card, ThreeCardHandValue } from './types.js';
-import { RANK_VALUE } from './rules.js';
 import { classifyThreeCardHand, compareThreeCardHands } from './hands.js';
 
 // ============================================================================
@@ -8,18 +7,16 @@ import { classifyThreeCardHand, compareThreeCardHands } from './hands.js';
 // CONFIRMED methodology: the 4-card set's strength is the BEST 3-CARD TEEN
 // PATTI COMBINATION found among any 3 of its 4 cards, using the exact same
 // hierarchy as the three-card sets (Trail > Pure Sequence > Sequence >
-// Color > Pair > High Card). The leftover (4th, excluded) card is used
-// purely as a kicker to break ties between two 4-card sets whose best
-// 3-card sub-combo lands in the same category/rank.
+// Color > Pair > High Card). The fourth card is excluded completely from
+// strength/tiebreak comparison: Set 4 is literally the strongest 3-card hand
+// available from its four cards.
 //
 // Because this reuses the 3-card hierarchy directly, a FourCardHandValue is
-// shape-compatible with ThreeCardHandValue (category + tiebreakRanks, with
-// the kicker appended as the final tiebreak element) and can be compared
-// with the same compareThreeCardHands() function.
+// shape-compatible with ThreeCardHandValue (category + tiebreakRanks) and can
+// be compared with the same compareThreeCardHands() function.
 //
-// ORDERING RULE: Set 4 must still rank WEAKER than Set 3 in a player's
-// arrangement (see arrangement.ts) - even though both now sit on the same
-// comparison scale, Set 4 is never allowed to out-rank Set 3.
+// ORDERING RULE: Set 4 must not rank STRONGER than Set 3 in a player's
+// arrangement (see arrangement.ts). Exact equality is valid.
 //
 // This file is still the single place to change if the 4-card methodology
 // is ever revised - nothing outside this file needs to know how the score
@@ -30,12 +27,9 @@ export type FourCardHandValue = ThreeCardHandValue & { label: string };
 
 const CATEGORY_NAMES = ['High Card', 'Pair', 'Color', 'Sequence', 'Pure Sequence', 'Trail'];
 
-/** All four ways to choose 3-of-4 cards, paired with the excluded (kicker) card. */
-function threeCardSubsets(cards: Card[]): { subset: Card[]; kicker: Card }[] {
-  return cards.map((excluded, i) => ({
-    subset: cards.filter((_, j) => j !== i),
-    kicker: excluded,
-  }));
+/** All four ways to choose 3 of the 4 cards. */
+function threeCardSubsets(cards: Card[]): Card[][] {
+  return cards.map((_, i) => cards.filter((_, j) => j !== i));
 }
 
 export function classifyFourCardHand(cards: Card[]): FourCardHandValue {
@@ -43,17 +37,11 @@ export function classifyFourCardHand(cards: Card[]): FourCardHandValue {
     throw new Error(`classifyFourCardHand requires exactly 4 cards, got ${cards.length}`);
   }
 
-  const candidates = threeCardSubsets(cards).map(({ subset, kicker }) => {
-    const base = classifyThreeCardHand(subset);
-    return {
-      category: base.category,
-      tiebreakRanks: [...base.tiebreakRanks, RANK_VALUE[kicker.rank]],
-    };
-  });
+  const candidates = threeCardSubsets(cards).map((subset) => classifyThreeCardHand(subset));
 
-  // Pick the best candidate (best 3-card sub-combo, kicker breaking ties
-  // between equally-strong sub-combos) using the same comparator as the
-  // three-card sets.
+  // Pick the strongest 3-card sub-combination. If multiple subsets are
+  // exactly equal, they remain equal: the unused fourth card never breaks
+  // the tie.
   let best = candidates[0];
   for (const c of candidates.slice(1)) {
     if (compareThreeCardHands(c, best) > 0) best = c;
@@ -62,7 +50,7 @@ export function classifyFourCardHand(cards: Card[]): FourCardHandValue {
   return {
     category: best.category,
     tiebreakRanks: best.tiebreakRanks,
-    label: `${CATEGORY_NAMES[best.category]} (+ kicker)`,
+    label: CATEGORY_NAMES[best.category],
   };
 }
 
@@ -73,12 +61,14 @@ export function compareFourCardHands(a: FourCardHandValue, b: FourCardHandValue)
   return compareThreeCardHands(a, b);
 }
 
-/** Does this 4-card set's best 3-card sub-combo contain a Sequence, Pure
- *  Sequence, or Trail? Used by isNoSequenceHand() dismissal check - kept
- *  consistent with how "no sequence" is evaluated for the three-card sets. */
+/** Does this 4-card set contain any Sequence/Pure Sequence among its
+ *  3-card subsets? Trial/Trail is deliberately excluded: it is not a sequence
+ *  for Hazari dismissal eligibility. */
 export function fourCardSetHasRun(cards: Card[]): boolean {
-  const value = classifyFourCardHand(cards);
-  return value.category === 3 || value.category === 4 || value.category === 5; // SEQUENCE, PURE_SEQUENCE, TRAIL
+  return threeCardSubsets(cards).some((subset) => {
+    const value = classifyThreeCardHand(subset);
+    return value.category === 3 || value.category === 4; // SEQUENCE / PURE_SEQUENCE
+  });
 }
 
 export function validateFourCardSet(cards: Card[]): { valid: boolean; error?: string } {

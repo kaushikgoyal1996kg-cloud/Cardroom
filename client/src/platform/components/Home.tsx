@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { GAME_CATALOG, catalogEntry, isRuntimeGameId, type CatalogGameId } from '../games/catalog';
+import { GAME_CATALOG, catalogEntry, type CatalogGameId } from '../games/catalog';
 import { AvatarBadge } from '../../components/Lobby/AvatarPicker';
+import { GameVariantGallery } from './GameVariantGallery';
 import type { GameId } from '../../game/types';
 import './Home.css';
 
@@ -59,6 +60,9 @@ export function Home({
       <div className="home__lamp" aria-hidden="true" />
 
       <header className="home__header">
+        <div className="home__brand-emblem" aria-hidden="true">
+          <img src="/brand/card-room-emblem.png" alt="" draggable={false} />
+        </div>
         <p className="home__eyebrow">The</p>
         <h1 className="home__brand">Card Room</h1>
         <p className="home__subtitle">Choose a table. The room remembers the rest.</p>
@@ -114,10 +118,13 @@ export function Home({
           })}
         </ul>
 
+        {active?.id === 'TEEN_PATTI' && <GameVariantGallery family="TEEN_PATTI" />}
+        {active?.id === 'POKER' && <GameVariantGallery family="POKER" />}
+
         <div className={`home__actions${active ? '' : ' is-idle'}`} aria-live="polite">
           {!active ? (
             <div className="home__selection-prompt">
-              <span className="home__selection-mark" aria-hidden="true">CR</span>
+              <span className="home__selection-mark" aria-hidden="true">♠</span>
               <p>Select a game to open its table options.</p>
             </div>
           ) : active.networkPlayable ? (
@@ -125,9 +132,7 @@ export function Home({
               <button
                 type="button"
                 className="btn btn--primary"
-                onClick={() => {
-                  if (isRuntimeGameId(active.id)) onPlay(active.id);
-                }}
+                onClick={() => onPlay(active.id)}
                 disabled={!canPlay}
               >
                 {busy ? 'Just a moment…' : `Play ${active.name}`}
@@ -135,9 +140,7 @@ export function Home({
               <button
                 type="button"
                 className="btn btn--secondary"
-                onClick={() => {
-                  if (isRuntimeGameId(active.id)) onCreateTable(active.id);
-                }}
+                onClick={() => onCreateTable(active.id)}
                 disabled={!canPlay}
               >
                 Create table

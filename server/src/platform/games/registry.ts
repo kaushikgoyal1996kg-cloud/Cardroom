@@ -11,9 +11,9 @@
 // to change.
 // ============================================================================
 
-export type GameId = 'HAZARI' | 'KITTI' | 'TEEN_PATTI';
+export type GameId = 'HAZARI' | 'KITTI' | 'TEEN_PATTI' | 'POKER';
 
-export const GAME_IDS: GameId[] = ['HAZARI', 'KITTI', 'TEEN_PATTI'];
+export const GAME_IDS: GameId[] = ['HAZARI', 'KITTI', 'TEEN_PATTI', 'POKER'];
 
 export interface GameDefinition {
   id: GameId;
@@ -26,7 +26,8 @@ export interface GameDefinition {
    * always four. When set, a game cannot start with any other count.
    */
   requiredPlayers?: number;
-  cardsPerPlayer: number;
+  /** Fixed private-card count, or VARIES when the selected variant controls it. */
+  cardsPerPlayer: number | 'VARIES';
   /**
    * False when the game has no working network controller yet. A room for a
    * non-playable game can never be created, so nobody can walk into a table
@@ -42,7 +43,7 @@ export interface GameDefinition {
  * being retyped here, so they cannot drift apart:
  *   - Hazari:     GAME_RULES.PLAYER_COUNT = 4, CARDS_PER_PLAYER = 13
  *   - Kitti:      KITTI_RULES 2-5 players, 9 cards
- *   - Teen Patti: TEEN_PATTI_RULES 2-9 players, 3 cards
+ *   - Teen Patti: TEEN_PATTI_RULES 2-9 players; card count varies by variant
  * A drift test in tests/gameRegistry.test.ts asserts they still match.
  */
 export const GAMES: Record<GameId, GameDefinition> = {
@@ -68,9 +69,18 @@ export const GAMES: Record<GameId, GameDefinition> = {
     name: 'Teen Patti',
     minPlayers: 2,
     maxPlayers: 9,
-    cardsPerPlayer: 3,
+    cardsPerPlayer: 'VARIES',
     networkPlayable: false,
     unavailableReason: 'Not yet available online',
+  },
+  POKER: {
+    id: 'POKER',
+    name: 'Poker',
+    minPlayers: 2,
+    maxPlayers: 9,
+    cardsPerPlayer: 'VARIES',
+    networkPlayable: false,
+    unavailableReason: 'Poker network tables are still being completed',
   },
 };
 

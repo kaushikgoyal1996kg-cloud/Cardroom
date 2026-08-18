@@ -1,5 +1,7 @@
 .tp-result {
-  min-height: 100dvh;
+  height: var(--js-vh, 100dvh);
+  max-height: var(--js-vh, 100dvh);
+  min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0,1fr) auto auto;
   gap: var(--space-3);

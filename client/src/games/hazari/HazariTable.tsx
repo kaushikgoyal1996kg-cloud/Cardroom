@@ -10,6 +10,7 @@ import { classifySet, labelFor, setValue } from '../../game/handClassification';
 import { useWakeLock } from '../../lib/useWakeLock';
 import { useVisualViewport } from '../../platform/lib/useVisualViewport';
 import { PlayMoneyPotBadge } from '../../platform/components/PlayMoneyBoard';
+import { PhaseTrack } from '../../platform/components/PhaseTrack';
 import type { PlayerId } from '../../game/types';
 import './HazariTable.css';
 
@@ -212,6 +213,12 @@ export function HazariTable() {
           <p className="hazari__eyebrow">Hazari · Round {gameState.roundNumber}</p>
           <strong className="hazari__phase-title">{SET_LABELS[currentSetIdx]}</strong>
         </div>
+        <PhaseTrack
+          labels={SET_LABELS}
+          activeIndex={currentSetIdx}
+          ariaLabel={`Hazari round ${gameState.roundNumber} progress`}
+          compact
+        />
         <div className="hazari__scoreline">
           <span>{pointsSoFar}/360 points</span>
           <small>Room {room.roomCode}</small>

@@ -3,6 +3,8 @@ import { isSoundEnabled, setSoundEnabled } from '../lib/sound';
 import { useInstallPrompt } from '../lib/useInstallPrompt';
 import { useState } from 'react';
 import { ChromeIcon } from '../platform/components/ChromeIcon';
+import { loadTablePreferences, saveTablePreferences, type TablePreferences } from '../lib/tablePreferences';
+import { tableUtilityCapabilities } from '../platform/games/tableUtilityCapabilities';
 import './RulesModal.css';
 
 interface Props {
@@ -18,14 +20,20 @@ interface Props {
 export function SettingsModal({ onClose, onOpenRules, onOpenStats, onOpenRoundHistory, onLeaveTable, leaveDescription, leaveActionLabel }: Props) {
   const { goToHomeScreen, room } = useGame();
   const [soundOn, setSoundOn] = useState(isSoundEnabled());
+  const [tablePreferences, setTablePreferences] = useState<TablePreferences>(() => loadTablePreferences());
   const { canPromptInstall, installed, isIos, promptInstall } = useInstallPrompt();
   const [confirmingLeave, setConfirmingLeave] = useState(false);
   const [showIosInstallHelp, setShowIosInstallHelp] = useState(false);
+  const utilityCapabilities = room ? tableUtilityCapabilities(room.gameId) : null;
 
   function toggleSound() {
     const next = !soundOn;
     setSoundOn(next);
     setSoundEnabled(next);
+  }
+
+  function updateTablePreference<K extends keyof TablePreferences>(key: K, value: TablePreferences[K]) {
+    setTablePreferences((current) => saveTablePreferences({ ...current, [key]: value }));
   }
 
   return (
@@ -70,19 +78,51 @@ export function SettingsModal({ onClose, onOpenRules, onOpenStats, onOpenRoundHi
             </span>
           </button>
 
-          <button className="settings-row" onClick={() => { onClose(); onOpenRules(); }}>
+          <button
+            className="settings-row"
+            onClick={() => updateTablePreference('deckPalette', tablePreferences.deckPalette === 'classic' ? 'four-color' : 'classic')}
+          >
+            <span className="settings-row__label"><ChromeIcon name="cards" /><span>Four-colour suits</span></span>
+            <span className={`settings-toggle ${tablePreferences.deckPalette === 'four-color' ? 'settings-toggle--on' : ''}`}>
+              {tablePreferences.deckPalette === 'four-color' ? 'On' : 'Off'}
+            </span>
+          </button>
+
+          <button
+            className="settings-row"
+            onClick={() => updateTablePreference('cardIndexSize', tablePreferences.cardIndexSize === 'standard' ? 'large' : 'standard')}
+          >
+            <span className="settings-row__label"><ChromeIcon name="cards" /><span>Large card indices</span></span>
+            <span className={`settings-toggle ${tablePreferences.cardIndexSize === 'large' ? 'settings-toggle--on' : ''}`}>
+              {tablePreferences.cardIndexSize === 'large' ? 'On' : 'Off'}
+            </span>
+          </button>
+
+          <button
+            className="settings-row"
+            onClick={() => updateTablePreference('motion', tablePreferences.motion === 'full' ? 'reduced' : 'full')}
+          >
+            <span className="settings-row__label"><ChromeIcon name="motion" /><span>Reduced animation</span></span>
+            <span className={`settings-toggle ${tablePreferences.motion === 'reduced' ? 'settings-toggle--on' : ''}`}>
+              {tablePreferences.motion === 'reduced' ? 'On' : 'Off'}
+            </span>
+          </button>
+
+          <button className="settings-row" onClick={onOpenRules}>
             <span className="settings-row__label"><ChromeIcon name="rules" /><span>Rules &amp; How to Play</span></span>
             <span className="settings-row__chevron" aria-hidden="true">›</span>
           </button>
 
-          <button className="settings-row" onClick={() => { onClose(); onOpenStats(); }}>
-            <span className="settings-row__label"><ChromeIcon name="stats" /><span>Your Stats</span></span>
-            <span className="settings-row__chevron" aria-hidden="true">›</span>
-          </button>
+          {utilityCapabilities?.stats && (
+            <button className="settings-row" onClick={onOpenStats}>
+              <span className="settings-row__label"><ChromeIcon name="stats" /><span>{utilityCapabilities.statsLabel}</span></span>
+              <span className="settings-row__chevron" aria-hidden="true">›</span>
+            </button>
+          )}
 
-          {room && (
-            <button className="settings-row" onClick={() => { onClose(); onOpenRoundHistory(); }}>
-              <span className="settings-row__label"><ChromeIcon name="history" /><span>Round History</span></span>
+          {utilityCapabilities?.history && (
+            <button className="settings-row" onClick={onOpenRoundHistory}>
+              <span className="settings-row__label"><ChromeIcon name="history" /><span>{utilityCapabilities.historyLabel}</span></span>
               <span className="settings-row__chevron" aria-hidden="true">›</span>
             </button>
           )}

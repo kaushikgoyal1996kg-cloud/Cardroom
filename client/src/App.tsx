@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGame } from './lib/GameStore';
 import { HomeScreen } from './platform/components/HomeScreen';
-import { ChromeIcon } from './platform/components/ChromeIcon';
 import { RoomLobby } from './components/Lobby/RoomLobby';
 import { ArrangementTable } from './games/hazari/ArrangementTable';
 import { DealingTable, useDealCeremony } from './games/hazari/DealingTable';
@@ -19,6 +18,11 @@ import { KittiRoundSummary } from './games/kitti/KittiRoundSummary';
 import { KittiWinner } from './games/kitti/KittiWinner';
 import { TeenPattiTable } from './games/teenpatti/TeenPattiTable';
 import { TeenPattiRoundSummary } from './games/teenpatti/TeenPattiRoundSummary';
+import { TeenPattiVariantChoice } from './games/teenpatti/TeenPattiVariantChoice';
+import { TeenPattiRulesSheet } from './games/teenpatti/TeenPattiRulesSheet';
+import { PokerRuntimeView } from './games/poker/PokerRuntimeView';
+import { pokerRuntimeIdentities } from './games/poker/runtime';
+import { PokerRulesSheet } from './games/poker/PokerRulesSheet';
 import { RulesModal } from './components/RulesModal';
 import { SettingsModal } from './components/SettingsModal';
 import { StatsModal } from './components/StatsModal';
@@ -27,6 +31,8 @@ import { LoadingSpinner } from './components/LoadingSpinner';
 import { TutorialModal } from './components/TutorialModal';
 import { ChatPanel } from './components/ChatPanel';
 import { VoiceCallPanel } from './components/VoiceCallPanel';
+import { TableControls } from './components/TableControls';
+import { ChromeIcon } from './platform/components/ChromeIcon';
 import { UpdateBanner } from './components/UpdateBanner';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { useBackGuard } from './lib/useBackGuard';
@@ -50,14 +56,42 @@ const PLAYING_STATES = new Set([
 ]);
 
 function HomeScreenReturn() {
-  const { room, gameState, kittiState, teenPattiState, returnToGame, leaveSession, leaveTable, leaveTeenPattiTable } = useGame();
-  const [confirmTeenPattiLeave, setConfirmTeenPattiLeave] = useState(false);
+  const { room, gameState, kittiState, returnToGame, leaveSession, leaveTable, leaveTeenPattiTable, leavePokerTable } = useGame();
+  const [confirmingLeave, setConfirmingLeave] = useState(false);
   if (!room) return null;
+
   const isHazari = room.gameId === 'HAZARI';
   const hazariActive = isHazari && room.status === 'IN_GAME' && gameState?.state !== 'GAME_COMPLETE';
   const kittiActive = room.gameId === 'KITTI' && room.status === 'IN_GAME' && kittiState?.state !== 'MATCH_COMPLETE';
   const teenPattiActive = room.gameId === 'TEEN_PATTI' && room.status === 'IN_GAME';
-  const gameName = room.gameId === 'HAZARI' ? 'Hazari' : room.gameId === 'KITTI' ? 'Kitti' : 'Teen Patti';
+  // The room's IN_GAME status is authoritative even during the brief reconnect
+  // window before detailed Poker state rehydrates. Leave must still use the
+  // Poker settle/release path in that window, never generic room:leave.
+  const pokerActive = room.gameId === 'POKER' && room.status === 'IN_GAME';
+  const gameName = room.gameId === 'HAZARI'
+    ? 'Hazari'
+    : room.gameId === 'KITTI'
+      ? 'Kitti'
+      : room.gameId === 'TEEN_PATTI'
+        ? 'Teen Patti'
+        : 'Poker';
+
+  const leaveLabel = teenPattiActive || pokerActive ? 'Leave & settle' : room.status === 'LOBBY' ? 'Leave this table' : 'Leave table';
+  const leaveMessage = teenPattiActive
+    ? 'Leaving packs your live hand if needed, settles your play-money P/L, and permanently releases your seat.'
+    : pokerActive
+      ? 'Leaving folds your live hand if needed, settles your virtual Poker stack/P&L, and permanently releases your seat.'
+    : hazariActive || kittiActive
+      ? 'Your seat will be handed to a computer so the match can continue for everyone else. You will not be able to reclaim this seat in the current match.'
+      : 'Your seat will be released and you will return to The Card Room.';
+
+  function confirmPermanentLeave() {
+    setConfirmingLeave(false);
+    if (teenPattiActive) void leaveTeenPattiTable();
+    else if (pokerActive) void leavePokerTable();
+    else if (hazariActive || kittiActive) leaveTable();
+    else leaveSession();
+  }
 
   return (
     <main className="home-return">
@@ -67,40 +101,41 @@ function HomeScreenReturn() {
         <h1>{gameName}</h1>
         <div className="home-return__room-code">{room.roomCode}</div>
         <p className="home-return__copy">
-          You stepped away from the table without leaving it. Your original seat is still yours.
+          You stepped away without leaving the table. Choose whether to return to your seat or release it permanently.
         </p>
-        <button className="btn btn-primary home-return__primary" onClick={returnToGame}>
-          {room.status === 'LOBBY' ? 'Return to room' : `Return to ${gameName}`}
-        </button>
 
-        {hazariActive && (
-          <button className="btn btn-ghost" onClick={leaveTable}>
-            Leave seat to a computer
+        <div className="home-return__choices">
+          <button className="home-return__choice home-return__choice--return" onClick={returnToGame}>
+            <span className="home-return__choice-mark"><ChromeIcon name="cards" /></span>
+            <span>
+              <strong>{room.status === 'LOBBY' ? 'Return to room' : `Return to ${gameName}`}</strong>
+              <small>Continue with the same seat and identity</small>
+            </span>
+            <em>Resume</em>
           </button>
-        )}
-        {!hazariActive && !kittiActive && !teenPattiActive && (
-          <button className="btn btn-ghost" onClick={leaveSession}>
-            Leave this table
+
+          <button className="home-return__choice home-return__choice--leave" onClick={() => setConfirmingLeave(true)}>
+            <span className="home-return__choice-mark"><ChromeIcon name="leave" /></span>
+            <span>
+              <strong>{leaveLabel}</strong>
+              <small>{teenPattiActive || pokerActive ? 'Settle and release your seat' : hazariActive || kittiActive ? 'Computer takes over the live seat' : 'Release this seat'}</small>
+            </span>
+            <em>Permanent</em>
           </button>
-        )}
-        {kittiActive && (
-          <p className="home-return__note">Your Kitti seat remains reserved while the match is in progress.</p>
-        )}
-        {teenPattiActive && !confirmTeenPattiLeave && (
-          <button className="btn btn-ghost" onClick={() => setConfirmTeenPattiLeave(true)}>
-            Leave and settle table
-          </button>
-        )}
-        {teenPattiActive && confirmTeenPattiLeave && (
-          <div className="home-return-settle">
-            <p className="home-return__note">Leaving packs your live hand if needed, settles your play-money P/L, and permanently releases your seat.</p>
-            <div>
-              <button className="btn btn-ghost" onClick={() => setConfirmTeenPattiLeave(false)}>Stay</button>
-              <button className="btn btn-primary" onClick={() => void leaveTeenPattiTable()}>Leave &amp; settle</button>
-            </div>
-          </div>
-        )}
+        </div>
+
+        <p className="home-return__note">Returning to The Card Room from the table controls keeps your seat connected. Leaving here does not.</p>
       </section>
+
+      {confirmingLeave && (
+        <ConfirmDialog
+          title={teenPattiActive || pokerActive ? 'Leave and settle?' : 'Leave this table?'}
+          message={leaveMessage}
+          confirmLabel={leaveLabel}
+          onConfirm={confirmPermanentLeave}
+          onCancel={() => setConfirmingLeave(false)}
+        />
+      )}
     </main>
   );
 }
@@ -125,6 +160,10 @@ export function App() {
     teenPattiPrivate,
     lastTeenPattiRoundResult,
     teenPattiSettlementNotice,
+    pokerState,
+    pokerPrivate,
+    lastPokerHandResult,
+    pokerSettlementNotice,
     gameError,
     clearGameError,
     confirmArrangement,
@@ -137,11 +176,21 @@ export function App() {
     leaveTable,
     leaveTeenPattiTable,
     clearTeenPattiSettlementNotice,
+    choosePokerVariant,
+    pokerAction,
+    startNextPokerHand,
+    topUpPoker,
+    leavePokerTable,
+    clearPokerSettlementNotice,
     leaveSession,
     returnToGame,
   } = useGame();
   const [showRules, setShowRules] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  // Table utilities are intentionally exclusive. The old independent Chat /
+  // Voice / Settings booleans allowed two surfaces to remain open at once and
+  // recreated the exact chrome collision the circular hub was introduced to
+  // eliminate. Full-screen guide/stat/history surfaces are tracked separately.
+  const [activeTableUtility, setActiveTableUtility] = useState<null | 'chat' | 'voice' | 'settings'>(null);
   const [showStats, setShowStats] = useState(false);
   const [showRoundHistory, setShowRoundHistory] = useState(false);
   const [showConnBanner, setShowConnBanner] = useState(false);
@@ -154,7 +203,7 @@ export function App() {
   // leaveSession/leaveTable directly. 'lobby' shows the plain "leave this
   // room" wording; 'game' adds the bot-takeover warning, matching
   // SettingsModal's existing in-game leave confirmation.
-  const [pendingLeaveConfirm, setPendingLeaveConfirm] = useState<null | 'lobby' | 'game'>(null);
+  const [pendingLeaveConfirm, setPendingLeaveConfirm] = useState<null | 'lobby' | 'game' | 'teen-patti' | 'poker'>(null);
 
   // A multi-game card room must never open with one game's rules before a
   // game has even been chosen. Show the guide only after the player actually
@@ -177,6 +226,20 @@ export function App() {
     setShowTutorial(false);
     setTutorialGameId(null);
   }, [room]);
+
+  const activeRoomSurfaceKey = room ? `${room.gameId}:${room.roomCode}:${viewMode}` : 'no-room';
+  useEffect(() => {
+    // Utility/modal state belongs to one visible room surface only. Leaving a
+    // room, switching into the Card Room while keeping the seat connected, or
+    // joining another game must never carry an old game's Chat/Settings/Rules
+    // or history sheet into the new surface. Voice-call membership itself is
+    // store-owned and is intentionally not ended here.
+    setActiveTableUtility(null);
+    setShowRules(false);
+    setShowStats(false);
+    setShowRoundHistory(false);
+    clearGameError();
+  }, [activeRoomSurfaceKey, clearGameError]);
 
   // Delay showing the connection banner briefly so a normal fast connection
   // never flashes it - only show once a wait is actually noticeable.
@@ -235,14 +298,25 @@ export function App() {
   // Cosmetic dealing ceremony. Runs only for a genuinely new deal (never on
   // reconnect). Reduced motion keeps the informative dealer-draw reveal but
   // skips the flying-card deal animation.
-  const dealCardsEach = room?.gameId === 'KITTI' ? 9 : room?.gameId === 'TEEN_PATTI' ? 3 : 13;
+  const dealCardsEach = room?.gameId === 'KITTI'
+    ? 9
+    : room?.gameId === 'TEEN_PATTI'
+      ? (teenPattiState?.variantDealCount ?? 3)
+      : room?.gameId === 'POKER'
+        ? (pokerState?.variant.holeCards ?? 0)
+        : 13;
   const initialDealerDrawRounds = room?.gameId === 'HAZARI'
     ? gameState?.roundNumber === 1 ? (gameState.initialDealerDraws?.length ?? 0) : 0
     : room?.gameId === 'KITTI'
       ? kittiState?.roundNumber === 1 && kittiState.scheduledRoundsComplete === 0 ? kittiState.initialDealerDraws.length : 0
-      : 0;
+      : room?.gameId === 'TEEN_PATTI'
+        ? teenPattiState?.roundNumber === 1 ? teenPattiState.initialDealerDraws.length : 0
+        : 0;
+  const dealSeatCount = room?.gameId === 'POKER' && pokerState
+    ? pokerState.players.filter((player) => player.stack > 0 || player.handCommitted > 0 || !player.folded).length
+    : (room?.players.length ?? 4);
   const dealingCeremony = useDealCeremony(
-    room?.players.length ?? 4,
+    Math.max(1, dealSeatCount),
     dealCardsEach,
     initialDealerDrawRounds
   );
@@ -302,11 +376,55 @@ export function App() {
     if (teenPattiState?.state === 'ROUND_COMPLETE' && lastTeenPattiRoundResult) {
       screen = <TeenPattiRoundSummary />;
       screenKey = 'round-summary';
-    } else if (teenPattiState?.state === 'BETTING' && teenPattiPrivate) {
-      screen = <TeenPattiTable dealing={dealingCeremony} />;
+    } else if (teenPattiState?.state === 'AWAITING_VARIANT') {
+      screen = <TeenPattiVariantChoice />;
+      screenKey = 'variant-choice';
+    } else if (teenPattiState?.state === 'BETTING' || teenPattiState?.state === 'AWAITING_DISCARD' || teenPattiState?.state === 'AWAITING_REFERENCE_ASSIGNMENT') {
+      // Public/private Teen Patti packets are deliberately coherence-gated in
+      // GameStore. For a few milliseconds during an authoritative update the
+      // private half can therefore be null even though the public table is
+      // perfectly valid. Keep the physical table mounted through that brief
+      // gap; TeenPattiTable disables private/action surfaces until the matching
+      // private snapshot arrives. Requiring teenPattiPrivate here caused a
+      // full-screen "Loading Teen Patti…" flash on normal betting updates.
+      screen = (
+        <TeenPattiTable
+          dealing={dealingCeremony}
+          onOpenRules={() => { setActiveTableUtility(null); setShowRules(true); }}
+        />
+      );
       screenKey = dealingCeremony ? 'dealing' : 'playing';
     } else {
       screen = <div className="waiting-screen"><LoadingSpinner message="Loading Teen Patti…" /></div>;
+      screenKey = 'loading';
+    }
+  } else if (room.gameId === 'POKER') {
+    if (pokerState && myPlayerId) {
+      screen = (
+        <PokerRuntimeView
+          state={pokerState}
+          privateState={pokerPrivate}
+          selfId={myPlayerId}
+          players={pokerRuntimeIdentities(room.players, room.playerDirectory)}
+          lastHandResult={lastPokerHandResult}
+          dealing={dealingCeremony && !['AWAITING_VARIANT', 'HAND_COMPLETE'].includes(pokerState.state)}
+          canStartNextHand={room.hostId === myPlayerId && pokerState.state === 'HAND_COMPLETE'}
+          onChooseVariant={choosePokerVariant}
+          onAction={pokerAction}
+          onStartNextHand={startNextPokerHand}
+          onTopUp={topUpPoker}
+          onBackToCardRoom={goToHomeScreen}
+        />
+      );
+      screenKey = pokerState.state === 'AWAITING_VARIANT'
+        ? 'variant-choice'
+        : pokerState.state === 'HAND_COMPLETE'
+          ? 'round-summary'
+          : dealingCeremony
+            ? 'dealing'
+            : 'playing';
+    } else {
+      screen = <div className="waiting-screen"><LoadingSpinner message="Loading Poker…" /></div>;
       screenKey = 'loading';
     }
   } else if (gameState?.state === 'GAME_COMPLETE' && !holdingFinalReveal && winnerInfo) {
@@ -373,15 +491,49 @@ export function App() {
   const hazariCanLeaveToBot = !!(
     room?.gameId === 'HAZARI' &&
     viewMode === 'active' &&
-    gameState &&
-    (ARRANGING_STATES.has(gameState.state) || PLAYING_STATES.has(gameState.state))
+    room.status === 'IN_GAME' &&
+    gameState?.state !== 'GAME_COMPLETE'
   );
+  const kittiCanLeaveToBot = !!(
+    room?.gameId === 'KITTI' &&
+    viewMode === 'active' &&
+    room.status === 'IN_GAME' &&
+    kittiState?.state !== 'MATCH_COMPLETE'
+  );
+  const botTakeoverLeaveAvailable = hazariCanLeaveToBot || kittiCanLeaveToBot;
   const teenPattiCanSettleAndLeave = !!(
     room?.gameId === 'TEEN_PATTI' &&
     room.status === 'IN_GAME' &&
     viewMode === 'active' &&
     teenPattiState
   );
+  const pokerCanSettleAndLeave = !!(
+    room?.gameId === 'POKER' &&
+    room.status === 'IN_GAME' &&
+    viewMode === 'active' &&
+    pokerState
+  );
+  const activeGameName = room?.gameId === 'HAZARI'
+    ? 'Hazari'
+    : room?.gameId === 'KITTI'
+      ? 'Kitti'
+      : room?.gameId === 'TEEN_PATTI'
+        ? 'Teen Patti'
+        : room?.gameId === 'POKER'
+          ? 'Poker'
+          : 'Card Room';
+  const tableLeaveAction = botTakeoverLeaveAvailable
+    ? leaveTable
+    : teenPattiCanSettleAndLeave
+      ? () => { void leaveTeenPattiTable(); }
+      : pokerCanSettleAndLeave
+        ? () => { void leavePokerTable(); }
+        : undefined;
+  const tableLeaveDescription = teenPattiCanSettleAndLeave
+    ? 'Leaving packs your live hand if needed, settles your current play-money P/L, and permanently releases your seat. You cannot reconnect to this table with the old session token.'
+    : pokerCanSettleAndLeave
+      ? 'Leaving folds your live hand if needed, keeps committed chips in the pot, settles your virtual Poker stack/P&L, and permanently releases your seat.'
+      : 'A computer player will take over your seat and continue the match from the same score, cards and turn position. Your leave is permanent for this match.';
 
   // Android/PWA/browser Back guard. `screenKey` above already IS the
   // existing screen-routing state (ARCHITECTURE.md: "a plain conditional
@@ -406,26 +558,47 @@ export function App() {
         case 'dealing':
         case 'arranging-waiting':
         case 'arranging':
+        case 'variant-choice':
         case 'playing':
-          if (room?.gameId === 'KITTI' || room?.gameId === 'TEEN_PATTI') {
-            // Kitti and Teen Patti do not use Hazari's bot-takeover exit.
-            // Back returns to the Card Room shell while keeping the live
-            // seat/session connected. Teen Patti's settle-on-leave path is a
-            // separate product flow and must not be faked by `room:leaveTable`.
-            goToHomeScreen();
-            return 'handled';
+          if (room?.gameId === 'TEEN_PATTI') {
+            setPendingLeaveConfirm('teen-patti');
+            return 'blocked';
           }
-          setPendingLeaveConfirm('game');
-          return 'blocked';
+          if (room?.gameId === 'POKER') {
+            setPendingLeaveConfirm('poker');
+            return 'blocked';
+          }
+          if (room?.gameId === 'HAZARI' || room?.gameId === 'KITTI') {
+            setPendingLeaveConfirm('game');
+            return 'blocked';
+          }
+          goToHomeScreen();
+          return 'handled';
         case 'round-summary':
         case 'winner':
-        case 'loading':
-        default:
           // No sensible Back destination from a transient/result screen -
           // absorb the press rather than unexpectedly exiting the PWA or
           // silently abandoning anything. The screen's own buttons (Next
           // round, Play Again, Return to Card Room, Leave) remain the way
           // forward.
+          return 'blocked';
+        case 'loading':
+          // Open-ended tables can briefly know that the seat is IN_GAME
+          // before their detailed reconnect state arrives. Do not trap the
+          // player on an indefinite spinner if that rehydration fails: Back
+          // still offers the authoritative settle/release path. Hazari/Kitti
+          // keep the old transient-loading guard because their permanent
+          // leave semantics depend on the live match state/bot takeover.
+          if (room?.status === 'IN_GAME' && room.gameId === 'TEEN_PATTI') {
+            setPendingLeaveConfirm('teen-patti');
+            return 'blocked';
+          }
+          if (room?.status === 'IN_GAME' && room.gameId === 'POKER') {
+            setPendingLeaveConfirm('poker');
+            return 'blocked';
+          }
+          return 'blocked';
+        default:
           return 'blocked';
       }
     },
@@ -444,10 +617,33 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screenKey]);
 
+  // Chat / Voice are table utilities, not result-screen chrome. A hand can
+  // complete while either panel is open (or while the radial wheel itself is
+  // expanded), especially on a fast fold/showdown. Close the controlled
+  // utility before a transient/result screen is painted so the new result's
+  // actions can never inherit an overlay from the previous betting screen.
+  // The voice *call* itself is not ended here - only its panel is closed.
+  useEffect(() => {
+    if (screenKey === 'dealing' || screenKey === 'round-summary' || screenKey === 'winner' || screenKey === 'loading') {
+      setActiveTableUtility(null);
+    }
+  }, [screenKey]);
+
+  const showTableControls = !!(
+    room &&
+    viewMode === 'active' &&
+    screenKey !== 'dealing' &&
+    screenKey !== 'round-summary' &&
+    screenKey !== 'winner' &&
+    screenKey !== 'loading'
+  );
+
   function confirmLeave() {
     backGuard.consumeAsBack();
     if (pendingLeaveConfirm === 'lobby') leaveSession();
     else if (pendingLeaveConfirm === 'game') leaveTable();
+    else if (pendingLeaveConfirm === 'teen-patti') void leaveTeenPattiTable();
+    else if (pendingLeaveConfirm === 'poker') void leavePokerTable();
     setPendingLeaveConfirm(null);
   }
 
@@ -468,46 +664,62 @@ export function App() {
             : 'Opening the Card Room… the first connection can take up to a minute'}
         </div>
       )}
-      {room && viewMode === 'active' && (
-        <button className="settings-fab fab" onClick={() => setShowSettings(true)} aria-label="Settings">
-          <ChromeIcon name="settings" />
-        </button>
+      {showTableControls && (
+        <>
+          {!showTutorial && !showRules && !showStats && !showRoundHistory && activeTableUtility !== 'settings' && (
+            <TableControls
+              key={`table-controls:${screenKey}`}
+              gameName={activeGameName}
+              onOpenChat={() => setActiveTableUtility('chat')}
+              onOpenVoice={() => setActiveTableUtility('voice')}
+              onOpenSettings={() => setActiveTableUtility('settings')}
+              onBackToCardRoom={() => { setActiveTableUtility(null); goToHomeScreen(); }}
+              onLeaveTable={tableLeaveAction}
+              leaveDescription={tableLeaveDescription}
+              leaveActionLabel={teenPattiCanSettleAndLeave || pokerCanSettleAndLeave ? 'Leave & settle' : 'Leave Table'}
+            />
+          )}
+          <ChatPanel
+            open={activeTableUtility === 'chat'}
+            onClose={() => setActiveTableUtility(null)}
+            showLauncher={false}
+          />
+          <VoiceCallPanel
+            open={activeTableUtility === 'voice'}
+            onClose={() => setActiveTableUtility(null)}
+            showLauncher={false}
+          />
+        </>
       )}
-      {room && viewMode === 'active' && <ChatPanel />}
-      {room && viewMode === 'active' && <VoiceCallPanel />}
       <div key={screenKey} className="screen-fade">
         {screen}
       </div>
       {showTutorial && tutorialGameId && (
         <TutorialModal gameId={tutorialGameId} onClose={() => setShowTutorial(false)} />
       )}
-      {showRules && room && hasGameGuide(room.gameId) && (
+      {showRules && room && room.gameId === 'TEEN_PATTI' && teenPattiState && (
+        <TeenPattiRulesSheet state={teenPattiState} onClose={() => setShowRules(false)} />
+      )}
+      {showRules && room && room.gameId === 'POKER' && pokerState && (
+        <PokerRulesSheet state={pokerState} onClose={() => setShowRules(false)} />
+      )}
+      {showRules && room && room.gameId !== 'TEEN_PATTI' && room.gameId !== 'POKER' && hasGameGuide(room.gameId) && (
         <RulesModal gameId={room.gameId} onClose={() => setShowRules(false)} />
       )}
       {showStats && <StatsModal onClose={() => setShowStats(false)} />}
       {showRoundHistory && <RoundHistoryModal onClose={() => setShowRoundHistory(false)} />}
-      {showSettings && (
+      {activeTableUtility === 'settings' && (
         <SettingsModal
-          onClose={() => setShowSettings(false)}
-          onOpenRules={() => setShowRules(true)}
-          onOpenStats={() => setShowStats(true)}
-          onOpenRoundHistory={() => setShowRoundHistory(true)}
-          onLeaveTable={
-            hazariCanLeaveToBot
-              ? leaveTable
-              : teenPattiCanSettleAndLeave
-                ? () => { void leaveTeenPattiTable(); }
-                : undefined
-          }
-          leaveDescription={
-            teenPattiCanSettleAndLeave
-              ? 'Leaving packs your live hand if needed, settles your current play-money P/L, and permanently releases your seat. You cannot reconnect to this table with the old session token.'
-              : undefined
-          }
-          leaveActionLabel={teenPattiCanSettleAndLeave ? 'Leave & settle' : undefined}
+          onClose={() => setActiveTableUtility(null)}
+          onOpenRules={() => { setActiveTableUtility(null); setShowRules(true); }}
+          onOpenStats={() => { setActiveTableUtility(null); setShowStats(true); }}
+          onOpenRoundHistory={() => { setActiveTableUtility(null); setShowRoundHistory(true); }}
+          onLeaveTable={tableLeaveAction}
+          leaveDescription={tableLeaveAction ? tableLeaveDescription : undefined}
+          leaveActionLabel={teenPattiCanSettleAndLeave || pokerCanSettleAndLeave ? 'Leave & settle' : undefined}
         />
       )}
-      {gameError && !ARRANGING_STATES.has(gameState?.state ?? '') && !PLAYING_STATES.has(gameState?.state ?? '') && !KITTI_ARRANGING_STATES.has(kittiState?.state ?? '') && !KITTI_PLAYING_STATES.has(kittiState?.state ?? '') && (
+      {gameError && room && !(room.gameId === 'TEEN_PATTI' && ['variant-choice', 'dealing', 'playing', 'round-summary'].includes(screenKey)) && !ARRANGING_STATES.has(gameState?.state ?? '') && !PLAYING_STATES.has(gameState?.state ?? '') && !KITTI_ARRANGING_STATES.has(kittiState?.state ?? '') && !KITTI_PLAYING_STATES.has(kittiState?.state ?? '') && (
         <div className="toast toast--error" onClick={clearGameError}>
           {gameError}
         </div>
@@ -524,15 +736,31 @@ export function App() {
           <button type="button" onClick={clearTeenPattiSettlementNotice} aria-label="Dismiss settlement">✕</button>
         </aside>
       )}
+      {pokerSettlementNotice && (
+        <aside className="tp-settlement-notice" role="status" aria-live="polite">
+          <div>
+            <span>Poker table settled</span>
+            <strong className={pokerSettlementNotice.profitLoss >= 0 ? 'is-positive' : 'is-negative'}>
+              P/L {pokerSettlementNotice.profitLoss >= 0 ? '+' : ''}{pokerSettlementNotice.profitLoss}
+            </strong>
+            <small>Final stack {pokerSettlementNotice.stack} · Funding {pokerSettlementNotice.totalFunding}</small>
+          </div>
+          <button type="button" onClick={clearPokerSettlementNotice} aria-label="Dismiss Poker settlement">✕</button>
+        </aside>
+      )}
       {pendingLeaveConfirm && (
         <ConfirmDialog
           title="Leave this room?"
           message={
             pendingLeaveConfirm === 'game'
-              ? "A computer player will take over your seat and the game will continue for everyone else. You won't be able to rejoin this game."
-              : "You'll leave the room. If you want back in, you'll need the room code again."
+              ? "A computer player will take over your seat and the game will continue for everyone else. You won't be able to rejoin this match."
+              : pendingLeaveConfirm === 'teen-patti'
+                ? 'Leaving packs your live hand if needed, settles your current play-money P/L, and permanently releases your seat.'
+                : pendingLeaveConfirm === 'poker'
+                  ? 'Leaving folds your live hand if needed, keeps committed chips in the pot, settles your virtual Poker P/L, and permanently releases your seat.'
+                  : "You'll leave the room. If you want back in, you'll need the room code again."
           }
-          confirmLabel="Leave"
+          confirmLabel={pendingLeaveConfirm === 'teen-patti' || pendingLeaveConfirm === 'poker' ? 'Leave & settle' : 'Leave'}
           cancelLabel="Stay"
           onConfirm={confirmLeave}
           onCancel={cancelLeave}

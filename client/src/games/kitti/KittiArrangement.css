@@ -44,7 +44,7 @@
 .karr-tray__name { color: var(--brass-300); font: 500 var(--text-base)/1 var(--font-display); }
 .karr-tray__order { color: var(--ink-500); font-size: .57rem; letter-spacing: .14em; text-transform: uppercase; }
 .karr-tray__kind { color: var(--ink-300); font-size: var(--text-xs); }
-.karr-tray__slots { display: flex; align-items: center; justify-content: flex-start; gap: var(--space-1); min-width: 0; }
+.karr-tray__slots { display: flex; align-items: center; justify-content: center; gap: 2px; min-width: 0; perspective: 28rem; }
 .karr-tray__card {
   position: relative;
   min-width: var(--touch-min);
@@ -58,6 +58,9 @@
   cursor: pointer;
   touch-action: manipulation;
 }
+.karr-tray__card:nth-child(1) { transform: translateY(3px); }
+.karr-tray__card:nth-child(2) { transform: translateY(0); }
+.karr-tray__card:nth-child(3) { transform: translateY(3px); }
 .karr-tray__empty {
   width: var(--touch-min);
   min-width: var(--touch-min);
@@ -106,7 +109,7 @@
   .karr__rule { display: none; }
 }
 
-/* ==========================================================================
+/* ========================================================================== 
    Premium release pass — Kitti arrangement uses the same physical vocabulary
    as the shared table: recessed felt trays, brass plates and warm room light.
    ========================================================================== */
@@ -203,4 +206,216 @@
     align-items: stretch;
     flex-direction: column;
   }
+}
+
+/* ========================================================================== 
+   Release 1.6 mobile geometry — the hand must fit the DEVICE, never make the
+   document wider. Nine medium cards are overlapped by an amount derived from
+   the viewport width, so 320–430px phones see all nine ranks at once without
+   horizontal page scrolling. Short landscape gets a compact 5+4 card rack.
+   ========================================================================== */
+@media (max-width: 26.875rem) and (orientation: portrait) {
+  .karr__bar {
+    align-items: start;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .karr__status {
+    max-width: 100%;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+  .karr__trays { padding: var(--space-2); }
+  .karr-tray {
+    grid-template-columns: 4.2rem minmax(0, 1fr);
+    gap: var(--space-1);
+  }
+  .karr__handbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .karr__handbar > span { max-width: 100%; overflow-wrap: anywhere; }
+  .karr__sort { max-width: 100%; }
+  .karr__sort button { min-width: 0; }
+  .karr__fan {
+    justify-content: center;
+    gap: 0;
+    overflow-x: hidden;
+    padding-inline: 0;
+    touch-action: manipulation;
+  }
+  .karr__fan .pcard {
+    position: relative;
+    flex: 0 0 auto;
+  }
+  .karr__fan .pcard + .pcard {
+    margin-left: clamp(
+      -1.5rem,
+      calc((100vw - var(--safe-left) - var(--safe-right) - 31.25rem) / 8),
+      -0.45rem
+    );
+  }
+  .karr__fan .pcard.is-selected { z-index: 3; }
+  .karr__actions {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+  .karr__rule,
+  .karr__assist,
+  .karr__error {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+  .karr__actions .btn {
+    width: 100%;
+    min-width: 0;
+  }
+  .karr__assist {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .karr {
+    grid-template-columns: minmax(0, 1fr) minmax(15.5rem, 40%);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  .karr__bar {
+    padding-right: calc(var(--safe-right) + var(--top-fab-reserve));
+    padding-bottom: var(--space-1);
+  }
+  .karr__felt {
+    min-width: 0;
+    margin: var(--space-1) var(--space-1) calc(var(--safe-bottom) + var(--space-1)) calc(var(--safe-left) + var(--space-1));
+  }
+  .karr__trays { gap: var(--space-1); padding: var(--space-2); }
+  .karr-tray {
+    grid-template-columns: minmax(4.35rem, .72fr) minmax(0, 1.6fr);
+    min-height: 3.75rem;
+    padding: var(--space-1) var(--space-2);
+  }
+  .karr__hand {
+    min-width: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: var(--space-1) calc(var(--safe-right) + var(--space-2)) 0 var(--space-2);
+    scrollbar-width: none;
+  }
+  .karr__hand::-webkit-scrollbar { display: none; }
+  .karr__handbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 0;
+  }
+  .karr__handbar > span {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    font-size: .65rem;
+  }
+  .karr__sort { align-self: stretch; justify-content: stretch; }
+  .karr__sort button { flex: 1; min-height: var(--touch-min); padding-inline: var(--space-1); }
+  .karr__fan {
+    display: grid;
+    /* Keep the normal medium card size. Narrow tracks deliberately overlap
+       neighbouring cards, so short landscape fits by spacing rather than by
+       shrinking the cards players are trying to read and arrange. */
+    grid-template-columns: repeat(5, 2.4rem);
+    justify-content: center;
+    align-content: start;
+    column-gap: 0;
+    row-gap: .2rem;
+    max-height: none;
+    overflow: visible;
+    padding: 12px 0 var(--space-1);
+    touch-action: manipulation;
+  }
+  .karr__fan .pcard {
+    margin-left: 0 !important;
+  }
+  .karr__fan .pcard.is-selected { z-index: 3; }
+  .karr__actions {
+    min-width: 0;
+    gap: var(--space-1);
+    padding: var(--space-1) calc(var(--safe-right) + var(--space-2)) calc(var(--safe-bottom) + var(--space-1)) var(--space-2);
+  }
+  .karr__actions .btn { width: 100%; min-width: 0; }
+  .karr__assist {
+    display: grid;
+    gap: 3px;
+    font-size: .62rem;
+  }
+  .karr__assist > span { display: none; }
+  .karr__assist .btn { min-height: var(--touch-min); }
+}
+
+/* ========================================================================== 
+   Premium hand architecture — each Kitti group is a three-card hand resting
+   directly on the felt. This removes the dashboard-box feeling while keeping
+   the locked Hand 1 > Hand 2 > Hand 3 rule and all existing interaction.
+   ========================================================================== */
+.karr-tray {
+  overflow: visible;
+  border: 0;
+  background:
+    radial-gradient(ellipse 72% 60% at 64% 76%, rgba(0,0,0,.24), transparent 72%),
+    linear-gradient(180deg, rgba(4,13,10,.08), rgba(0,0,0,.13));
+  box-shadow:
+    inset 0 -1px rgba(220,192,134,.07),
+    inset 0 -8px 20px rgba(0,0,0,.1);
+}
+
+.karr-tray::before {
+  left: .72rem;
+  right: .72rem;
+  top: auto;
+  bottom: .38rem;
+  width: auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(200,164,92,.34) 20% 80%, transparent);
+  opacity: .64;
+}
+
+.karr-tray__slots {
+  position: relative;
+  min-height: 3.9rem;
+  isolation: isolate;
+}
+
+.karr-tray__slots::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 6%;
+  right: 6%;
+  bottom: .12rem;
+  height: 60%;
+  border-radius: 50% 50% 42% 42% / 28% 28% 70% 70%;
+  border-bottom: 1px solid rgba(220,192,134,.12);
+  background: radial-gradient(ellipse at 50% 100%, rgba(0,0,0,.28), transparent 68%);
+  pointer-events: none;
+}
+
+.karr-tray__card {
+  top: 0;
+  transition: top var(--dur-fast) var(--ease-settle), transform var(--dur-fast) var(--ease-settle);
+}
+
+.karr__fan {
+  align-items: flex-start;
+  perspective: 34rem;
+}
+
+.karr__fan .pcard {
+  top: 0;
+}
+
+.karr__fan .pcard.is-selected {
+  z-index: 20 !important;
+}
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .karr__fan .pcard { top: 0 !important; }
+  .karr-tray__slots { min-height: 3.5rem; }
 }

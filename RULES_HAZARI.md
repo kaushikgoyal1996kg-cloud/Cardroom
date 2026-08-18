@@ -75,14 +75,17 @@ equal, and the caller resolves it (see Ties below).
 
 ## Hand ranking — the four-card set
 
-Documented in `rules.ts` as an **assumption**, a Teen-Patti-inspired extension:
+**Confirmed house rule:** Set 4 contains four cards, but its ranking is the
+**best 3-card Teen Patti hand that can be made from those four cards**.
 
-Four of a Kind > Straight Flush (4-run, one suit) > Flush (4 same suit) >
-Straight (4-run, mixed) > Three of a Kind + kicker > Two Pair > One Pair >
-High Card. Rank-based tiebreaks within category.
+All four 3-card subsets are evaluated using the same ranking as Sets 1–3:
+Trail > Pure Sequence > Sequence > Colour > Pair > High Card. The strongest
+subset is Set 4's value. The unused fourth card is ignored completely and is
+**not** a kicker or additional tiebreaker.
 
-Isolated in `fourCardRanking.ts` so the methodology can be swapped without
-touching anything else.
+Therefore, if Set 3 and Set 4's best three cards are exactly equal, they are
+an exact tie and the arrangement remains valid because Set 3 ≥ Set 4 allows
+equality.
 
 ---
 
@@ -124,8 +127,9 @@ the player who played later takes it. Suit is never used.
 
 Two conditions make a player **eligible** to dismiss their hand:
 
-1. **No Possible Sequence** — no arrangement of the 13 cards can produce any
-   set containing a Sequence, Pure Sequence or Trail.
+1. **No Possible Sequence** — no 3-card subset anywhere in the raw 13-card
+   deal can form a Sequence or Pure Sequence. A **Trial/Trail does not count
+   as a sequence and does not prevent dismissal**.
 2. **Six Pairs** — the raw 13-card hand contains at least six pairs.
 
 Rules:

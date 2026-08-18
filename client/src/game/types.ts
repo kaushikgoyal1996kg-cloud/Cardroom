@@ -21,7 +21,7 @@ export interface PublicPlayerInfo {
 }
 
 /** Mirrors the server's platform/games/registry GameId. */
-export type GameId = 'HAZARI' | 'KITTI' | 'TEEN_PATTI';
+export type GameId = 'HAZARI' | 'KITTI' | 'TEEN_PATTI' | 'POKER';
 
 export interface PublicPlayMoneyState {
   proposal: {
@@ -44,6 +44,8 @@ export interface PublicRoomInfo {
   gameId: GameId;
   status: 'LOBBY' | 'IN_GAME';
   players: PublicPlayerInfo[];
+  /** Public-safe identity archive for readable history after a player leaves. */
+  playerDirectory?: Record<PlayerId, { name: string; avatar: string }>;
   maxPlayers: number;
   hostId: PlayerId;
   gameState?: string;
@@ -75,6 +77,8 @@ export interface HaazariPublicStatePayload {
   dealerId: PlayerId;
   roundNumber: number;
   cumulativeScores: Record<PlayerId, number>;
+  /** Server-authored completed rounds. Optional only for rolling compatibility with older staging servers. */
+  roundHistory?: RoundResult[];
   currentSetIndex: number;
   currentLeader: PlayerId | null;
   currentPlayOrder: PlayerId[] | null;
@@ -179,6 +183,8 @@ export interface KittiPublicStatePayload {
   deciderPlayerIds: PlayerId[];
   roundWinnerId: PlayerId | null;
   roundsWon: Record<PlayerId, number>;
+  /** Server-authored completed rounds. Optional only for rolling compatibility with older staging servers. */
+  roundHistory?: KittiRoundResult[];
   matchWinnerId: PlayerId | null;
   initialDealerDraws: {
     contenders: PlayerId[];
@@ -198,8 +204,11 @@ export type TeenPattiVariantId =
   | 'HIGHEST_CARD_JOKER'
   | 'AK47'
   | 'PAIRS_ARE_JOKERS'
-  | 'NAMED_RANK_LITTLE'
+  | 'K_LITTLE'
+  | 'Q_LITTLE'
+  | 'J_LITTLE'
   | 'RANDOM_PACK_JOKER'
+  | 'REVOLVING_JOKER'
   | 'UP_DOWN_SAME'
   | 'UP_DOWN'
   | 'DOWN_ONLY'
@@ -210,22 +219,51 @@ export type TeenPattiVariantId =
   | 'ASSUMED_THIRD'
   | 'CLOSEST_TO_N';
 
+export type TeenPattiFiveCardJokerId =
+  | 'NONE'
+  | 'STANDARD_JOKER'
+  | 'RANDOM_PACK_JOKER'
+  | 'LOWEST_CARD_JOKER'
+  | 'HIGHEST_CARD_JOKER'
+  | 'AK47'
+  | 'PAIRS_ARE_JOKERS'
+  | 'UP_DOWN_SAME'
+  | 'UP_DOWN'
+  | 'DOWN_ONLY'
+  | 'TWO_REFERENCE_JOKER';
+
 export interface TeenPattiTableConfig {
   startingBalance: number;
   bootAmount: number;
   baseBlind: number;
   maxBlind: number;
+  friendlyAssist?: boolean;
 }
 
 export interface TeenPattiRoundVariantConfig {
   variantId: TeenPattiVariantId;
-  namedRank?: Rank;
   targetNumber?: number;
   reorderTargetCards?: boolean;
+  fiveCardJoker?: TeenPattiFiveCardJokerId;
+}
+
+export interface TeenPattiTwoReferenceAssignment {
+  upDownReferenceIndex: 0 | 1;
+}
+
+export type TeenPattiTableMode = 'FIXED' | 'VARIANT_TABLE';
+export type TeenPattiVariantRotation = 'DEALER_CHOICE' | 'FIXED_ROTATION' | 'SURPRISE_ME';
+
+export interface TeenPattiVariantTablePolicy {
+  mode: TeenPattiTableMode;
+  fixedVariant?: TeenPattiVariantId;
+  variants?: TeenPattiVariantId[];
+  rotation?: TeenPattiVariantRotation;
 }
 
 export interface TeenPattiLobbySetup {
   tableConfig: TeenPattiTableConfig;
+  variantPolicy: TeenPattiVariantTablePolicy;
   roundVariant: TeenPattiRoundVariantConfig;
   proposedBy: PlayerId;
   acceptedBy: PlayerId[];
@@ -244,11 +282,43 @@ export type TeenPattiAction =
   | { type: 'ACCEPT_OPEN_SHOW' }
   | { type: 'DECLINE_OPEN_SHOW' };
 
+export type TeenPattiFriendlySuggestion = 'PLAY' | 'PACK' | 'SIDESHOW' | 'SHOW';
+export type TeenPattiFriendlyAssistStatus = 'PENDING' | 'ACCEPTED';
+
+export interface TeenPattiFriendlyAssistRequestState {
+  requestId: string;
+  coachPlayerId: PlayerId;
+  targetPlayerId: PlayerId;
+  status: TeenPattiFriendlyAssistStatus;
+  lastSuggestion: TeenPattiFriendlySuggestion | null;
+}
+
+export interface TeenPattiFriendlyAssistPrivateState {
+  enabled: boolean;
+  coachLockedTargetPlayerId: PlayerId | null;
+  outgoing: (TeenPattiFriendlyAssistRequestState & {
+    targetCards: Card[];
+    targetDiscardedCardIds: string[];
+    targetTwoReferenceAssignment: TeenPattiTwoReferenceAssignment | null;
+  }) | null;
+  incoming: TeenPattiFriendlyAssistRequestState[];
+}
+
 export interface TeenPattiPrivateStatePayload {
+  /** Must match the public snapshot before this private state is rendered. */
+  roundNumber: number;
+  sequence: number;
   cards: Card[];
   cardCount: number;
   cardsViewed: boolean;
   seen: boolean;
+  friendlyAssist: TeenPattiFriendlyAssistPrivateState;
+  twoReferenceAssignment: TeenPattiTwoReferenceAssignment | null;
+  discardState: {
+    complete: boolean;
+    selectedSlots: number[];
+    legalSelections: number[][];
+  } | null;
 }
 
 export interface TeenPattiSideshowResult {
@@ -256,16 +326,21 @@ export interface TeenPattiSideshowResult {
   opponentId: PlayerId;
   packedPlayerId: PlayerId;
   tied: boolean;
+  /** Present for retained-discard rounds so both compared five-card hands can be shown transparently. */
+  revealedHands?: TeenPattiShowdownEntry[];
 }
 
 export interface TeenPattiShowdownEntry {
   playerId: PlayerId;
   cards: Card[];
+  discardedCardIds?: string[];
   description: string;
 }
 
 export interface TeenPattiRoundOutcome {
   roundNumber: number;
+  variantId: TeenPattiVariantId;
+  variantName: string;
   dealerId: PlayerId;
   winnerIds: PlayerId[];
   potAwarded: number;
@@ -294,14 +369,24 @@ export interface TeenPattiPublicStatePayload {
   currentTurn: PlayerId | null;
   sequence: number;
   tableConfig: TeenPattiTableConfig;
+  variantPolicy: TeenPattiVariantTablePolicy;
   variant: TeenPattiRoundVariantConfig;
+  variantDecision: 'CHOOSE_VARIANT' | 'CONFIGURE_VARIANT' | null;
+  variantWasSurprise: boolean;
+  variantName: string;
+  nextVariantChooserId: PlayerId | null;
+  variantDealCount: number;
   variantHelp: string;
+  variantReferenceCards: Card[];
+  twoReferenceAssignmentsComplete: number;
+  discardSelectionsComplete: number;
   initialDealerDraws: {
     contenders: PlayerId[];
     draws: { playerId: PlayerId; card: Card }[];
   }[];
   lastSideshow: TeenPattiSideshowResult | null;
   openShowRequestFrom: PlayerId | null;
+  openShowAcceptedBy: PlayerId[];
   players: {
     playerId: PlayerId;
     chips: number;
@@ -311,7 +396,160 @@ export interface TeenPattiPublicStatePayload {
     committed: number;
     blindTurns: number;
     topUps: number;
+    roundsWon: number;
     profitLoss: number;
+    referenceAssigned: boolean;
+    discardLocked: boolean;
   }[];
+  roundHistory: TeenPattiRoundOutcome[];
   lastOutcome: TeenPattiRoundOutcome | null;
+}
+
+// ============================================================================
+// Poker (hidden until the network controller is fully enabled)
+// ============================================================================
+export type PokerVariantId =
+  | 'TEXAS_HOLDEM'
+  | 'PLO4'
+  | 'PLO5'
+  | 'PLO6'
+  | 'SHORT_DECK';
+
+export type PokerTableMode = 'FIXED' | 'VARIANT_TABLE';
+export type PokerVariantRotation = 'DEALER_CHOICE' | 'FIXED_ROTATION';
+export type PokerState = 'READY' | 'AWAITING_VARIANT' | 'PREFLOP' | 'FLOP' | 'TURN' | 'RIVER' | 'SHOWDOWN' | 'HAND_COMPLETE';
+
+export interface PokerTableConfig {
+  mode: PokerTableMode;
+  fixedVariant?: PokerVariantId;
+  variants?: PokerVariantId[];
+  rotation?: PokerVariantRotation;
+  startingStack: number;
+  smallBlind: number;
+  bigBlind: number;
+  ante: number;
+  actionTimerSeconds: 0 | 15 | 20 | 30 | 45 | 60;
+}
+
+export interface PokerLobbySetup {
+  config: PokerTableConfig;
+  proposedBy: PlayerId;
+  acceptedBy: PlayerId[];
+  revision: number;
+  seatCap: number;
+  variants: Array<{
+    id: PokerVariantId;
+    name: string;
+    shortName: string;
+    howToPlay: string;
+  }>;
+}
+
+export type PokerAction =
+  | { type: 'FOLD' }
+  | { type: 'CHECK' }
+  | { type: 'CALL' }
+  | { type: 'RAISE_TO'; amount: number };
+
+export interface PokerPlayerStatePayload {
+  playerId: PlayerId;
+  stack: number;
+  folded: boolean;
+  allIn: boolean;
+  streetCommitted: number;
+  handCommitted: number;
+  actedThisStreet: boolean;
+  topUps: number;
+  handsWon: number;
+}
+
+export interface PokerLegalActions {
+  fold: boolean;
+  check: boolean;
+  call: boolean;
+  raise: boolean;
+  minRaiseTo: number | null;
+  maxRaiseTo: number | null;
+}
+
+export interface PokerPrivateStatePayload {
+  /** Must match the public snapshot before cards/legal actions are rendered. */
+  handNumber: number;
+  sequence: number;
+  holeCards: Card[];
+  toCall: number;
+  legalActions: PokerLegalActions;
+}
+
+export interface PokerPlayerSettlement {
+  playerId: PlayerId;
+  stack: number;
+  totalFunding: number;
+  topUps: number;
+  profitLoss: number;
+}
+
+export interface PokerHandValuePayload {
+  category: string;
+  categoryStrength: number;
+  tiebreak: number[];
+  cards: Card[];
+}
+
+export interface PokerPotAwardPayload {
+  amount: number;
+  eligiblePlayerIds: PlayerId[];
+  winnerIds: PlayerId[];
+}
+
+export interface PokerShowdownEntryPayload {
+  playerId: PlayerId;
+  holeCards: Card[];
+  hand: PokerHandValuePayload;
+}
+
+export interface PokerHandOutcomePayload {
+  handNumber: number;
+  variantId: PokerVariantId;
+  /** Server-authored hand label captured with the result/history entry. */
+  variantName: string;
+  dealerId: PlayerId;
+  board: Card[];
+  pots: PokerPotAwardPayload[];
+  showdown: PokerShowdownEntryPayload[] | null;
+  winnerIds: PlayerId[];
+  reason: 'LAST_STANDING' | 'SHOWDOWN';
+}
+
+export interface PokerPublicVariant {
+  id: PokerVariantId;
+  name: string;
+  shortName: string;
+  holeCards: number;
+  betting: 'NO_LIMIT' | 'POT_LIMIT' | 'ANTE_NO_LIMIT';
+  minPlayers: number;
+  maxPlayers: number;
+  howToPlay: string;
+}
+
+export interface PokerPublicStatePayload {
+  state: PokerState;
+  sequence: number;
+  handNumber: number;
+  variantId: PokerVariantId;
+  variant: PokerPublicVariant;
+  tableConfig: PokerTableConfig;
+  dealerId: PlayerId;
+  nextVariantChooserId: PlayerId | null;
+  approvedVariantIds: PokerVariantId[];
+  approvedVariants: PokerPublicVariant[];
+  currentTurn: PlayerId | null;
+  board: Card[];
+  pot: number;
+  currentBet: number;
+  minRaiseTo: number | null;
+  maxRaiseTo: number | null;
+  players: PokerPlayerStatePayload[];
+  handHistory: PokerHandOutcomePayload[];
+  outcome: PokerHandOutcomePayload | null;
 }

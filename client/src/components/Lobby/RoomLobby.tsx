@@ -5,12 +5,26 @@ import { buildInviteUrl } from '../../platform/lib/inviteUrl';
 import { AvatarBadge } from './AvatarPicker';
 import { LoadingSpinner } from '../LoadingSpinner';
 import { TeenPattiLobbySetup } from '../../games/teenpatti/TeenPattiLobbySetup';
+import { PokerLobbyConsensus } from '../../games/poker/PokerLobbyConsensus';
 import { PlayMoneyBoard } from '../../platform/components/PlayMoneyBoard';
 import './RoomLobby.css';
 
 export function RoomLobby() {
-  const { room, myPlayerId, setReady, startGame, addBot, removeBot, leaveSession, teenPattiSetup } = useGame();
+  const {
+    room,
+    myPlayerId,
+    setReady,
+    startGame,
+    addBot,
+    removeBot,
+    leaveSession,
+    teenPattiSetup,
+    pokerSetup,
+    proposePokerSetup,
+    acceptPokerSetup,
+  } = useGame();
   const [shareCopied, setShareCopied] = useState(false);
+  const [pokerSetupBusy, setPokerSetupBusy] = useState(false);
   if (!room) {
     return (
       <div className="waiting-screen">
@@ -29,10 +43,11 @@ export function RoomLobby() {
   const allHumansOnline = room.players.every((p) => p.isBot || p.connected);
   const allReady = enoughPlayers && allHumansOnline && room.players.every((p) => p.ready);
   const teenPattiSetupReady = room.gameId !== 'TEEN_PATTI' || (!!teenPattiSetup && room.players.every((p) => teenPattiSetup.acceptedBy.includes(p.playerId)));
+  const pokerSetupReady = room.gameId !== 'POKER' || (!!pokerSetup && room.players.every((p) => pokerSetup.acceptedBy.includes(p.playerId)));
   const playMoneyReady = !room.playMoney.proposal || room.players.every(
     (p) => p.isBot || room.playMoney.proposal!.acceptedBy.includes(p.playerId)
   );
-  const canStart = allReady && teenPattiSetupReady && playMoneyReady;
+  const canStart = allReady && teenPattiSetupReady && pokerSetupReady && playMoneyReady;
   // Release 1 supports optional computer seats in Hazari and Kitti. Bots are
   // auto-ready and auto-accept the optional virtual board; Teen Patti remains
   // Coming Soon and deliberately has no bot controller.
@@ -124,6 +139,35 @@ export function RoomLobby() {
       </div>
 
       {room.gameId === 'TEEN_PATTI' && <TeenPattiLobbySetup />}
+      {room.gameId === 'POKER' && myPlayerId && (
+        <PokerLobbyConsensus
+          setup={pokerSetup}
+          players={room.players.map((player) => ({
+            playerId: player.playerId,
+            name: player.name,
+            isHost: player.isHost,
+          }))}
+          selfId={myPlayerId}
+          hostId={room.hostId}
+          busy={pokerSetupBusy}
+          onPropose={async (config) => {
+            setPokerSetupBusy(true);
+            try {
+              await proposePokerSetup(config);
+            } finally {
+              setPokerSetupBusy(false);
+            }
+          }}
+          onAccept={async (revision) => {
+            setPokerSetupBusy(true);
+            try {
+              await acceptPokerSetup(revision);
+            } finally {
+              setPokerSetupBusy(false);
+            }
+          }}
+        />
+      )}
       {(room.gameId === 'HAZARI' || room.gameId === 'KITTI') && <PlayMoneyBoard />}
 
       <div className="room-lobby__actions">
@@ -152,6 +196,8 @@ export function RoomLobby() {
               ? 'Waiting for every human player to be back online before Start.'
               : !teenPattiSetupReady
                 ? 'Every player must accept the current Teen Patti table setup before Start.'
+              : !pokerSetupReady
+                ? 'Every player must accept the current Poker table setup before Start.'
               : !playMoneyReady
                 ? 'Every human player must accept the optional play-money board, or the host can withdraw it.'
                 : 'Everyone at the table must be ready before the host can start.'}

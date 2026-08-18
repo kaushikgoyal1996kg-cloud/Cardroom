@@ -71,7 +71,9 @@ export function Landing({ onIdentitySaved }: LandingProps = {}) {
     <main className="invite-arrival">
       <div className="invite-arrival__lamp" aria-hidden="true" />
       <section className="invite-card" aria-label={`${gameName} invitation`}>
-        <div className="invite-card__seal" aria-hidden="true">CR</div>
+        <div className="invite-card__seal" aria-hidden="true">
+          <img src="/brand/card-room-emblem.png" alt="" />
+        </div>
         <p className="invite-card__eyebrow">Private table invitation</p>
         <h1>The Card Room</h1>
         <p className="invite-card__game">{gameName}</p>

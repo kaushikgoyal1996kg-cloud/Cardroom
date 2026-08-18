@@ -69,12 +69,16 @@ leaves, settle their table account against the current session state.
 - The **weaker hand packs**.
 - **Exact tie → the sideshow initiator packs.**
 
-### Final two ✅
+### Mutual Show / final show ✅
 
-- The two may **mutually agree to an open show at no extra cost**.
-- Otherwise betting continues, and either may initiate a showdown.
-- A **showdown costs the normal current seen amount**.
-- **Exact equal hands split the pot equally.**
+- **Any active player may propose Mutual Show**, including when three or more players remain.
+- The request is **free** and does not itself place another bet.
+- Cards are opened only if **every currently active player accepts** the same request.
+- While the unanimous vote is pending, betting pauses on the exact current turn. If any active player declines, the request is cancelled and betting resumes from that unchanged turn.
+- On unanimous acceptance, all active hands are revealed and compared. The best hand wins; if two or more best hands are exactly tied, the pot is **split equally among those tied winners**.
+- With the final two players, this same Mutual Show flow preserves the already-locked no-cost mutual open show rule.
+- If Mutual Show is not agreed with the final two, betting continues and either may initiate a paid showdown.
+- A **paid showdown costs the normal current seen amount**.
 
 ---
 
@@ -101,9 +105,10 @@ colour and high card by highest, then second, then third. Suit is never used.
 ## Dealer-selected variant framework 🟡
 
 The descriptor/configuration framework exists and the rules are represented as
-data. **Only Classic is runtime-enabled today.** Unsupported variants are
-rejected explicitly rather than silently behaving like Classic. Live execution
-of the variants below remains future work.
+data. The currently complete runtime paths remain **behind the Coming Soon
+release gate**. Unsupported variants are rejected explicitly rather than
+silently behaving like Classic; a descriptor alone never makes a variant
+playable.
 
 The dealer may select:
 
@@ -151,9 +156,7 @@ rank is a pair, both are wild.
 rank are wild. In larger-card variants multiple pairs may become wild unless
 discarded by the declared round rule.
 
-**Named rank + Little** (e.g. *K Little*, *Q Little*) — the named rank is wild
-and the player's lowest card is also wild. The framework may support
-equivalent named ranks.
+**K Little / Q Little / J Little** — these are three separate selectable variants, not one configurable Named Little mode. In **K Little**, Kings are wild; in **Q Little**, Queens are wild; in **J Little**, Jacks are wild. “Little” is the player's lowest remaining rank other than the fixed named rank; if that Little rank is duplicated, every card of that rank is wild. If every dealt card is already the fixed named rank, there is no additional Little rank.
 
 **Random-pack joker** — reveal a random card from the undealt pack; all cards
 of that rank are wild.
@@ -177,17 +180,27 @@ assigns one reference to Up/Down and the other to Same-rank.
 - Cannot choose Same for both.
 - Cannot choose Up/Down for both.
 
-### 5-card discard structures
+### 5-card retained-discard structures
 
-The dealer may deal 5 and require:
+**Runtime status:** 🟢 hidden/runtime-ready behind the Teen Patti Coming Soon gate.
+
+The round dealer configures the 5-card structure **before the deal** and chooses one of:
 
 - discard 1 lowest + 1 highest
 - discard 2 lowest
 - discard 2 highest
 
-These may combine with compatible joker rules.
+The dealer also chooses the compatible joker rule for that round. The joker applies to the final active three cards; Card Room jokers remain fully wild in **both rank and suit**.
+
+All five originally dealt cards stay with the player for the entire hand. The required two cards are only **marked discarded**; they are never returned to the pack. Only the three non-discarded cards are ranked.
+
+If the discard boundary contains equal-ranked physical cards, **the player chooses which actual card to discard**. Suit never breaks that choice automatically because the physical choice can change the resulting hand (for example, preserving or breaking a Pure Sequence). A blind player can make the required choice among eligible facedown card positions without seeing card identities.
+
+At sideshow or showdown, all five originally dealt cards are revealed and the two retained discards are visibly identified. Discarded cards have **no comparison value and no tie-break value**; an exact tie between the active three-card hands follows the normal Teen Patti tie/split rule for that show context.
 
 ### 2-card assumed-third
+
+**Runtime status:** 🟢 hidden/runtime-ready behind the Teen Patti Coming Soon gate. The server automatically chooses the strongest legal assumed card while enforcing the restriction below; it never uses a rank strictly between the two real ranks.
 
 Deal 2 actual cards. The player may **assume any third card**, rank and suit,
 to form the strongest legal 3-card hand.
@@ -207,7 +220,52 @@ The player forms a 3-digit value from selected cards. The closest numerical
 value to the target wins.
 
 Whether players may **reorder** selected cards is **declared by the dealer for
-that round**.
+that round**. If two players finish at exactly the same numerical distance from
+the target, that comparison is an exact tie; the normal Teen Patti tie rule for
+the relevant sideshow/final-show context applies rather than inventing another
+target-number tiebreak.
+
+The server may select Closest to N first (fixed table, rotation or Surprise Me),
+but **no boot is charged and no cards are dealt until that round's dealer has
+locked the 3-digit target and the reorder/no-reorder declaration**. Reconnect
+restores this pending configuration state.
+
+### Revolving Joker — locked
+
+The round begins with **three undealt reference cards face-up on the board**.
+Every card matching any of those three ranks is wild.
+
+Whenever a player **packs/folds for any reason**, that player's complete
+three-card hand is revealed and **replaces** the current board joker references.
+The previous three reference ranks immediately stop being jokers; joker ranks
+never accumulate. If another player later packs, that newer packed hand replaces
+them again. A sideshow loser (who is automatically packed) and an in-hand player
+leave that is treated as a pack use the same rule.
+
+The server owns every replacement and broadcasts the same current three
+reference cards to all remaining players. Reconnect restores the exact current
+references.
+
+### Surprise Me / Random Variant — locked table + dealer option
+
+**Surprise Me is not a joker mechanic.** The host first chooses the
+**approved Surprise Me variant pool** from the variants that are runtime-ready
+for this table. Random selection is always server-authoritative, common to the
+whole table and reconnect-safe; no client can force or reroll the random result.
+
+Two supported uses are locked:
+
+1. **Surprise Me Table** — a dedicated table format. Before **every hand**, the
+   server randomly selects one complete Teen Patti variant from the host-approved
+   pool.
+2. **Dealer Choice → Surprise Me** — on a normal Dealer Choice Variant Table,
+   the dealer may press **Surprise Me** instead of naming a variant. The server
+   then randomly selects the actual variant from that same host-approved pool.
+
+Only fully runtime-ready variants may enter either pool. If the server randomly
+selects a variant that still requires dealer parameters for that round (for
+example Closest to N target/reordering), no boot is charged and no cards are
+dealt until the round dealer supplies those required settings.
 
 ### Explicitly out of scope
 
@@ -242,20 +300,29 @@ conflicts below, but Teen Patti is still deliberately gated as **Coming Soon**.
 
 ### Play-money/session exit 🟡
 
-Top-up, funding and live P/L exist in the Classic engine and protocol. The
-**settle-on-leave / dynamic active-session removal flow is not finished**. Do not
-reuse Hazari's `room:leaveTable` for Teen Patti: that event converts a Hazari seat
-to a bot and is not this game's agreed exit behaviour. Teen Patti must remain
-gated until its own settlement-safe leave path is implemented and tested.
+Top-up, funding and live P/L exist in the Teen Patti engine/protocol, and a
+Teen-Patti-specific **permanent settle-on-leave / dynamic active-session removal
+flow is implemented behind the gate**. It does not reuse Hazari's bot-takeover
+`room:leaveTable` semantics. Teen Patti must still remain gated until the full
+repository suites, reconnect/multi-device coverage and real-device QA pass.
+
+### Friendly Assist / Watch & Suggest
+
+**Runtime status:** 🟢 hidden/private-table social layer behind the Teen Patti Coming Soon gate.
+
+The host may enable Friendly Assist for a private table. After a player packs, that folded player may request permission to watch **one** still-active player's cards for the remainder of that hand. No card is revealed until the target explicitly accepts.
+
+After acceptance, only that coach receives the consenting player's private cards, retained 5-card discard marks and private Two-Reference role assignment where relevant. The coach may privately suggest **Play, Pack, Sideshow or Show**, but suggestions never execute an action. The active player always remains the only authority over their own betting action and may revoke the assist at any time.
+
+A coach cannot switch to a second active player's hand after seeing one player's cards in the same hand. Accepting while blind changes the consenting active player to **seen betting status** because hand information can now be communicated, although their own cards may remain visually closed until they press See. Requests are hand-bound so delayed network messages cannot create a new assist session in a later round.
 
 ### Variant framework 🟡
 
 Descriptors/configuration exist for the agreed variants, including their deal
-counts, discard/joker/target metadata and in-round help text. **Classic is the
-only runtime-enabled variant.** Attempting to configure an unsupported variant
-throws/refuses instead of falling back to Classic. The actual joker, discard,
-Muflis, Best-of-Four, assumed-third and Closest-to-N evaluators still need to be
-implemented.
+counts, discard/joker/target metadata and in-round help text. Classic, Muflis,
+Best of Four, Standard/Lowest/Highest Joker, AK47, Pairs Are Jokers,
+Random-Pack Joker, Up–Down–Same, Up–Down, Down Only, **Revolving Joker**,
+**Two-Reference Joker**, all three **5-card retained-discard families**, **2 Cards · Assume the Third**, **Closest to N**, **K Little**, **Q Little** and **J Little** are runtime-enabled behind the release gate. **Surprise Me** is implemented as server-random selection over the host-approved runtime-ready pool, both for a dedicated Surprise Me Table and as a Dealer Choice option; if it lands on a dealer-configured variant such as Closest to N or a 5-card family, the round pauses before boot/deal for that dealer's required configuration. Unsupported variants still throw/refuse instead of falling back to Classic.
 
 ### Network/session/client 🟡
 
@@ -267,10 +334,9 @@ so none of this is release-reachable yet.
 
 ### Release work still required ⛔
 
-- Teen Patti-specific settle-on-leave and room/player lifecycle
+- full reconnect/multi-device coverage for Teen Patti-specific settle-on-leave and room/player lifecycle
 - full reconnect/multi-device/socket integration tests for the new flow
 - real-device mobile/rotation/keyboard/voice QA with up to 9 seats
-- runtime implementations and UI for the non-Classic variants
 - final product-level play-money consent/settlement polish
 
 ---
@@ -285,12 +351,12 @@ so none of this is release-reachable yet.
 | Compulsory sideshow + final-two shows + exact-tie split | ✅ Classic core |
 | Card privacy / explicit See | ✅ |
 | Host setup proposal + unanimous acceptance | ✅ server flow |
-| Top-up + live P/L | 🟡 engine/protocol/UI; leave settlement pending |
-| Variant descriptors + “How to play” data | 🟡 Classic runtime only |
+| Top-up + live P/L | 🟡 engine/protocol/UI plus permanent settle-on-leave built behind gate; release QA pending |
+| Variant descriptors + “How to play” data | 🟡 22 runtime-ready variants/modes behind disabled release gate |
 | `TeenPattiSession` + `teenpatti:*` protocol | 🟡 built behind disabled registry |
 | Hidden Classic table + round summary | 🟡 built, not release-enabled |
-| Teen Patti-specific settle-on-leave | ⛔ |
-| Full variant execution | ⛔ |
+| Teen Patti-specific settle-on-leave | 🟡 implemented behind gate; integration/device QA pending |
+| Full variant execution | 🟡 all 20 approved runtime variants/modes are implemented behind the disabled release gate; full package/device release verification remains pending |
 | Registry | ✅ deliberately `networkPlayable: false` |
 
 The repository test suite has **not** been rerun in the current constrained

@@ -40,7 +40,9 @@ export function PlayerProfile({ initial, onSaved, onCancel }: PlayerProfileProps
           <ChromeIcon name="back" />
         </button>
 
-        <div className="player-profile__seal" aria-hidden="true">CR</div>
+        <div className="player-profile__seal" aria-hidden="true">
+          <img src="/brand/card-room-emblem.png" alt="" />
+        </div>
         <div className="player-profile__preview" aria-hidden="true">
           <AvatarBadge avatar={avatar} size="lg" ring />
         </div>

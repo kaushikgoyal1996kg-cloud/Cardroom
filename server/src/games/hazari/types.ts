@@ -46,7 +46,7 @@ export interface ThreeCardHandValue {
 
 // Note: FourCardHandValue lives in fourCardRanking.ts (it's shape-compatible
 // with ThreeCardHandValue since the 4-card set is ranked using the same
-// Teen Patti hierarchy applied to its best 3-card sub-combination).
+// Teen Patti hierarchy applied to its best 3-card sub-combination; the unused fourth card is ignored).
 
 export interface PlayedSet {
   playerId: PlayerId;

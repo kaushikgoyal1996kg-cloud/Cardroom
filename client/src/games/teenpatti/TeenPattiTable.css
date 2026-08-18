@@ -1,7 +1,11 @@
 .tp-table-screen {
+  /* Portrait hand + action chrome is roughly ten rem tall with medium cards.
+     Transient consent/error surfaces use this shared reserve rather than
+     guessing an offset that lands inside the player's own cards/actions. */
+  --tp-player-rail-reserve: 10rem;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto auto;
-  height: 100dvh;
+  height: var(--js-vh, 100dvh);
   overflow: hidden;
   color: var(--ink-200);
   background:
@@ -19,6 +23,9 @@
 }
 .tp-table-screen__eyebrow { margin: 0 0 2px; color: var(--brass-500); font-size: .62rem; letter-spacing: var(--tracking-wider); text-transform: uppercase; }
 .tp-table-screen__title { margin: 0; color: var(--ink-100); font: 500 var(--text-lg)/1.1 var(--font-display); }
+.tp-table-screen__reference { display: flex; align-items: center; gap: .35rem; min-width: 0; color: var(--ink-500); font-size: .52rem; letter-spacing: .08em; text-transform: uppercase; }
+.tp-table-screen__reference > div { display: flex; gap: .16rem; }
+.tp-table-screen__reference .pcard { pointer-events: none; }
 .tp-table-screen__pot { display: grid; justify-items: center; min-width: 4.4rem; padding: .28rem .7rem; border: 1px solid rgba(200,164,92,.25); border-radius: 999px; background: rgba(200,164,92,.05); }
 .tp-table-screen__pot span { color: var(--ink-500); font-size: .54rem; letter-spacing: .12em; text-transform: uppercase; }
 .tp-table-screen__pot strong { color: var(--brass-300); font-size: .9rem; font-variant-numeric: tabular-nums; }
@@ -40,9 +47,19 @@
 .tp-hand__meta span { color: var(--brass-300); font-family: var(--font-display); font-size: var(--text-sm); }
 .tp-hand__meta small { color: var(--ink-500); font-size: .58rem; line-height: 1.25; }
 .tp-hand__cards { display: flex; justify-content: center; align-items: center; min-width: 0; gap: 2px; }
+/* Keep the local hand rail at its final height during the physical deal, but
+   do not render duplicate face-down cards underneath the flying ceremony. */
+.tp-hand__deal-slot {
+  display: block;
+  flex: 0 0 auto;
+  width: 3.25rem;
+  height: calc(3.25rem * 1.42);
+  visibility: hidden;
+  pointer-events: none;
+}
 .tp-hand__money { display: grid; justify-items: end; gap: 1px; color: var(--ink-400); font-size: .6rem; font-variant-numeric: tabular-nums; }
 .tp-hand__money strong { color: var(--ink-100); }
-.tp-hand__money button { min-height: 2.1rem; border: 0; background: transparent; color: var(--brass-300); font: inherit; cursor: pointer; }
+.tp-hand__money button { min-height: var(--touch-min); border: 0; background: transparent; color: var(--brass-300); font: inherit; cursor: pointer; }
 .is-positive { color: var(--status-connected) !important; }
 .is-negative { color: var(--status-lost) !important; }
 
@@ -55,19 +72,23 @@
   background: linear-gradient(180deg, rgba(23,18,14,.97), #080706);
 }
 .tp-actions__buttons { display: flex; justify-content: center; flex-wrap: wrap; gap: .4rem; width: 100%; }
+.tp-actions__waiting { display: grid; justify-items: center; gap: .35rem; }
 .tp-actions__buttons .btn { min-height: var(--touch-min); min-width: 7rem; }
 .tp-actions__primary { width: min(22rem, 100%); min-height: var(--touch-min); }
 .tp-actions__status, .tp-actions__substatus { margin: 0; color: var(--ink-400); font-size: var(--text-sm); text-align: center; }
 .tp-actions__substatus { margin-top: .25rem; color: var(--brass-400); font-size: .65rem; }
 .tp-open-show-request { width: min(30rem, 100%); text-align: center; }
-.tp-open-show-request p { margin: 0 0 .45rem; }
+.tp-open-show-request p { margin: 0 0 .35rem; }
+.tp-open-show-request > small { display:block; margin-bottom:.45rem; color:var(--ink-500); font-size:.6rem; line-height:1.35; }
 .tp-open-show-request > div { display: flex; justify-content: center; gap: .5rem; }
 
-.tp-rules, .tp-topup { position: fixed; z-index: 90; inset: 0; display: grid; place-items: center; padding: calc(var(--safe-top) + var(--space-3)) calc(var(--safe-right) + var(--space-3)) calc(var(--safe-bottom) + var(--space-3)) calc(var(--safe-left) + var(--space-3)); background: rgba(2,5,4,.76); backdrop-filter: blur(3px); }
-.tp-rules__sheet, .tp-topup__sheet { width: min(31rem, 100%); max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 2rem); overflow-y: auto; touch-action: pan-y; border: 1px solid rgba(200,164,92,.38); border-radius: var(--radius-lg); padding: var(--space-4); background: radial-gradient(ellipse 80% 42% at 50% 0%, rgba(44,91,69,.3), transparent 68%), linear-gradient(180deg,#17231e,#100e0c 72%); box-shadow: 0 28px 80px rgba(0,0,0,.58); }
+.tp-rules, .tp-topup { position: fixed; z-index: 90; inset: 0; display: grid; place-items: center; padding: calc(var(--safe-top) + var(--space-3)) calc(var(--safe-right) + var(--space-3)) calc(var(--safe-bottom) + var(--space-3)) calc(var(--safe-left) + var(--space-3)); background: rgba(2,5,4,.82); }
+.tp-rules__sheet, .tp-topup__sheet { width: min(31rem, 100%); max-height: calc(var(--js-vh, 100dvh) - var(--safe-top) - var(--safe-bottom) - 2rem); overflow-y: auto; touch-action: pan-y; border: 1px solid rgba(200,164,92,.38); border-radius: var(--radius-lg); padding: var(--space-4); background: radial-gradient(ellipse 80% 42% at 50% 0%, rgba(44,91,69,.3), transparent 68%), linear-gradient(180deg,#17231e,#100e0c 72%); box-shadow: 0 28px 80px rgba(0,0,0,.58); }
 .tp-rules__eyebrow, .tp-topup__eyebrow { margin: 0 0 var(--space-1); color: var(--brass-500); font-size: var(--text-xs); letter-spacing: var(--tracking-wider); text-transform: uppercase; }
 .tp-rules h2, .tp-topup h2 { margin: 0 0 var(--space-2); color: var(--ink-100); font: 500 var(--text-xl)/1.1 var(--font-display); }
 .tp-rules p, .tp-topup p { color: var(--ink-400); font-size: var(--text-sm); }
+.tp-rules__references { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin: var(--space-3) 0; padding: var(--space-2) var(--space-3); border: 1px solid rgba(200,164,92,.18); border-radius: var(--radius-md); background: rgba(200,164,92,.035); color: var(--brass-300); font-size: var(--text-xs); }
+.tp-rules__references > div { display: flex; gap: .25rem; }
 .tp-rules dl { display: grid; gap: .45rem; margin: var(--space-3) 0; }
 .tp-rules dl div { display: grid; grid-template-columns: 6rem 1fr; gap: .6rem; border-top: 1px solid rgba(168,132,63,.12); padding-top: .45rem; }
 .tp-rules dt { color: var(--brass-300); }
@@ -77,22 +98,325 @@
 
 .tp-sideshow-note, .tp-error { position: fixed; z-index: 70; left: 50%; transform: translateX(-50%); max-width: min(90vw, 32rem); border-radius: 999px; padding: .45rem .85rem; box-shadow: 0 14px 38px rgba(0,0,0,.35); font-size: .7rem; text-align: center; }
 .tp-sideshow-note { top: calc(var(--safe-top) + 4.6rem); border: 1px solid rgba(200,164,92,.3); background: rgba(20,27,22,.94); color: var(--ink-200); }
-.tp-error { bottom: calc(var(--safe-bottom) + 7.4rem); border: 1px solid var(--status-lost); background: var(--room-900); color: var(--ink-100); }
+.tp-error { bottom: calc(var(--safe-bottom) + var(--tp-player-rail-reserve) + .35rem); border: 1px solid var(--status-lost); background: var(--room-900); color: var(--ink-100); }
 
 @media (max-width: 430px) {
   .tp-table-screen__bar { grid-template-columns: minmax(0,1fr) auto; }
-  .tp-table-screen__rules { grid-column: 2; grid-row: 2; min-height: 1.6rem; margin-top: -1rem; }
+  .tp-table-screen__reference { grid-column: 1; grid-row: 2; }
+  .tp-table-screen__rules { grid-column: 2; grid-row: 2; min-height: var(--touch-min); margin-top: -.55rem; }
   .tp-hand { grid-template-columns: 5rem 1fr 5.6rem; gap: .25rem; }
   .tp-hand__meta small { max-width: 5rem; }
   .tp-actions__buttons .btn { min-width: 6.5rem; padding-inline: .65rem; }
 }
 
 @media (orientation: landscape) and (max-height: 30rem) {
-  .tp-table-screen { grid-template-columns: minmax(0,1fr) minmax(17rem,23rem); grid-template-rows: auto minmax(0,1fr) auto; }
+  .tp-table-screen {
+    --tp-side-rail: clamp(17rem, 34vw, 23rem);
+    --tp-player-rail-reserve: .45rem;
+    grid-template-columns: minmax(0,1fr) var(--tp-side-rail);
+    grid-template-rows: auto minmax(0,1fr) auto;
+  }
   .tp-table-screen__bar { grid-column: 1 / -1; padding-top: calc(var(--safe-top) + var(--space-1)); }
   .tp-table-screen__table { grid-column: 1; grid-row: 2 / 4; }
   .tp-hand { grid-column: 2; grid-row: 2; grid-template-columns: 1fr; align-content: center; border-left: 1px solid rgba(168,132,63,.14); }
   .tp-hand__meta, .tp-hand__money { justify-items: center; text-align: center; }
   .tp-actions { grid-column: 2; grid-row: 3; border-left: 1px solid rgba(168,132,63,.14); }
   .tp-actions__buttons { max-height: 7rem; overflow-y: auto; touch-action: pan-y; }
+}
+
+.tp-reference-choice {
+  width: min(34rem, 100%);
+  display: grid;
+  gap: .5rem;
+  text-align: center;
+}
+.tp-reference-choice__copy { display: grid; gap: .15rem; }
+.tp-reference-choice__copy strong { color: var(--ink-100); font: 500 var(--text-md)/1.15 var(--font-display); }
+.tp-reference-choice__copy small { color: var(--ink-500); font-size: .62rem; line-height: 1.35; }
+.tp-reference-choice__buttons { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; }
+.tp-reference-choice__buttons .btn { min-height: var(--touch-min); }
+
+@media (max-width: 430px) {
+  .tp-reference-choice__buttons { grid-template-columns: 1fr; }
+}
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .tp-reference-choice { gap: .3rem; }
+  .tp-reference-choice__copy small { display: none; }
+  .tp-reference-choice__buttons { grid-template-columns: 1fr; }
+}
+
+/* Five-card retained-discard rounds: cards never leave the player's hand. The
+   two discarded physical cards are dimmed/marked, but remain present and are
+   revealed with the rest of the hand at sideshow/showdown. */
+.tp-hand__card-slot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+.tp-hand__card-slot:disabled { opacity: 1; }
+.tp-hand__card-slot.is-selectable { cursor: pointer; }
+.tp-hand__card-slot.is-selectable::after {
+  content: '';
+  position: absolute;
+  inset: .14rem;
+  border: 1px solid rgba(222,193,127,.48);
+  border-radius: 8px;
+  pointer-events: none;
+  box-shadow: 0 0 0 2px rgba(222,193,127,.05);
+}
+.tp-hand__card-slot.is-discarded {
+  transform: translateY(.35rem);
+  filter: saturate(.65) brightness(.72);
+}
+.tp-hand__discard-mark {
+  position: absolute;
+  left: 50%;
+  bottom: -.35rem;
+  transform: translateX(-50%);
+  z-index: 4;
+  padding: .08rem .3rem;
+  border: 1px solid rgba(222,193,127,.28);
+  border-radius: 999px;
+  background: rgba(17,14,11,.92);
+  color: var(--brass-300);
+  font-size: .42rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.tp-discard-choice {
+  width: min(44rem, 100%);
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  align-items: center;
+  gap: .6rem;
+}
+.tp-discard-choice__copy { display: grid; gap: .12rem; min-width: 0; }
+.tp-discard-choice__copy strong { color: var(--ink-100); font-size: .72rem; }
+.tp-discard-choice__copy small { color: var(--ink-500); font-size: .54rem; line-height: 1.35; }
+.tp-discard-choice__actions { display: flex; gap: .35rem; align-items: center; }
+.tp-discard-choice__actions .btn { min-height: var(--touch-min); white-space: nowrap; }
+@media (max-width: 560px) {
+  .tp-discard-choice { grid-template-columns: 1fr; }
+  .tp-discard-choice__actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .tp-discard-choice__actions .btn { white-space: normal; }
+}
+@media (orientation: landscape) and (max-height: 30rem) {
+  .tp-discard-choice { grid-template-columns: minmax(12rem,1fr) auto; gap: .35rem; }
+  .tp-discard-choice__copy small { display: none; }
+  .tp-discard-choice__actions .btn { min-height: 2.35rem; padding-inline: .55rem; font-size: .58rem; }
+  .tp-hand__discard-mark { bottom: -.22rem; }
+}
+
+/* Friendly Assist is a consent-only private-table social layer. It deliberately
+   lives in the action rail rather than over the felt so it never obscures cards,
+   seats or the circular Voice/Chat/Settings hub. */
+.tp-friendly-incoming {
+  position: fixed;
+  z-index: 64;
+  left: 50%;
+  bottom: calc(var(--safe-bottom) + var(--tp-player-rail-reserve) + .35rem);
+  transform: translateX(-50%);
+  width: min(36rem, calc(100vw - var(--safe-left) - var(--safe-right) - 1rem));
+  display: grid;
+  gap: .35rem;
+  pointer-events: none;
+}
+.tp-friendly-incoming > * { pointer-events: auto; }
+.tp-friendly-incoming__request,
+.tp-friendly-incoming__active {
+  border: 1px solid rgba(211,178,108,.34);
+  border-radius: .8rem;
+  background: linear-gradient(155deg, rgba(17,45,35,.97), rgba(12,15,13,.98));
+  box-shadow: 0 14px 38px rgba(0,0,0,.4);
+}
+.tp-friendly-incoming__request {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  align-items: center;
+  gap: .6rem;
+  padding: .55rem .65rem;
+}
+.tp-friendly-incoming__request > div:first-child { display: grid; gap: .1rem; min-width: 0; }
+.tp-friendly-incoming__request strong { color: var(--ink-100); font-size: .68rem; }
+.tp-friendly-incoming__request small { color: var(--ink-500); font-size: .52rem; line-height: 1.3; }
+.tp-friendly-incoming__request > div:last-child { display: flex; gap: .3rem; }
+.tp-friendly-incoming__request .btn { min-height: 2.25rem; padding-inline: .65rem; font-size: .58rem; }
+.tp-friendly-incoming__active {
+  min-height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .55rem;
+  padding: .35rem .55rem;
+  color: var(--ink-400);
+  font-size: .58rem;
+}
+.tp-friendly-incoming__active strong { color: var(--brass-300); }
+.tp-friendly-incoming__active em {
+  padding: .16rem .38rem;
+  border-radius: 999px;
+  background: rgba(211,178,108,.12);
+  color: var(--gold-200, #e3c684);
+  font-style: normal;
+  font-weight: 800;
+}
+.tp-friendly-incoming__active button { border: 0; background: transparent; color: var(--ink-500); font: inherit; text-decoration: underline; cursor: pointer; }
+
+.tp-friendly-coach {
+  width: min(47rem, 100%);
+  display: grid;
+  grid-template-columns: minmax(8rem, .85fr) minmax(0, 1.5fr) auto;
+  align-items: center;
+  gap: .55rem;
+}
+.tp-friendly-coach__copy { display: grid; gap: .1rem; min-width: 0; }
+.tp-friendly-coach__copy strong { color: var(--ink-100); font: 500 .78rem/1.1 var(--font-display); }
+.tp-friendly-coach__copy small { color: var(--ink-500); font-size: .52rem; line-height: 1.3; }
+.tp-friendly-coach__targets { display: flex; justify-content: center; flex-wrap: wrap; gap: .35rem; }
+.tp-friendly-coach__targets .btn { min-height: 2.3rem; min-width: auto; padding-inline: .7rem; font-size: .58rem; }
+.tp-friendly-coach__targets span { color: var(--ink-500); font-size: .6rem; }
+.tp-friendly-coach__cards { display: flex; justify-content: center; align-items: center; min-width: 0; gap: 1px; }
+.tp-friendly-coach__card { position: relative; display: grid; place-items: center; }
+.tp-friendly-coach__card.is-discarded { transform: translateY(.25rem); filter: saturate(.62) brightness(.72); }
+.tp-friendly-coach__card > span {
+  position: absolute;
+  bottom: -.22rem;
+  z-index: 4;
+  padding: .06rem .22rem;
+  border-radius: 999px;
+  background: rgba(12,10,8,.92);
+  color: var(--brass-300);
+  font-size: .38rem;
+  text-transform: uppercase;
+}
+.tp-friendly-coach__suggestions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .28rem; }
+.tp-friendly-coach__suggestions button {
+  min-height: 2.2rem;
+  padding: .28rem .52rem;
+  border: 1px solid rgba(211,178,108,.22);
+  border-radius: 999px;
+  background: rgba(7,16,13,.5);
+  color: var(--ink-300);
+  font: inherit;
+  font-size: .55rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+.tp-friendly-coach__suggestions button.is-active { border-color: rgba(211,178,108,.65); color: var(--gold-200, #e3c684); background: rgba(54,76,55,.5); }
+.tp-friendly-coach__suggestions button.is-stop { color: var(--ink-500); border-style: dashed; }
+
+@media (max-width: 620px) {
+  .tp-friendly-incoming { bottom: calc(var(--safe-bottom) + var(--tp-player-rail-reserve) + .35rem); }
+  .tp-friendly-incoming__request { grid-template-columns: 1fr; }
+  .tp-friendly-incoming__request > div:last-child { display: grid; grid-template-columns: 1fr 1fr; }
+  .tp-friendly-coach { grid-template-columns: 1fr; gap: .35rem; }
+  .tp-friendly-coach__copy { text-align: center; }
+  .tp-friendly-coach__cards { order: 2; }
+  .tp-friendly-coach__suggestions { order: 3; justify-content: center; }
+}
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .tp-friendly-incoming {
+    /* In short landscape the hand/action rail owns the right column. Keep
+       consent notices entirely inside the left felt column instead. */
+    left: calc(var(--safe-left) + .45rem);
+    right: calc(var(--safe-right) + var(--tp-side-rail) + .45rem);
+    bottom: calc(var(--safe-bottom) + .45rem);
+    transform: none;
+    width: auto;
+    max-width: 22rem;
+  }
+  .tp-error {
+    left: calc(var(--safe-left) + .45rem);
+    right: calc(var(--safe-right) + var(--tp-side-rail) + .45rem);
+    bottom: calc(var(--safe-bottom) + .45rem);
+    transform: none;
+    max-width: none;
+  }
+  .tp-friendly-incoming__request small { display: none; }
+  .tp-friendly-coach { grid-template-columns: 1fr; max-height: 8.5rem; overflow-y: auto; touch-action: pan-y; }
+  .tp-friendly-coach__copy small { display: none; }
+  .tp-friendly-coach__cards { min-height: 3.2rem; }
+  .tp-friendly-coach__suggestions { justify-content: center; }
+}
+
+/* Retained-discard sideshow transparency. In five-card rounds the two compared
+   players' complete physical hands are public at sideshow, while marked
+   discards remain visibly excluded from the three-card comparison. */
+.tp-sideshow-note.has-reveal {
+  width: min(38rem, calc(100vw - var(--safe-left) - var(--safe-right) - 1rem));
+  max-width: none;
+  border-radius: var(--radius-md);
+  padding: .5rem .65rem .65rem;
+}
+.tp-sideshow-note__summary {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: .2rem .45rem;
+}
+.tp-sideshow-note__summary strong { color: var(--ink-100); font-weight: 600; }
+.tp-sideshow-note__summary span { color: var(--brass-400); font-size: .58rem; }
+.tp-sideshow-note__hands {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .45rem;
+  margin-top: .45rem;
+  padding-top: .45rem;
+  border-top: 1px solid rgba(200,164,92,.15);
+}
+.tp-sideshow-note__hand {
+  display: grid;
+  grid-template-columns: minmax(4.5rem, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: .35rem;
+  min-width: 0;
+}
+.tp-sideshow-note__hand-copy { display: grid; min-width: 0; text-align: left; }
+.tp-sideshow-note__hand-copy strong { overflow: hidden; color: var(--ink-100); font-size: .62rem; text-overflow: ellipsis; white-space: nowrap; }
+.tp-sideshow-note__hand-copy small { overflow: hidden; color: var(--ink-500); font-size: .48rem; text-overflow: ellipsis; white-space: nowrap; }
+.tp-sideshow-note__cards { display: flex; justify-content: flex-end; align-items: center; min-width: 0; }
+.tp-sideshow-note__card { position: relative; margin-left: -.65rem; }
+.tp-sideshow-note__card:first-child { margin-left: 0; }
+.tp-sideshow-note__card.is-discarded { transform: translateY(.2rem); filter: saturate(.5) brightness(.68); }
+.tp-sideshow-note__card > span {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: -.2rem;
+  transform: translateX(-50%);
+  padding: .03rem .2rem;
+  border: 1px solid rgba(222,193,127,.28);
+  border-radius: 999px;
+  background: rgba(17,14,11,.94);
+  color: var(--brass-300);
+  font-size: .34rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+@media (max-width: 560px) {
+  .tp-sideshow-note.has-reveal { top: calc(var(--safe-top) + 3.8rem); }
+  .tp-sideshow-note__hands { grid-template-columns: 1fr; gap: .32rem; }
+  .tp-sideshow-note__hand { grid-template-columns: 4.4rem minmax(0,1fr); }
+  .tp-sideshow-note__hand-copy small { display: none; }
+}
+@media (orientation: landscape) and (max-height: 30rem) {
+  .tp-sideshow-note.has-reveal {
+    top: calc(var(--safe-top) + .35rem);
+    left: calc(var(--safe-left) + .45rem);
+    width: min(32rem, 58vw);
+    transform: none;
+  }
+  .tp-sideshow-note__hands { gap: .3rem; }
+  .tp-sideshow-note__hand { grid-template-columns: 4rem minmax(0,1fr); }
+  .tp-sideshow-note__hand-copy small { display: none; }
+  .tp-sideshow-note__card { margin-left: -.9rem; }
 }

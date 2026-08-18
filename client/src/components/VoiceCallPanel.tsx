@@ -3,7 +3,13 @@ import { useGame } from '../lib/GameStore';
 import { ChromeIcon } from '../platform/components/ChromeIcon';
 import './VoiceCallPanel.css';
 
-export function VoiceCallPanel() {
+interface VoiceCallPanelProps {
+  open?: boolean;
+  onClose?: () => void;
+  showLauncher?: boolean;
+}
+
+export function VoiceCallPanel({ open: controlledOpen, onClose, showLauncher = true }: VoiceCallPanelProps = {}) {
   const {
     room,
     myPlayerId,
@@ -16,7 +22,13 @@ export function VoiceCallPanel() {
     leaveVoiceCall,
     toggleVoiceMute,
   } = useGame();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+
+  function closePanel() {
+    if (onClose) onClose();
+    else setInternalOpen(false);
+  }
 
   if (!room || !voiceCallSupported) return null;
 
@@ -28,22 +40,24 @@ export function VoiceCallPanel() {
 
   return (
     <>
-      <button
-        className={`voice-call-toggle fab ${inVoiceCall ? 'voice-call-toggle--active' : ''}`}
-        onClick={() => setOpen((o) => !o)}
-        aria-label="Voice call"
-      >
-        <ChromeIcon name={inVoiceCall ? "phoneActive" : "phone"} />
-        {inVoiceCall && othersInCall.length > 0 && (
-          <span className="voice-call-toggle__badge">{othersInCall.length}</span>
-        )}
-      </button>
+      {showLauncher && (
+        <button
+          className={`voice-call-toggle fab ${inVoiceCall ? 'voice-call-toggle--active' : ''}`}
+          onClick={() => setInternalOpen((o) => !o)}
+          aria-label="Voice call"
+        >
+          <ChromeIcon name={inVoiceCall ? "phoneActive" : "phone"} />
+          {inVoiceCall && othersInCall.length > 0 && (
+            <span className="voice-call-toggle__badge">{othersInCall.length}</span>
+          )}
+        </button>
+      )}
 
       {open && (
-        <div className="voice-call-panel panel">
+        <div className={`voice-call-panel panel${showLauncher ? '' : ' is-table-utility'}`}>
           <div className="voice-call-panel__header">
             <span>Voice Call</span>
-            <button className="btn btn-ghost voice-call-panel__close" onClick={() => setOpen(false)} aria-label="Close voice call">
+            <button className="btn btn-ghost voice-call-panel__close" onClick={closePanel} aria-label="Close voice call">
               <ChromeIcon name="close" />
             </button>
           </div>

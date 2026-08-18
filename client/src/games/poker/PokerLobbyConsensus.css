@@ -1,0 +1,156 @@
+.poker-consensus {
+  width: min(100%, 46rem);
+  margin-inline: auto;
+  display: grid;
+  gap: .7rem;
+}
+
+.poker-consensus--waiting {
+  min-height: 13rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: center;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid rgba(200,164,92,.28);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, var(--wood-800), var(--wood-900));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 .65rem 1.8rem rgba(0,0,0,.24);
+}
+
+.poker-consensus__mark {
+  width: 3.2rem;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(200,164,92,.32);
+  border-radius: 50%;
+  color: var(--brass-300);
+  background: var(--felt-900);
+  font-size: 1.45rem;
+}
+
+.poker-consensus--waiting p,
+.poker-consensus__heading p {
+  margin: 0 0 .12rem;
+  color: var(--brass-400);
+  font-size: .62rem;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+
+.poker-consensus--waiting h2,
+.poker-consensus__heading h2 { margin: 0; color: var(--ink-100); font-size: 1rem; }
+.poker-consensus--waiting div > span { display: block; margin-top: .28rem; color: var(--ink-400); font-size: .72rem; line-height: 1.45; }
+
+.poker-consensus__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+}
+
+.poker-consensus__heading > span {
+  flex: 0 0 auto;
+  padding: .25rem .55rem;
+  border: 1px solid rgba(200,164,92,.28);
+  border-radius: 999px;
+  color: var(--brass-300);
+  font-size: .64rem;
+}
+
+.poker-consensus__variants {
+  display: flex;
+  gap: .35rem;
+  overflow-x: auto;
+  padding-bottom: .12rem;
+  scrollbar-width: thin;
+}
+
+.poker-consensus__variants article {
+  flex: 0 0 auto;
+  min-width: 6rem;
+  display: grid;
+  gap: .06rem;
+  padding: .42rem .55rem;
+  border: 1px solid rgba(200,164,92,.24);
+  border-radius: .65rem;
+  background: var(--felt-900);
+}
+.poker-consensus__variants strong { color: var(--brass-300); font-size: .72rem; }
+.poker-consensus__variants span { color: var(--ink-400); font-size: .58rem; }
+
+.poker-consensus__facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .35rem;
+}
+.poker-consensus__facts div {
+  min-width: 0;
+  padding: .42rem .5rem;
+  border: 1px solid rgba(200,164,92,.18);
+  border-radius: .58rem;
+  background: linear-gradient(180deg, var(--wood-800), var(--wood-900));
+}
+.poker-consensus__facts dt { color: var(--ink-400); font-size: .56rem; text-transform: uppercase; letter-spacing: .06em; }
+.poker-consensus__facts dd { margin: .08rem 0 0; color: var(--ink-100); font-size: .74rem; font-variant-numeric: tabular-nums; }
+
+.poker-consensus__players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
+}
+.poker-consensus__players span {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  padding: .25rem .5rem;
+  border: 1px solid rgba(200,164,92,.18);
+  border-radius: 999px;
+  color: var(--ink-400);
+  font-size: .64rem;
+}
+.poker-consensus__players span.is-accepted { border-color: rgba(124,170,132,.35); color: var(--ink-200); }
+.poker-consensus__players i { width: .75rem; color: var(--brass-300); font-style: normal; text-align: center; }
+
+.poker-consensus__actions {
+  min-height: var(--touch-min);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .42rem;
+}
+.poker-consensus__actions button,
+.poker-consensus__cancel {
+  min-height: var(--touch-min);
+  padding: .4rem .72rem;
+  border-radius: .58rem;
+  border: 1px solid rgba(200,164,92,.3);
+  color: var(--ink-100);
+  background: linear-gradient(180deg, var(--wood-700), var(--wood-900));
+  font: inherit;
+  font-size: .7rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.poker-consensus__actions .poker-consensus__accept { border-color: rgba(220,192,134,.5); background: linear-gradient(180deg, var(--felt-600), var(--felt-800)); }
+.poker-consensus__actions button:disabled { opacity: .5; cursor: default; }
+.poker-consensus__waiting-copy,
+.poker-consensus__ready { color: var(--ink-400); font-size: .66rem; }
+.poker-consensus__ready { color: var(--brass-300); }
+.poker-consensus__safety { color: var(--ink-500); font-size: .58rem; text-align: right; }
+.poker-consensus__cancel { justify-self: start; }
+
+@media (max-width: 560px) {
+  .poker-consensus__facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .poker-consensus__actions { flex-wrap: wrap; }
+  .poker-consensus__waiting-copy,
+  .poker-consensus__ready { width: 100%; text-align: right; }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .poker-consensus { gap: .4rem; }
+  .poker-consensus__facts { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .25rem; }
+  .poker-consensus__facts div { padding-block: .3rem; }
+  .poker-consensus__variants article { padding-block: .3rem; }
+}

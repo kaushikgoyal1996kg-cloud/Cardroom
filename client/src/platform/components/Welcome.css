@@ -1,4 +1,4 @@
-/* ==========================================================================
+/* ========================================================================== 
    Welcome — the Card Room entrance
 
    This is an arrival, not a form. The screen should feel like standing at
@@ -90,42 +90,34 @@
     0 28px 80px rgba(0,0,0,.26);
 }
 
-.welcome__seal {
+.welcome__brand-emblem {
   position: relative;
-  width: 4.25rem;
-  height: 4.25rem;
-  display: grid;
-  place-items: center;
-  margin-bottom: var(--space-4);
-  border-radius: 50%;
-  border: 1px solid var(--brass-600);
-  background:
-    radial-gradient(circle at 36% 28%, rgba(239, 216, 165, .16), transparent 28%),
-    linear-gradient(145deg, #3d2b1c, #17110c 68%);
+  width: clamp(5.4rem, 24vw, 7.1rem);
+  aspect-ratio: 1;
+  margin-bottom: var(--space-3);
+  border-radius: 24%;
+  overflow: hidden;
+  border: 1px solid rgba(220, 192, 134, .34);
+  background: #0a0b09;
   box-shadow:
-    inset 0 0 0 4px rgba(7, 5, 3, .55),
-    inset 0 0 0 5px rgba(200,164,92,.18),
-    0 8px 22px rgba(0,0,0,.46);
+    0 18px 38px rgba(0,0,0,.46),
+    0 0 0 4px rgba(200,164,92,.035),
+    inset 0 1px 0 rgba(255,255,255,.05);
 }
 
-.welcome__seal::before,
-.welcome__seal::after {
-  content: '•';
+.welcome__brand-emblem::after {
+  content: '';
   position: absolute;
-  top: 50%;
-  transform: translateY(-52%);
-  color: var(--brass-500);
-  font-size: .65rem;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(145deg, rgba(255,255,255,.06), transparent 32%, transparent 72%, rgba(200,164,92,.045));
 }
-.welcome__seal::before { left: .48rem; }
-.welcome__seal::after { right: .48rem; }
 
-.welcome__seal-mark {
-  font-family: var(--font-display);
-  color: var(--brass-300);
-  font-size: 1.02rem;
-  letter-spacing: .08em;
-  transform: translateX(.04em);
+.welcome__brand-emblem img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .welcome__eyebrow {
@@ -257,7 +249,7 @@
 @media (max-width: 23.75rem) {
   .welcome__content { padding-inline: .8rem; }
   .welcome__brand { font-size: 2.45rem; }
-  .welcome__seal { width: 3.8rem; height: 3.8rem; margin-bottom: var(--space-3); }
+  .welcome__brand-emblem { width: 4.8rem; margin-bottom: var(--space-3); }
 }
 
 /* ---- Short mobile landscape ------------------------------------------- */
@@ -273,8 +265,7 @@
     padding: .7rem 1rem;
   }
   .welcome__content::before { border-radius: 18px; }
-  .welcome__seal { width: 2.6rem; height: 2.6rem; margin-bottom: .3rem; }
-  .welcome__seal-mark { font-size: .78rem; }
+  .welcome__brand-emblem { width: 3.25rem; margin-bottom: .25rem; border-radius: 20%; }
   .welcome__eyebrow { display: none; }
   .welcome__brand { font-size: 1.9rem; }
   .welcome__brand-the { margin-bottom: .15rem; }

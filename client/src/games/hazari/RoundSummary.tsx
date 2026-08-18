@@ -16,7 +16,7 @@ const SET_LABELS = ['Set 1', 'Set 2', 'Set 3', 'Set 4'];
  * underneath rather than in a stack of panels.
  */
 export function RoundSummary() {
-  const { room, lastRoundResult, gameState, myPlayerId, startNextRound } = useGame();
+  const { room, lastRoundResult, gameState, myPlayerId, startNextRound, goToHomeScreen } = useGame();
   // A JS-measured viewport height, not just CSS `dvh` - see .rsum's own
   // comment in RoundSummary.css for why (Bug 5, 2026-08-15 THIRD
   // real-device retest: `dvh` alone was not reliable enough in Android
@@ -178,6 +178,9 @@ export function RoundSummary() {
             Waiting for the host to deal the next round…
           </p>
         )}
+        <button type="button" className="btn btn-ghost rsum__card-room" onClick={goToHomeScreen}>
+          Card Room
+        </button>
       </div>
     </div>
   );

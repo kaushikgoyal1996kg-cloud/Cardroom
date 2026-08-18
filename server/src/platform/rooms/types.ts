@@ -53,6 +53,10 @@ export interface RoomState {
   gameId: GameId;
   hostId: PlayerId;
   players: Map<PlayerId, PlayerSlot>;
+  /** Public-safe identity archive for this room's lifetime. It keeps completed
+   *  round/hand history readable after an open-ended table participant settles
+   *  and permanently releases their live seat. */
+  playerDirectory?: Record<PlayerId, { name: string; avatar: string }>;
   status: 'LOBBY' | 'IN_GAME';
   /** The running game, once started. Typed as the shared session boundary,
    *  never as any one game's engine. */
@@ -101,6 +105,8 @@ export interface PublicRoomInfo {
   gameId: GameId;
   status: RoomState['status'];
   players: PublicPlayerInfo[];
+  /** Public-safe room-lifetime identities; no tokens, cards or balances. */
+  playerDirectory?: Record<PlayerId, { name: string; avatar: string }>;
   maxPlayers: number;
   hostId: PlayerId;
   /** Engine state name of the running game, if any. Deliberately a plain

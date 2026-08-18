@@ -389,7 +389,7 @@
   background: linear-gradient(180deg, rgba(200,164,92,.08), rgba(14,11,9,.28));
   box-shadow: 0 0 16px rgba(200,164,92,.045);
 }
-.reveal { background: rgba(4,5,4,.74); backdrop-filter: blur(2px); }
+.reveal { background: rgba(4,5,4,.82); }
 .reveal__sheet {
   border-color: rgba(200,164,92,.42);
   background:
@@ -402,7 +402,7 @@
   background: linear-gradient(90deg, rgba(200,164,92,.12), rgba(200,164,92,.035));
 }
 
-/* ==========================================================================
+/* ========================================================================== 
    Premium release 1.1 — phase-led table chrome and Kitti-style hand identity.
    Rules/state remain server authoritative; these are presentation cues only.
    ========================================================================== */
@@ -488,5 +488,36 @@
 
 @media (orientation: landscape) and (max-height: 30rem) {
   .hazari__eyebrow { display: none; }
+  .hazari__scoreline > small { display: none; }
+}
+
+/* ========================================================================== 
+   All-games premium shell — the live header is now a three-part table HUD:
+   phase / progress / score. It stays quiet and shallow so the felt remains the
+   hero, especially on short landscape phones.
+   ========================================================================== */
+.hazari__bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+}
+.hazari__bar > .phase-track { justify-self: center; }
+.hazari__scoreline { justify-self: end; }
+
+@media (max-width: 23.75rem) {
+  .hazari__bar { column-gap: .3rem; }
+  .hazari__scoreline > small { display: none; }
+  .hazari__phase-title { font-size: .9rem; }
+  .hazari__eyebrow { font-size: .5rem; }
+}
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .hazari__bar {
+    min-height: 2.4rem;
+    padding-left: calc(var(--safe-left) + .7rem);
+    padding-right: calc(var(--safe-right) + var(--top-fab-reserve));
+  }
+  .hazari__eyebrow { display: none; }
+  .hazari__phase-title { font-size: .88rem; }
   .hazari__scoreline > small { display: none; }
 }

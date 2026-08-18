@@ -19,6 +19,11 @@ describe('service worker never touches live game traffic', () => {
     expect(originGuard).toBeLessThan(firstRespondWith);
   });
 
+
+  it('keeps the approved Card Room emblem in the offline shell cache', () => {
+    expect(SW_SRC).toContain("'/brand/card-room-emblem.png'");
+  });
+
   it('also excludes /socket.io/ paths explicitly, as defense in depth', () => {
     expect(SW_SRC).toMatch(/url\.pathname\.startsWith\(['"]\/socket\.io\/['"]\)/);
   });

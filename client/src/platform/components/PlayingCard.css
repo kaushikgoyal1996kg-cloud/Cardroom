@@ -236,3 +236,21 @@
     transform: translateY(-14px) rotate(var(--pcard-tilt, 0deg));
   }
 }
+
+/* --------------------------------------------------------------------------
+   Player readability preferences. These deliberately do NOT change the
+   physical card dimensions, so Hazari/Kitti mobile geometry cannot be broken
+   by a preference. Four-colour suits are a clarity option, not a new theme.
+   -------------------------------------------------------------------------- */
+html[data-card-deck='four-color'] .pcard.is-spades { color: #171719; }
+html[data-card-deck='four-color'] .pcard.is-hearts { color: #bd2635; }
+html[data-card-deck='four-color'] .pcard.is-diamonds { color: #245eae; }
+html[data-card-deck='four-color'] .pcard.is-clubs { color: #23744a; }
+
+html[data-card-index='large'] .pcard__rank {
+  font-size: calc(var(--pcard-w) * 0.38);
+  line-height: .88;
+}
+html[data-card-index='large'] .pcard__suit {
+  font-size: calc(var(--pcard-w) * 0.27);
+}

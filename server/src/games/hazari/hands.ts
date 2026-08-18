@@ -121,24 +121,42 @@ export function hasSixPairs(hand: Card[]): boolean {
 }
 
 /**
- * isNoSequenceHand(): true if the player's confirmed 4-set arrangement
- * contains NO Sequence, Pure Sequence, or Trail in any of its three-card
- * sets, AND the 4-card set contains no run-based combination either (per
- * the documented assumption in rules.ts). Must be called on a CONFIRMED
- * arrangement (post set-building), not the raw hand, since "sequence"
- * requires 3+ consecutive cards to evaluate.
+ * handHasNoPossibleSequence(): authoritative dismissal check on the RAW
+ * 13-card deal. A Trial/Trail is NOT a sequence and therefore does not block
+ * NO_SEQUENCE dismissal. We examine every 3-card subset so arrangement cannot
+ * create or hide eligibility.
+ */
+export function handHasNoPossibleSequence(hand: Card[]): boolean {
+  if (hand.length !== GAME_RULES.CARDS_PER_PLAYER) {
+    throw new Error(`handHasNoPossibleSequence requires a full ${GAME_RULES.CARDS_PER_PLAYER}-card hand`);
+  }
+  for (let i = 0; i < hand.length; i++) {
+    for (let j = i + 1; j < hand.length; j++) {
+      for (let k = j + 1; k < hand.length; k++) {
+        const category = classifyThreeCardHand([hand[i], hand[j], hand[k]]).category;
+        if (category === ThreeCardCategory.SEQUENCE || category === ThreeCardCategory.PURE_SEQUENCE) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+/**
+ * Arrangement-level mirror retained for diagnostics/tests. Trial/Trail does
+ * not count as a sequence for dismissal eligibility.
  */
 export function isNoSequenceHand(
   threeCardSets: [Card[], Card[], Card[]],
   fourCardSetHasRun: boolean
 ): boolean {
-  const strongCategories = new Set([
+  const runCategories = new Set([
     ThreeCardCategory.SEQUENCE,
     ThreeCardCategory.PURE_SEQUENCE,
-    ThreeCardCategory.TRAIL,
   ]);
-  const anyThreeCardRunOrTrail = threeCardSets.some((set) =>
-    strongCategories.has(classifyThreeCardHand(set).category)
+  const anyThreeCardRun = threeCardSets.some((set) =>
+    runCategories.has(classifyThreeCardHand(set).category)
   );
-  return !anyThreeCardRunOrTrail && !fourCardSetHasRun;
+  return !anyThreeCardRun && !fourCardSetHasRun;
 }

@@ -1,0 +1,165 @@
+.poker-rules {
+  position: fixed;
+  z-index: 90;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: max(calc(var(--safe-top) + .65rem), .8rem) max(calc(var(--safe-right) + .65rem), .8rem) max(calc(var(--safe-bottom) + .65rem), .8rem) max(calc(var(--safe-left) + .65rem), .8rem);
+  background: rgba(2,5,4,.84);
+}
+
+.poker-rules__sheet {
+  width: min(32rem, 100%);
+  max-height: calc(var(--app-height, 100dvh) - var(--safe-top) - var(--safe-bottom) - 1.5rem);
+  overflow-y: auto;
+  touch-action: pan-y;
+  padding: 1rem;
+  border: 1px solid rgba(200,164,92,.4);
+  border-radius: 1rem;
+  background:
+    radial-gradient(ellipse 82% 34% at 50% 0%, rgba(44,91,69,.32), transparent 70%),
+    repeating-linear-gradient(92deg, rgba(255,255,255,.01) 0 1px, transparent 1px 9px),
+    linear-gradient(180deg, var(--wood-800), var(--wood-900));
+  box-shadow: 0 1.8rem 5rem rgba(0,0,0,.62), inset 0 1px 0 rgba(255,255,255,.035);
+}
+
+.poker-rules__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .8rem;
+}
+
+.poker-rules__heading p {
+  margin: 0 0 .16rem;
+  color: var(--brass-400);
+  font-size: .61rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.poker-rules__heading h2 {
+  margin: 0;
+  color: var(--ink-100);
+  font: 500 1.38rem/1.08 var(--font-display);
+}
+
+.poker-rules__heading > span {
+  flex: 0 0 auto;
+  padding: .23rem .48rem;
+  border: 1px solid rgba(220,192,134,.35);
+  border-radius: 999px;
+  color: var(--brass-300);
+  font-size: .64rem;
+  letter-spacing: .06em;
+}
+
+.poker-rules__intro {
+  margin: .72rem 0;
+  color: var(--ink-300);
+  font-size: .78rem;
+  line-height: 1.46;
+}
+
+.poker-rules__facts {
+  display: grid;
+  gap: 0;
+  margin: .7rem 0;
+}
+
+.poker-rules__facts div {
+  display: grid;
+  grid-template-columns: minmax(6.3rem, .72fr) minmax(0, 1.28fr);
+  gap: .65rem;
+  padding: .4rem .1rem;
+  border-top: 1px solid rgba(200,164,92,.13);
+}
+
+.poker-rules__facts dt {
+  color: var(--brass-300);
+  font-size: .68rem;
+}
+
+.poker-rules__facts dd {
+  margin: 0;
+  color: var(--ink-300);
+  font-size: .7rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.poker-rules__variants {
+  display: grid;
+  gap: .42rem;
+  margin: .76rem 0;
+  padding: .65rem;
+  border: 1px solid rgba(200,164,92,.2);
+  border-radius: .72rem;
+  background: rgba(4,15,12,.28);
+}
+
+.poker-rules__variants > span {
+  color: var(--ink-400);
+  font-size: .6rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.poker-rules__variants > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .26rem;
+}
+
+.poker-rules__variants > div span {
+  padding: .2rem .4rem;
+  border: 1px solid rgba(200,164,92,.22);
+  border-radius: 999px;
+  color: var(--ink-400);
+  font-size: .61rem;
+}
+
+.poker-rules__variants > div span.is-current {
+  border-color: rgba(220,192,134,.56);
+  background: var(--felt-800);
+  color: var(--brass-300);
+}
+
+.poker-rules__variants small,
+.poker-rules__money {
+  color: var(--ink-400);
+  font-size: .61rem;
+  line-height: 1.35;
+}
+
+.poker-rules__money {
+  margin: .72rem 0;
+  padding-left: .65rem;
+  border-left: 2px solid rgba(200,164,92,.34);
+}
+
+.poker-rules__back {
+  width: 100%;
+  min-height: var(--touch-min);
+  border: 1px solid rgba(220,192,134,.56);
+  border-radius: .64rem;
+  background: linear-gradient(180deg, var(--felt-600), var(--felt-800));
+  color: var(--ink-100);
+  font: inherit;
+  font-size: .75rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.poker-rules__back:focus-visible {
+  outline: 2px solid var(--brass-300);
+  outline-offset: 2px;
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .poker-rules { place-items: stretch center; padding-block: max(calc(var(--safe-top) + .28rem), .35rem) max(calc(var(--safe-bottom) + .28rem), .35rem); }
+  .poker-rules__sheet { width: min(42rem, 100%); padding: .62rem .78rem; }
+  .poker-rules__facts { grid-template-columns: 1fr 1fr; column-gap: .8rem; }
+  .poker-rules__intro { margin-block: .42rem; }
+  .poker-rules__variants, .poker-rules__money { margin-block: .42rem; }
+}

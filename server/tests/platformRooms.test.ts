@@ -14,12 +14,14 @@ import {
   asKitti,
   HazariSession,
   KittiSession,
+  PokerSession,
   GameNotAvailableError,
 } from '../src/platform/games/sessions.js';
 import { HaazariGame } from '../src/games/hazari/gameEngine.js';
 import { GAME_RULES } from '../src/games/hazari/rules.js';
 import { KITTI_RULES } from '../src/games/kitti/rules.js';
 import { TEEN_PATTI_RULES } from '../src/games/teenpatti/rules.js';
+import { POKER_VARIANTS, DEFAULT_POKER_TABLE_CONFIG } from '../src/games/poker/rules.js';
 
 // ============================================================================
 // 1. The registry must not drift from each game's own rules module.
@@ -42,16 +44,24 @@ describe('game registry stays in sync with each engine', () => {
   it('Teen Patti limits match TEEN_PATTI_RULES', () => {
     expect(GAMES.TEEN_PATTI.minPlayers).toBe(TEEN_PATTI_RULES.MIN_PLAYERS);
     expect(GAMES.TEEN_PATTI.maxPlayers).toBe(TEEN_PATTI_RULES.MAX_PLAYERS);
-    expect(GAMES.TEEN_PATTI.cardsPerPlayer).toBe(TEEN_PATTI_RULES.CLASSIC_CARDS_PER_PLAYER);
+    expect(TEEN_PATTI_RULES.CLASSIC_CARDS_PER_PLAYER).toBe(3);
+    expect(GAMES.TEEN_PATTI.cardsPerPlayer).toBe('VARIES');
   });
 
   it('Teen Patti seats up to 9', () => {
     expect(maxPlayersFor('TEEN_PATTI')).toBe(9);
   });
 
+  it('Poker is registered but stays network-disabled until its controller is complete', () => {
+    expect(GAMES.POKER.minPlayers).toBe(Math.min(...Object.values(POKER_VARIANTS).map((variant) => variant.minPlayers)));
+    expect(GAMES.POKER.maxPlayers).toBe(Math.max(...Object.values(POKER_VARIANTS).map((variant) => variant.maxPlayers)));
+    expect(GAMES.POKER.cardsPerPlayer).toBe('VARIES');
+    expect(GAMES.POKER.networkPlayable).toBe(false);
+  });
+
   it('validates game ids', () => {
     expect(isGameId('HAZARI')).toBe(true);
-    expect(isGameId('POKER')).toBe(false);
+    expect(isGameId('POKER')).toBe(true);
     expect(isGameId(undefined)).toBe(false);
     expect(() => getGame('NOPE' as never)).toThrow();
   });
@@ -119,6 +129,7 @@ describe('rooms are game-aware', () => {
     expect(room.gameId).toBe('KITTI');
     expect(room.roomCode.startsWith('KIT')).toBe(true);
     expect(() => rooms.createRoom('Alice', 'TEEN_PATTI')).toThrow(RoomManagerError);
+    expect(() => rooms.createRoom('Alice', 'POKER')).toThrow(RoomManagerError);
   });
 
   it('there is no API to change a room\'s game after creation', () => {
@@ -170,6 +181,32 @@ describe('seat limits follow the room\'s game', () => {
 // ============================================================================
 // 4. The session factory, and the guarantee about HaazariGame.
 // ============================================================================
+
+describe('Poker session adapter (still network-gated)', () => {
+  it('adapts the authoritative engine without exposing it through room creation yet', () => {
+    const session = new PokerSession('PKR1', ['a', 'b'], DEFAULT_POKER_TABLE_CONFIG);
+    expect(session.gameId).toBe('POKER');
+    expect(session.state).toBe('READY');
+    expect(session.getPrivateState('a').holeCards).toEqual([]);
+  });
+
+  it('keeps preflop hole cards out of the public session state', () => {
+    const session = new PokerSession('PKR2', ['a', 'b'], DEFAULT_POKER_TABLE_CONFIG);
+    session.engine.dealHand();
+
+    const mine = session.getPrivateState('a').holeCards;
+    const theirs = session.getPrivateState('b').holeCards;
+    const publicState = session.getPublicState();
+    const serializedPublic = JSON.stringify(publicState);
+
+    expect(mine).toHaveLength(2);
+    expect(theirs).toHaveLength(2);
+    expect(publicState.board).toEqual([]);
+    for (const card of [...mine, ...theirs]) {
+      expect(serializedPublic).not.toContain(card.id);
+    }
+  });
+});
 
 describe('game session factory', () => {
   it('builds a Hazari session for a Hazari room', () => {
@@ -322,6 +359,11 @@ describe('active-seat release boundary', () => {
     const remaining = rooms.releaseActiveSeat(room.roomCode, hostId)!;
     expect(remaining.players.has(hostId)).toBe(false);
     expect(remaining.hostId).toBe(second.playerId);
+    // Open-ended Teen Patti/Poker histories can still reference a player after
+    // their live seat is released. Preserve only public-safe identity data so
+    // reconnecting tablemates see the real historical name, not a raw id or
+    // generic “Former player” label.
+    expect(rooms.toPublic(remaining).playerDirectory?.[hostId]).toMatchObject({ name: 'Host' });
     expect(() => rooms.reconnect(hostToken, 'stale-socket')).toThrow(/invalid|expired/i);
   });
 

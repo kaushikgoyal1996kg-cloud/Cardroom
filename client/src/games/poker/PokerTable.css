@@ -1,0 +1,285 @@
+.poker-table-screen {
+  width: 100%;
+  height: var(--app-height, 100dvh);
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  place-items: stretch;
+}
+
+.poker-table-screen .table {
+  min-height: 0;
+  height: 100%;
+  padding-bottom: max(9.7rem, calc(var(--safe-bottom) + 8.7rem));
+}
+
+
+/* Hand-complete uses the felt as context behind the result, but the live local
+   hand/action rail is intentionally gone. Reserve only the lower bankroll
+   furniture instead of keeping the much deeper live-action cavity. */
+.poker-table-screen.is-result .table {
+  padding-bottom: max(5.4rem, calc(var(--safe-bottom) + 4.8rem));
+}
+
+/* Mixed/variant tables always show the current game and street in the centre
+   rather than making the player infer it from the number of hole cards. */
+.poker-board {
+  display: grid;
+  justify-items: center;
+  gap: .4rem;
+  min-width: min(72vw, 25rem);
+  pointer-events: none;
+}
+
+.poker-board__variant {
+  display: inline-flex;
+  gap: .5rem;
+  align-items: baseline;
+  padding: .22rem .55rem;
+  border: 1px solid rgba(200,164,92,.22);
+  border-radius: 999px;
+  background: var(--felt-900);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025), 0 4px 12px rgba(0,0,0,.18);
+  font-size: .64rem;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  color: var(--ink-400);
+}
+
+.poker-board__variant strong { color: var(--brass-300); }
+.poker-board__variant small {
+  color: var(--ink-400);
+  font-size: .54rem;
+  letter-spacing: .045em;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.poker-board__cards {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: clamp(.12rem, .65vw, .32rem);
+  min-height: 4.5rem;
+}
+
+.poker-board__slot {
+  display: inline-grid;
+  place-items: center;
+  width: clamp(2.1rem, 6.4vw, 3.5rem);
+}
+
+.poker-board__empty {
+  width: 100%;
+  aspect-ratio: 2.5 / 3.5;
+  border: 1px dashed rgba(200,164,92,.36);
+  border-radius: .32rem;
+  background: rgba(4,12,10,.16);
+  box-shadow: inset 0 2px 7px rgba(0,0,0,.2);
+  opacity: .58;
+}
+
+.poker-board__pot {
+  display: inline-flex;
+  align-items: baseline;
+  gap: .42rem;
+  padding: .25rem .72rem;
+  border: 1px solid rgba(200,164,92,.34);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--wood-800), var(--wood-900));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 .28rem .8rem rgba(0,0,0,.22);
+}
+
+.poker-board__pot span { color: var(--ink-400); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; }
+.poker-board__pot strong { color: var(--ink-100); font-variant-numeric: tabular-nums; }
+
+.poker-local {
+  position: fixed;
+  z-index: 24;
+  left: max(var(--safe-left), .45rem);
+  right: max(var(--safe-right), .45rem);
+  bottom: max(var(--safe-bottom), .45rem);
+  display: grid;
+  grid-template-columns: minmax(7rem, .72fr) minmax(0, 1.7fr);
+  gap: .55rem;
+  align-items: end;
+  max-width: 54rem;
+  margin-inline: auto;
+}
+
+/* These are pieces of the wooden table rail, not floating glass panels. */
+.poker-local__hand,
+.poker-actions {
+  min-width: 0;
+  border: 1px solid rgba(200,164,92,.3);
+  background:
+    repeating-linear-gradient(92deg, rgba(255,255,255,.012) 0 1px, transparent 1px 8px),
+    linear-gradient(180deg, var(--wood-800), var(--wood-900) 76%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.04),
+    inset 0 -1px 0 rgba(0,0,0,.36),
+    0 .55rem 1.5rem rgba(0,0,0,.34);
+}
+
+.poker-local__hand {
+  border-radius: .82rem;
+  padding: .42rem .5rem .38rem;
+}
+
+.poker-local__cards {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  min-height: 4.2rem;
+  overflow: visible;
+}
+
+.poker-local__cards > * + * { margin-left: clamp(-1.7rem, -4.2vw, -.52rem); }
+
+/* Reserve the finished hand footprint during the cosmetic deal without
+   drawing a second set of face-down cards underneath the flying cards. */
+.poker-local__deal-slot {
+  display: block;
+  flex: 0 0 auto;
+  width: 3.25rem;
+  height: calc(3.25rem * 1.42);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.poker-local__caption {
+  display: flex;
+  justify-content: space-between;
+  gap: .4rem;
+  font-size: .66rem;
+  color: var(--ink-400);
+}
+.poker-local__caption strong { color: var(--ink-100); }
+
+.poker-actions {
+  border-radius: .88rem;
+  padding: .42rem;
+}
+.poker-actions.is-live { border-color: rgba(220,192,134,.48); }
+
+.poker-actions__primary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .35rem;
+}
+
+.poker-action,
+.poker-bet-controls__presets button {
+  min-height: var(--touch-min);
+  border-radius: .58rem;
+  border: 1px solid rgba(200,164,92,.3);
+  background: linear-gradient(180deg, var(--wood-700), var(--wood-900));
+  color: var(--ink-100);
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.poker-action:disabled { opacity: .42; cursor: default; }
+.poker-action--main,
+.poker-action--raise { border-color: rgba(220,192,134,.56); }
+.poker-action--main {
+  background: linear-gradient(180deg, var(--felt-600), var(--felt-800));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+}
+.poker-action--raise { background: linear-gradient(180deg, #5b432e, var(--wood-900)); }
+.poker-action--fold { color: #dfb2ac; border-color: rgba(171,89,82,.28); }
+.poker-action:focus-visible,
+.poker-bet-controls__presets button:focus-visible,
+.poker-bet-controls__slider input:focus-visible {
+  outline: 2px solid var(--brass-300);
+  outline-offset: 2px;
+}
+
+.poker-bet-controls {
+  display: grid;
+  grid-template-columns: auto minmax(7rem, 1fr);
+  gap: .45rem;
+  align-items: center;
+  margin-top: .38rem;
+}
+
+.poker-bet-controls__presets { display: flex; gap: .25rem; }
+.poker-bet-controls__presets button {
+  min-height: var(--touch-min);
+  padding: .2rem .45rem;
+  display: grid;
+  place-content: center;
+  line-height: 1.05;
+}
+.poker-bet-controls__presets span { color: var(--ink-400); font-size: .58rem; }
+.poker-bet-controls__presets strong { font-size: .72rem; font-variant-numeric: tabular-nums; }
+
+.poker-bet-controls__slider {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: .4rem;
+  color: var(--ink-400);
+  font-size: .62rem;
+}
+.poker-bet-controls__slider input { width: 100%; min-width: 0; accent-color: var(--brass-400); }
+
+.poker-actions__waiting {
+  min-height: var(--touch-min);
+  margin: 0;
+  display: grid;
+  place-items: center;
+  color: var(--ink-400);
+  font-size: .76rem;
+}
+
+@media (orientation: portrait) and (max-width: 520px) {
+  .poker-table-screen .table { padding-bottom: max(12.8rem, calc(var(--safe-bottom) + 12rem)); }
+  .poker-local { grid-template-columns: 1fr; gap: .35rem; }
+  .poker-local__hand {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    padding-block: .25rem;
+  }
+  .poker-local__cards { min-height: 3.5rem; justify-content: flex-start; padding-left: .5rem; }
+  .poker-local__caption { display: grid; text-align: right; }
+  .poker-bet-controls { grid-template-columns: 1fr; }
+  .poker-bet-controls__presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .poker-table-screen .table { padding-bottom: max(7.15rem, calc(var(--safe-bottom) + 6.55rem)); }
+  .poker-local {
+    left: max(var(--safe-left), .3rem);
+    right: max(calc(var(--safe-right) + 3.4rem), 3.7rem);
+    bottom: max(var(--safe-bottom), .25rem);
+    grid-template-columns: minmax(6.5rem, .58fr) minmax(0, 2fr);
+  }
+  .poker-local__hand { padding: .22rem .35rem; }
+  .poker-local__cards { min-height: 3rem; }
+  .poker-local__caption { font-size: .58rem; }
+  .poker-actions { padding: .28rem; }
+  .poker-action { min-height: var(--touch-min); font-size: .72rem; }
+  .poker-bet-controls { margin-top: .22rem; }
+  .poker-bet-controls__slider { display: none; }
+  .poker-board { gap: .2rem; transform: scale(.9); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .poker-board { transform: none; }
+}
+
+@media (orientation: portrait) and (max-width: 520px) {
+  .poker-table-screen.is-result .table {
+    padding-bottom: max(8.6rem, calc(var(--safe-bottom) + 8rem));
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .poker-table-screen.is-result .table {
+    padding-bottom: max(4.4rem, calc(var(--safe-bottom) + 3.9rem));
+  }
+}

@@ -27,7 +27,14 @@
           calc(env(safe-area-inset-bottom, 0px) + 24px)
           calc(env(safe-area-inset-left, 0px) + 24px);
       }
-      .motif { opacity: 0.85; }
+      .motif {
+        width: 72px;
+        height: 72px;
+        object-fit: cover;
+        border-radius: 22%;
+        border: 1px solid rgba(220,192,134,.35);
+        box-shadow: 0 12px 28px rgba(0,0,0,.4);
+      }
       h1 {
         margin: 0;
         font-size: 1.5rem;
@@ -57,14 +64,7 @@
   </head>
   <body>
     <div class="wrap">
-      <svg class="motif" width="72" height="72" viewBox="0 0 100 100" fill="none" aria-hidden="true">
-        <ellipse cx="50" cy="50" rx="46" ry="30" stroke="#a8843f" stroke-width="1.2" opacity="0.8" />
-        <ellipse cx="50" cy="50" rx="34" ry="20" stroke="#a8843f" stroke-width="1" opacity="0.6" />
-        <ellipse cx="50" cy="50" rx="20" ry="11" stroke="#dcc086" stroke-width="1" opacity="0.9" />
-        <circle cx="50" cy="50" r="7" fill="#dcc086" opacity="0.85" />
-        <circle cx="50" cy="50" r="3" fill="#12100e" />
-        <path d="M50 4 V20 M50 80 V96 M4 50 H20 M80 50 H96" stroke="#a8843f" stroke-width="1" opacity="0.5" />
-      </svg>
+      <img class="motif" src="/brand/card-room-emblem.png" alt="" aria-hidden="true" />
       <h1>The table is offline</h1>
       <p>
         The Card Room needs a connection to deal you in. Check your signal and

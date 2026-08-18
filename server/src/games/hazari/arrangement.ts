@@ -13,11 +13,10 @@ export interface ValidationResult {
  * - exactly 13 cards used, no duplicates, no cards outside the player's hand
  * - split is exactly 3 + 3 + 3 + 4
  * - each individual set is internally valid
- * - sets are ordered strongest -> weakest across ALL FOUR sets. Set 4 uses
- *   Hazari's dedicated four-card classifier in fourCardRanking.ts; that
- *   classifier deliberately returns the same comparison-value shape used by
- *   Sets 1-3, so Set 4 must not out-rank Set 3 just as Set 3 must not out-rank
- *   Set 2. (This is NOT a best-3-of-4 rule.)
+ * - sets are ordered strongest -> weakest across ALL FOUR sets. Set 4 is
+ *   evaluated as the best 3-card combination available from its 4 cards.
+ *   The unused fourth card does not break ties, so Set 3 may exactly equal
+ *   Set 4 and the arrangement remains valid.
  */
 export function validatePlayerArrangement(
   originalHand: Card[],

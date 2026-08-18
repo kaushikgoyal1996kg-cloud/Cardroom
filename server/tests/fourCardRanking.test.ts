@@ -37,10 +37,10 @@ describe('classifyFourCardHand - best 3-of-4 Teen Patti sub-combo', () => {
     expect(v.label).toMatch(/High Card/);
   });
 
-  it('uses the excluded 4th card as a kicker to break ties between equal best-subsets', () => {
-    const higherKicker = classifyFourCardHand([c('5', 'SPADES'), c('5', 'HEARTS'), c('2', 'DIAMONDS'), c('K', 'CLUBS')]);
-    const lowerKicker = classifyFourCardHand([c('5', 'SPADES'), c('5', 'HEARTS'), c('2', 'DIAMONDS'), c('3', 'CLUBS')]);
-    expect(compareFourCardHands(higherKicker, lowerKicker)).toBeGreaterThan(0);
+  it('ignores the unused 4th card completely when the best three are equal', () => {
+    const kingLeftOver = classifyFourCardHand([c('5', 'SPADES'), c('5', 'HEARTS'), c('2', 'DIAMONDS'), c('K', 'CLUBS')]);
+    const threeLeftOver = classifyFourCardHand([c('5', 'SPADES'), c('5', 'HEARTS'), c('2', 'DIAMONDS'), c('3', 'CLUBS')]);
+    expect(compareFourCardHands(kingLeftOver, threeLeftOver)).toBe(0);
   });
 
   it('full category ordering (same hierarchy as 3-card sets): Trail > Pure Sequence > Sequence > Color > Pair > High Card', () => {
@@ -59,12 +59,12 @@ describe('classifyFourCardHand - best 3-of-4 Teen Patti sub-combo', () => {
 });
 
 describe('fourCardSetHasRun (used by isNoSequenceHand dismissal check)', () => {
-  it('true when a run-based subset (Sequence/Pure Sequence) or Trail exists among any 3 of the 4', () => {
+  it('true only when a Sequence/Pure Sequence exists among any 3 of the 4', () => {
     expect(fourCardSetHasRun([c('9', 'CLUBS'), c('8', 'HEARTS'), c('7', 'SPADES'), c('2', 'DIAMONDS')])).toBe(true);
     expect(fourCardSetHasRun([c('A', 'CLUBS'), c('2', 'HEARTS'), c('3', 'SPADES'), c('K', 'DIAMONDS')])).toBe(true);
-    expect(fourCardSetHasRun([c('9', 'SPADES'), c('9', 'HEARTS'), c('9', 'DIAMONDS'), c('K', 'CLUBS')])).toBe(true);
+    expect(fourCardSetHasRun([c('9', 'SPADES'), c('9', 'HEARTS'), c('9', 'DIAMONDS'), c('K', 'CLUBS')])).toBe(false); // Trial is not a sequence
   });
-  it('false when no 3-card subset forms a run or trail', () => {
+  it('false when no 3-card subset forms a Sequence/Pure Sequence', () => {
     expect(fourCardSetHasRun([c('K', 'SPADES'), c('9', 'HEARTS'), c('5', 'DIAMONDS'), c('2', 'CLUBS')])).toBe(false);
     expect(fourCardSetHasRun([c('5', 'SPADES'), c('5', 'HEARTS'), c('K', 'DIAMONDS'), c('2', 'CLUBS')])).toBe(false);
   });

@@ -194,7 +194,7 @@
 
 .chat-panel__send {
   padding: 0 14px;
-  min-height: 38px;
+  min-height: var(--touch-min);
 }
 
 .chat-msg__voice {
@@ -219,7 +219,7 @@
   border: none;
   border-radius: 999px;
   min-width: 52px;
-  min-height: 38px;
+  min-height: var(--touch-min);
   font-size: 1rem;
   color: var(--ink-900);
   touch-action: none;
@@ -251,7 +251,7 @@
   margin: 4px 0;
 }
 
-/* ==========================================================================
+/* ========================================================================== 
    Card-room visual pass. Positioning/keyboard math above stays authoritative;
    this layer removes the remaining legacy gold/green panel look.
    ========================================================================== */
@@ -368,3 +368,41 @@
 .chat-panel__recording-dot { width: .48rem; height: .48rem; border-radius: 50%; background: var(--status-away); animation: chat-recording-pulse .9s ease-in-out infinite; }
 @keyframes chat-recording-pulse { 50% { opacity: .42; transform: scale(.86); } }
 @media (prefers-reduced-motion: reduce) { .chat-panel__recording-dot { animation: none; } }
+
+/* Hub-launched table chat no longer pretends there is a bottom-right chat
+   FAB. It opens under the shared circular table control instead, keeping the
+   live game's action rail and arranged hand completely unobstructed. */
+.chat-panel.is-table-utility {
+  top: calc(env(safe-area-inset-top, 0px) + 3.9rem);
+  right: calc(env(safe-area-inset-right, 0px) + .55rem);
+  bottom: auto;
+  left: auto;
+  width: min(23rem, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 1.1rem));
+  max-width: none;
+  max-height: min(72dvh, 32rem, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 5rem));
+  margin-left: 0;
+}
+
+/* Once the mobile keyboard is genuinely open, the composer becomes the
+   priority. Switch to the measured keyboard-bottom anchor for that state. */
+.chat-panel.is-table-utility.is-keyboard-open {
+  top: auto;
+  right: calc(env(safe-area-inset-right, 0px) + .55rem);
+  bottom: calc(var(--keyboard-height, 0px) + 12px);
+  max-height: min(52dvh, 360px);
+}
+
+@media (orientation: landscape) and (max-height: 30rem) {
+  .chat-panel.is-table-utility {
+    top: calc(env(safe-area-inset-top, 0px) + 3.45rem);
+    right: calc(env(safe-area-inset-right, 0px) + .45rem);
+    bottom: auto;
+    width: min(21rem, 44vw);
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 4rem);
+  }
+  .chat-panel.is-table-utility.is-keyboard-open {
+    top: auto;
+    bottom: calc(var(--keyboard-height, 0px) + 8px);
+    max-height: min(52dvh, 330px);
+  }
+}

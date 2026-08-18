@@ -8,6 +8,7 @@ import { classifyThree, labelFor } from '../../game/handClassification';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useWakeLock } from '../../lib/useWakeLock';
 import { PlayMoneyPotBadge } from '../../platform/components/PlayMoneyBoard';
+import { PhaseTrack } from '../../platform/components/PhaseTrack';
 import './KittiTable.css';
 
 const HAND_NAMES = ['Hand 1', 'Hand 2', 'Hand 3'];
@@ -131,6 +132,13 @@ export function KittiTable() {
           <p className="kitti-table-screen__eyebrow">Kitti · {roundLabel}</p>
           <h1 className="kitti-table-screen__title">{phaseLabel}</h1>
         </div>
+        <PhaseTrack
+          labels={isDecider ? ['Decider'] : HAND_NAMES}
+          activeIndex={isDecider ? 0 : kittiState.currentHandIndex}
+          completedIndexes={isDecider ? [] : kittiState.handResultsThisRound.map((result) => result.handIndex)}
+          ariaLabel={`${roundLabel} progress`}
+          compact
+        />
         <div className="kitti-table-screen__scoreline">
           <span>{kittiState.scheduledRoundsComplete}/10 complete</span>
           {kittiState.suddenDeath && <strong>Leaders only</strong>}
@@ -173,7 +181,14 @@ export function KittiTable() {
               <small>{kittiDeciderHand.length === 3 ? labelFor(classifyThree(kittiDeciderHand)) : 'Fresh 3 cards'}</small>
             </div>
             <div className="kitti-mini-hand__cards">
-              {kittiDeciderHand.map((card) => <PlayingCard key={card.id} card={card} size="sm" />)}
+              {kittiDeciderHand.map((card, cardIndex) => (
+                <PlayingCard
+                  key={card.id}
+                  card={card}
+                  size="sm"
+                  tilt={(cardIndex - (kittiDeciderHand.length - 1) / 2) * 1.25}
+                />
+              ))}
             </div>
           </div>
         ) : (
@@ -187,7 +202,15 @@ export function KittiTable() {
                   <small>{labelFor(classifyThree(group))}</small>
                 </div>
                 <div className="kitti-mini-hand__cards">
-                  {group.map((card) => <PlayingCard key={card.id} card={card} size="sm" disabled={!active} />)}
+                  {group.map((card, cardIndex) => (
+                    <PlayingCard
+                      key={card.id}
+                      card={card}
+                      size="sm"
+                      disabled={!active}
+                      tilt={(cardIndex - (group.length - 1) / 2) * 1.15}
+                    />
+                  ))}
                 </div>
                 {completed && <span className="kitti-mini-hand__done">Played</span>}
               </div>

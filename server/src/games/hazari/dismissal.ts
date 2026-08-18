@@ -1,7 +1,6 @@
 import type { Card, DismissalReason, PlayerId } from './types.js';
 import { GAME_RULES } from './rules.js';
-import { hasSixPairs, isNoSequenceHand } from './hands.js';
-import { fourCardSetHasRun } from './fourCardRanking.js';
+import { hasSixPairs, handHasNoPossibleSequence } from './hands.js';
 
 // ============================================================================
 // DISMISSAL - a player-elected action, NOT automatic (per Section 24: "not
@@ -28,16 +27,15 @@ export interface DismissalEligibility {
 
 /**
  * Checks whether a player's hand currently qualifies them to dismiss.
- * - Condition 1 (NO_SEQUENCE): evaluated on the player's CONFIRMED 4-set
- *   arrangement, since "no sequence" is a property of how the hand was
- *   built, not the raw 13 cards.
- * - Condition 2 (SIX_PAIRS): evaluated on the raw 13-card hand, before/
- *   regardless of arrangement.
+ * - Condition 1 (NO_SEQUENCE): evaluated on the raw 13-card deal. If no
+ *   3-card subset can form a Sequence or Pure Sequence, the hand is eligible.
+ *   Trial/Trail is NOT a sequence and does not block dismissal.
+ * - Condition 2 (SIX_PAIRS): evaluated on the raw 13-card hand.
  * A player is eligible if EITHER enabled condition is met.
  */
 export function getDismissalEligibility(
   rawHand: Card[],
-  confirmedSets?: [Card[], Card[], Card[], Card[]]
+  _confirmedSets?: [Card[], Card[], Card[], Card[]]
 ): DismissalEligibility {
   const reasons: DismissalReason[] = [];
 
@@ -45,17 +43,8 @@ export function getDismissalEligibility(
     reasons.push('SIX_PAIRS');
   }
 
-  if (GAME_RULES.NO_SEQUENCE_DISMISSAL && confirmedSets) {
-    const threeCardSets: [Card[], Card[], Card[]] = [confirmedSets[0], confirmedSets[1], confirmedSets[2]];
-    const fourHasRun = confirmedSets[3].length === 4 ? fourCardSetHasRun(confirmedSets[3]) : false;
-    if (
-      confirmedSets[0].length === 3 &&
-      confirmedSets[1].length === 3 &&
-      confirmedSets[2].length === 3 &&
-      isNoSequenceHand(threeCardSets, fourHasRun)
-    ) {
-      reasons.push('NO_SEQUENCE');
-    }
+  if (GAME_RULES.NO_SEQUENCE_DISMISSAL && handHasNoPossibleSequence(rawHand)) {
+    reasons.push('NO_SEQUENCE');
   }
 
   return { eligible: reasons.length > 0, reasons };

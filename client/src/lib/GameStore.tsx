@@ -1,20 +1,29 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { getSocket, type RoomAck, type TablesAck, type TeenPattiLeaveAck, type TeenPattiSetupAck } from './socket';
+import { getSocket, type PokerLeaveAck, type PokerSetupAck, type RoomAck, type TablesAck, type TeenPattiLeaveAck, type TeenPattiSetupAck } from './socket';
 import type {
   Card,
   ChatMessage,
   DismissalReason,
   GameId,
-  PlayerId,
   FourSets,
   HaazariPublicStatePayload,
   KittiGroups,
   KittiPublicStatePayload,
   KittiRoundResult,
+  PlayerId,
+  PokerAction,
+  PokerHandOutcomePayload,
+  PokerLobbySetup,
+  PokerPlayerSettlement,
+  PokerPrivateStatePayload,
+  PokerPublicStatePayload,
+  PokerTableConfig,
+  PokerVariantId,
   PublicRoomInfo,
   RoundResult,
   TableSummary,
   TeenPattiAction,
+  TeenPattiFriendlySuggestion,
   TeenPattiLobbySetup,
   TeenPattiPlayerSettlement,
   TeenPattiPrivateStatePayload,
@@ -22,6 +31,7 @@ import type {
   TeenPattiRoundOutcome,
   TeenPattiRoundVariantConfig,
   TeenPattiTableConfig,
+  TeenPattiVariantTablePolicy,
 } from '../game/types';
 import { DEFAULT_AVATAR } from '../game/avatars';
 import { playDealSound, playChatSound, playErrorSound, playRoundCompleteSound, playVictorySound } from './sound';
@@ -29,6 +39,7 @@ import { hapticMedium, hapticError, hapticSuccess, hapticVictory } from './hapti
 import { recordGameResult, getAllStats, type PlayerStats } from './stats';
 import type { KittiSuggestionAck, SuggestionOptionsAck } from './socket';
 import { friendlyGameError } from './errorMessages';
+import { coherentPokerPrivateState, coherentTeenPattiPrivateState } from './privateStateCoherence';
 import { VoiceCallManager, isVoiceCallSupported } from './voiceCall';
 import { requestReturnToCardRoom } from './navigation';
 
@@ -65,6 +76,12 @@ interface GameContextValue {
   lastTeenPattiRoundResult: TeenPattiRoundOutcome | null;
   teenPattiRoundHistory: TeenPattiRoundOutcome[];
   teenPattiSettlementNotice: TeenPattiPlayerSettlement | null;
+  pokerSetup: PokerLobbySetup | null;
+  pokerPrivate: PokerPrivateStatePayload | null;
+  pokerState: PokerPublicStatePayload | null;
+  lastPokerHandResult: PokerHandOutcomePayload | null;
+  pokerHandHistory: PokerHandOutcomePayload[];
+  pokerSettlementNotice: PokerPlayerSettlement | null;
   roomError: string | null;
   gameError: string | null;
   chatMessages: ChatMessage[];
@@ -131,13 +148,29 @@ interface GameContextValue {
   playKittiHand: () => void;
   playKittiDecider: () => void;
   startNextKittiRound: () => void;
-  proposeTeenPattiSetup: (tableConfig: TeenPattiTableConfig, roundVariant: TeenPattiRoundVariantConfig) => Promise<TeenPattiSetupAck>;
+  proposeTeenPattiSetup: (tableConfig: TeenPattiTableConfig, roundVariant: TeenPattiRoundVariantConfig, variantPolicy: TeenPattiVariantTablePolicy) => Promise<TeenPattiSetupAck>;
   acceptTeenPattiSetup: (revision: number) => Promise<TeenPattiSetupAck>;
+  chooseTeenPattiRoundVariant: (roundVariant: TeenPattiRoundVariantConfig) => void;
+  chooseTeenPattiSurpriseRound: () => void;
+  assignTeenPattiTwoReference: (upDownReferenceIndex: 0 | 1) => void;
+  chooseTeenPattiDiscards: (discardedSlots: number[]) => void;
+  requestTeenPattiFriendlyAssist: (targetPlayerId: PlayerId) => void;
+  respondTeenPattiFriendlyAssist: (requestId: string, accept: boolean) => void;
+  revokeTeenPattiFriendlyAssist: (requestId: string) => void;
+  suggestTeenPattiFriendlyAssist: (requestId: string, suggestion: TeenPattiFriendlySuggestion) => void;
   teenPattiAction: (action: TeenPattiAction) => void;
   topUpTeenPatti: (amount: number) => void;
   startNextTeenPattiRound: () => void;
   leaveTeenPattiTable: () => Promise<TeenPattiLeaveAck>;
   clearTeenPattiSettlementNotice: () => void;
+  proposePokerSetup: (config: PokerTableConfig) => Promise<PokerSetupAck>;
+  acceptPokerSetup: (revision: number) => Promise<PokerSetupAck>;
+  choosePokerVariant: (variantId: PokerVariantId) => void;
+  pokerAction: (action: PokerAction) => void;
+  topUpPoker: (amount: number) => void;
+  startNextPokerHand: () => void;
+  leavePokerTable: () => Promise<PokerLeaveAck>;
+  clearPokerSettlementNotice: () => void;
   leaveTable: () => void;
   sendChat: (message: string, kind: 'text' | 'emoji' | 'voice', durationSec?: number) => void;
   getStats: (gameId: GameId) => { name: string; stats: PlayerStats }[];
@@ -172,6 +205,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const kittiStateRef = useRef<KittiPublicStatePayload | null>(null);
   const teenPattiStateRef = useRef<TeenPattiPublicStatePayload | null>(null);
   const teenPattiDealRoundRef = useRef<number | null>(null);
+  const pokerStateRef = useRef<PokerPublicStatePayload | null>(null);
+  const pokerDealHandRef = useRef<number | null>(null);
   useEffect(() => {
     myPlayerIdRef.current = myPlayerId;
   }, [myPlayerId]);
@@ -200,6 +235,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [lastTeenPattiRoundResult, setLastTeenPattiRoundResult] = useState<TeenPattiRoundOutcome | null>(null);
   const [teenPattiRoundHistory, setTeenPattiRoundHistory] = useState<TeenPattiRoundOutcome[]>([]);
   const [teenPattiSettlementNotice, setTeenPattiSettlementNotice] = useState<TeenPattiPlayerSettlement | null>(null);
+  const [pokerSetup, setPokerSetup] = useState<PokerLobbySetup | null>(null);
+  const [pokerPrivate, setPokerPrivate] = useState<PokerPrivateStatePayload | null>(null);
+  const [pokerState, setPokerState] = useState<PokerPublicStatePayload | null>(null);
+  const [lastPokerHandResult, setLastPokerHandResult] = useState<PokerHandOutcomePayload | null>(null);
+  const [pokerHandHistory, setPokerHandHistory] = useState<PokerHandOutcomePayload[]>([]);
+  const [pokerSettlementNotice, setPokerSettlementNotice] = useState<PokerPlayerSettlement | null>(null);
   useEffect(() => {
     gameStateRef.current = gameState;
   }, [gameState]);
@@ -209,6 +250,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     teenPattiStateRef.current = teenPattiState;
   }, [teenPattiState]);
+  useEffect(() => {
+    pokerStateRef.current = pokerState;
+  }, [pokerState]);
   const [roomError, setRoomError] = useState<string | null>(null);
   const [gameError, setGameError] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -301,9 +345,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             setTeenPattiSetup(null);
             setTeenPattiPrivate(null);
             setTeenPattiState(null);
+            teenPattiStateRef.current = null;
             setLastTeenPattiRoundResult(null);
             setTeenPattiRoundHistory([]);
             teenPattiDealRoundRef.current = null;
+            setPokerSetup(null);
+            setPokerPrivate(null);
+            setPokerState(null);
+            pokerStateRef.current = null;
+            setLastPokerHandResult(null);
+            setPokerHandHistory([]);
+            pokerDealHandRef.current = null;
             setViewMode('active');
             setRoomError("Your table timed out while you were away. You'll need to start or join a new one.");
           }
@@ -351,9 +403,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           setKittiWinnerInfo(null);
           setTeenPattiPrivate(null);
           setTeenPattiState(null);
+          teenPattiStateRef.current = null;
           setLastTeenPattiRoundResult(null);
           setTeenPattiRoundHistory([]);
           teenPattiDealRoundRef.current = null;
+          setPokerPrivate(null);
+          setPokerState(null);
+          pokerStateRef.current = null;
+          setLastPokerHandResult(null);
+          setPokerHandHistory([]);
+          pokerDealHandRef.current = null;
         }
         return r;
       });
@@ -368,7 +427,25 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
     };
     const onYourArrangement = ({ sets }: { sets: FourSets }) => setMyArrangedSets(sets);
-    const onGameState = (s: HaazariPublicStatePayload) => setGameState(s);
+    const onGameState = (s: HaazariPublicStatePayload) => {
+      setGameState(s);
+      // Round history is server-authored. This keeps Settings -> Round History
+      // complete during the next live round and after reconnect/return-to-table,
+      // instead of relying only on transient `roundComplete` events.
+      if (Array.isArray(s.roundHistory)) {
+        setRoundHistory(s.roundHistory);
+        if (s.state === 'ROUND_COMPLETE' || s.state === 'DISMISSED_ROUND') {
+          const restored = [...s.roundHistory].reverse().find((round) => round.roundNumber === s.roundNumber);
+          if (restored) setLastRoundResult(restored);
+        }
+      }
+      // Reconnect may restore GAME_COMPLETE without replaying hazari:over. The
+      // public winnerId + cumulative scores are sufficient to rebuild the
+      // winner screen; the event handler remains responsible for sound/stats.
+      if (s.state === 'GAME_COMPLETE' && s.winnerId) {
+        setWinnerInfo({ winnerId: s.winnerId, finalScores: s.cumulativeScores });
+      }
+    };
     const onGameError = ({ message }: { message: string }) => {
       // "Not currently in a room." means THIS SOCKET currently has no
       // room/player binding server-side (see `withGame`/`roomCodeOf` on the
@@ -443,6 +520,22 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
       kittiStateRef.current = state;
       setKittiState(state);
+      // Same reconnect-safe history model as Hazari. Older servers may omit
+      // the field during a rolling deploy, hence the array guard. A completed
+      // snapshot is also sufficient to rebuild the result screen even if the
+      // one-time kitti:roundComplete event happened while this client was away.
+      if (Array.isArray(state.roundHistory)) {
+        setKittiRoundHistory(state.roundHistory);
+        if (state.state === 'ROUND_COMPLETE') {
+          const restored = [...state.roundHistory].reverse().find((round) => round.roundNumber === state.roundNumber);
+          if (restored) setLastKittiRoundResult(restored);
+        }
+      }
+      // Same principle for MATCH_COMPLETE: restore the winner screen from the
+      // authoritative snapshot; only kitti:over triggers celebration/device stats.
+      if (state.state === 'MATCH_COMPLETE' && state.matchWinnerId) {
+        setKittiWinnerInfo({ winnerId: state.matchWinnerId, roundsWon: state.roundsWon });
+      }
     };
     const onKittiRoundComplete = ({ result }: { result: KittiRoundResult }) => {
       setLastKittiRoundResult(result);
@@ -466,9 +559,33 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const onTeenPattiSetup = ({ setup }: { setup: TeenPattiLobbySetup | null }) => setTeenPattiSetup(setup);
     const onTeenPattiPrivate = (state: TeenPattiPrivateStatePayload) => setTeenPattiPrivate(state);
     const onTeenPattiState = (state: TeenPattiPublicStatePayload) => {
-      const isNewDeal = state.state === 'BETTING' && teenPattiDealRoundRef.current !== state.roundNumber;
-      teenPattiDealRoundRef.current = state.roundNumber;
+      const hasRoundCards = state.state === 'BETTING'
+        || state.state === 'AWAITING_DISCARD'
+        || state.state === 'AWAITING_REFERENCE_ASSIGNMENT';
+      const isNewDeal = hasRoundCards && teenPattiDealRoundRef.current !== state.roundNumber;
+      // A dealer-choice/config table can spend time in AWAITING_VARIANT with
+      // the upcoming round number already visible. Do not mark it dealt until
+      // cards actually exist. Five-card variants have a post-deal discard
+      // gate, while Two-Reference Joker has a post-deal assignment gate, so
+      // both states count as the real deal. Otherwise the ceremony would fire
+      // late only after players finished those private choices.
+      if (hasRoundCards) teenPattiDealRoundRef.current = state.roundNumber;
+      // Action emitters read this ref synchronously. Keep it in lock-step with
+      // the socket packet (as Poker already does) so a fast tap on a freshly
+      // rendered turn cannot accidentally carry the previous sequence while
+      // React's effect that mirrors state -> ref is still waiting to run.
+      teenPattiStateRef.current = state;
       setTeenPattiState(state);
+      if (Array.isArray(state.roundHistory)) setTeenPattiRoundHistory(state.roundHistory);
+      // A reconnect can land directly on ROUND_COMPLETE after the one-time
+      // teenpatti:roundComplete event already happened. `lastOutcome` is part
+      // of the authoritative public snapshot, so use it to restore the same
+      // summary silently. Once the server advances, clear the prior result.
+      if (state.state === 'ROUND_COMPLETE' && state.lastOutcome) {
+        setLastTeenPattiRoundResult(state.lastOutcome);
+      } else if (state.state !== 'ROUND_COMPLETE') {
+        setLastTeenPattiRoundResult(null);
+      }
       if (isNewDeal && !suppressDealAnimation.current && !restorationActiveRef.current) {
         playDealSound();
         setFreshDealCount((n) => n + 1);
@@ -487,8 +604,49 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (mine) setTeenPattiSettlementNotice(mine);
       setTeenPattiPrivate(null);
       setTeenPattiState(null);
+      teenPattiStateRef.current = null;
       setLastTeenPattiRoundResult(null);
       teenPattiDealRoundRef.current = null;
+    };
+    const onPokerSetup = ({ setup }: { setup: PokerLobbySetup | null }) => setPokerSetup(setup);
+    const onPokerPrivate = (state: PokerPrivateStatePayload) => setPokerPrivate(state);
+    const onPokerState = (state: PokerPublicStatePayload) => {
+      const isNewDeal = state.handNumber > 0
+        && ['PREFLOP', 'FLOP', 'TURN', 'RIVER'].includes(state.state)
+        && pokerDealHandRef.current !== state.handNumber;
+      if (state.handNumber > 0 && state.state !== 'AWAITING_VARIANT' && state.state !== 'READY') {
+        pokerDealHandRef.current = state.handNumber;
+      }
+      pokerStateRef.current = state;
+      setPokerState(state);
+      if (Array.isArray(state.handHistory)) setPokerHandHistory(state.handHistory);
+      if (state.state === 'HAND_COMPLETE' && state.outcome) {
+        setLastPokerHandResult(state.outcome);
+      } else if (state.state === 'AWAITING_VARIANT' || state.state === 'PREFLOP') {
+        setLastPokerHandResult(null);
+      }
+      if (isNewDeal && !suppressDealAnimation.current && !restorationActiveRef.current) {
+        playDealSound();
+        setFreshDealCount((n) => n + 1);
+      }
+    };
+    const onPokerHandComplete = ({ result }: { result: PokerHandOutcomePayload }) => {
+      setLastPokerHandResult(result);
+      setPokerHandHistory((prev) => prev.some((entry) => entry.handNumber === result.handNumber) ? prev : [...prev, result]);
+      if (!restorationActiveRef.current) {
+        playRoundCompleteSound();
+        hapticSuccess();
+      }
+    };
+    const onPokerTableEnded = ({ settlements }: { reason: 'NOT_ENOUGH_PLAYERS'; settlements: PokerPlayerSettlement[] }) => {
+      const mine = settlements.find((entry) => entry.playerId === myPlayerIdRef.current);
+      if (mine) setPokerSettlementNotice(mine);
+      setPokerPrivate(null);
+      setPokerState(null);
+      pokerStateRef.current = null;
+      setLastPokerHandResult(null);
+      setPokerHandHistory([]);
+      pokerDealHandRef.current = null;
     };
 
     const onChatMessage = (msg: ChatMessage) => {
@@ -540,6 +698,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socket.on('teenpatti:state', onTeenPattiState);
     socket.on('teenpatti:roundComplete', onTeenPattiRoundComplete);
     socket.on('teenpatti:tableEnded', onTeenPattiTableEnded);
+    socket.on('poker:setup', onPokerSetup);
+    socket.on('poker:private', onPokerPrivate);
+    socket.on('poker:state', onPokerState);
+    socket.on('poker:handComplete', onPokerHandComplete);
+    socket.on('poker:tableEnded', onPokerTableEnded);
     socket.on('room:chatMessage', onChatMessage);
 
     if (socket.connected) onConnect();
@@ -568,6 +731,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       socket.off('teenpatti:state', onTeenPattiState);
       socket.off('teenpatti:roundComplete', onTeenPattiRoundComplete);
       socket.off('teenpatti:tableEnded', onTeenPattiTableEnded);
+      socket.off('poker:setup', onPokerSetup);
+      socket.off('poker:private', onPokerPrivate);
+      socket.off('poker:state', onPokerState);
+      socket.off('poker:handComplete', onPokerHandComplete);
+      socket.off('poker:tableEnded', onPokerTableEnded);
       socket.off('room:chatMessage', onChatMessage);
     };
   }, []);
@@ -584,6 +752,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       socketRef.current.emit('room:create', { playerName, avatar, gameId }, (res) => {
         if (res.ok && res.roomCode && res.playerId && res.token && res.room) {
           storeSession({ token: res.token, roomCode: res.roomCode, playerName });
+          setRoomError(null);
+          setGameError(null);
+          setTeenPattiSettlementNotice(null);
+          setPokerSettlementNotice(null);
           setRoom(res.room);
           setMyPlayerId(res.playerId);
           setMyName(playerName);
@@ -607,6 +779,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       socketRef.current.emit('room:join', { roomCode, playerName, avatar }, (res) => {
         if (res.ok && res.roomCode && res.playerId && res.token && res.room) {
           storeSession({ token: res.token, roomCode: res.roomCode, playerName });
+          setRoomError(null);
+          setGameError(null);
+          setTeenPattiSettlementNotice(null);
+          setPokerSettlementNotice(null);
           setRoom(res.room);
           setMyPlayerId(res.playerId);
           setMyName(playerName);
@@ -630,6 +806,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       socketRef.current.emit('room:quickMatch', { playerName, avatar, gameId }, (res) => {
         if (res.ok && res.roomCode && res.playerId && res.token && res.room) {
           storeSession({ token: res.token, roomCode: res.roomCode, playerName });
+          setRoomError(null);
+          setGameError(null);
+          setTeenPattiSettlementNotice(null);
+          setPokerSettlementNotice(null);
           setRoom(res.room);
           setMyPlayerId(res.playerId);
           setMyName(playerName);
@@ -839,9 +1019,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socketRef.current.emit('kitti:startNextRound');
   }, []);
 
-  const proposeTeenPattiSetup = useCallback((tableConfig: TeenPattiTableConfig, roundVariant: TeenPattiRoundVariantConfig) => {
+  const proposeTeenPattiSetup = useCallback((tableConfig: TeenPattiTableConfig, roundVariant: TeenPattiRoundVariantConfig, variantPolicy: TeenPattiVariantTablePolicy) => {
     return new Promise<TeenPattiSetupAck>((resolve) => {
-      socketRef.current.emit('teenpatti:proposeSetup', { tableConfig, roundVariant }, (res) => {
+      if (actionsGatedRef.current) {
+        resolve({ ok: false, error: 'Reconnect before changing Teen Patti table settings.' });
+        return;
+      }
+      socketRef.current.emit('teenpatti:proposeSetup', { tableConfig, roundVariant, variantPolicy }, (res) => {
         if (!res.ok) setRoomError(res.error ?? 'Could not propose Teen Patti settings.');
         if (res.setup) setTeenPattiSetup(res.setup);
         resolve(res);
@@ -851,6 +1035,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const acceptTeenPattiSetup = useCallback((revision: number) => {
     return new Promise<TeenPattiSetupAck>((resolve) => {
+      if (actionsGatedRef.current) {
+        resolve({ ok: false, error: 'Reconnect before accepting Teen Patti table settings.' });
+        return;
+      }
       socketRef.current.emit('teenpatti:acceptSetup', { revision }, (res) => {
         if (!res.ok) setRoomError(res.error ?? 'Could not accept Teen Patti settings.');
         if (res.setup) setTeenPattiSetup(res.setup);
@@ -859,22 +1047,84 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const chooseTeenPattiRoundVariant = useCallback((roundVariant: TeenPattiRoundVariantConfig) => {
+    if (actionsGatedRef.current) return;
+    const expectedSeq = teenPattiStateRef.current?.sequence;
+    if (expectedSeq === undefined) return;
+    socketRef.current.emit('teenpatti:chooseRoundVariant', { roundVariant, expectedSeq });
+  }, []);
+
+  const chooseTeenPattiSurpriseRound = useCallback(() => {
+    if (actionsGatedRef.current) return;
+    const expectedSeq = teenPattiStateRef.current?.sequence;
+    if (expectedSeq === undefined) return;
+    socketRef.current.emit('teenpatti:chooseSurpriseRound', { expectedSeq });
+  }, []);
+
+  const assignTeenPattiTwoReference = useCallback((upDownReferenceIndex: 0 | 1) => {
+    if (actionsGatedRef.current) return;
+    const expectedSeq = teenPattiStateRef.current?.sequence;
+    if (expectedSeq === undefined) return;
+    socketRef.current.emit('teenpatti:assignTwoReference', { upDownReferenceIndex, expectedSeq });
+  }, []);
+
+  const chooseTeenPattiDiscards = useCallback((discardedSlots: number[]) => {
+    if (actionsGatedRef.current) return;
+    const expectedSeq = teenPattiStateRef.current?.sequence;
+    if (expectedSeq === undefined) return;
+    socketRef.current.emit('teenpatti:chooseDiscards', { discardedSlots, expectedSeq });
+  }, []);
+
+  const requestTeenPattiFriendlyAssist = useCallback((targetPlayerId: PlayerId) => {
+    if (actionsGatedRef.current) return;
+    const expectedRoundNumber = teenPattiStateRef.current?.roundNumber;
+    if (expectedRoundNumber === undefined) return;
+    socketRef.current.emit('teenpatti:friendlyAssistRequest', { targetPlayerId, expectedRoundNumber });
+  }, []);
+
+  const respondTeenPattiFriendlyAssist = useCallback((requestId: string, accept: boolean) => {
+    if (actionsGatedRef.current) return;
+    socketRef.current.emit('teenpatti:friendlyAssistRespond', { requestId, accept });
+  }, []);
+
+  const revokeTeenPattiFriendlyAssist = useCallback((requestId: string) => {
+    if (actionsGatedRef.current) return;
+    socketRef.current.emit('teenpatti:friendlyAssistRevoke', { requestId });
+  }, []);
+
+  const suggestTeenPattiFriendlyAssist = useCallback((requestId: string, suggestion: TeenPattiFriendlySuggestion) => {
+    if (actionsGatedRef.current) return;
+    socketRef.current.emit('teenpatti:friendlyAssistSuggest', { requestId, suggestion });
+  }, []);
+
   const teenPattiAction = useCallback((action: TeenPattiAction) => {
     if (actionsGatedRef.current) return;
     const expectedSeq = teenPattiStateRef.current?.sequence;
+    // Never send an authoritative betting action before the client has a
+    // server state to bind it to. This mirrors Poker's stale-action guard and
+    // closes the old optional-sequence bypass at the network boundary.
+    if (expectedSeq === undefined) return;
     socketRef.current.emit('teenpatti:action', { action, expectedSeq });
   }, []);
 
   const topUpTeenPatti = useCallback((amount: number) => {
     if (actionsGatedRef.current) return;
-    socketRef.current.emit('teenpatti:topUp', { amount });
+    const expectedSeq = teenPattiStateRef.current?.sequence;
+    // Top-ups are additive. Bind them to the current server state so a rapid
+    // double tap cannot fund the table twice before the first update arrives.
+    if (expectedSeq === undefined) return;
+    socketRef.current.emit('teenpatti:topUp', { amount, expectedSeq });
   }, []);
 
   const startNextTeenPattiRound = useCallback(() => {
     if (actionsGatedRef.current) return;
-    setLastTeenPattiRoundResult(null);
-    setTeenPattiPrivate(null);
-    socketRef.current.emit('teenpatti:startNextRound');
+    const expectedSeq = teenPattiStateRef.current?.sequence;
+    if (expectedSeq === undefined) return;
+    // Bind the host's next-round command to the exact completed-round state.
+    // A delayed/double-tapped command from an older result screen can never
+    // start a later round. The result/private UI is cleared only by the
+    // authoritative state/private broadcasts that follow a successful deal.
+    socketRef.current.emit('teenpatti:startNextRound', { expectedSeq });
   }, []);
 
   const leaveTeenPattiTable = useCallback(() => {
@@ -919,9 +1169,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setTeenPattiSetup(null);
         setTeenPattiPrivate(null);
         setTeenPattiState(null);
+        teenPattiStateRef.current = null;
         setLastTeenPattiRoundResult(null);
         setTeenPattiRoundHistory([]);
         teenPattiDealRoundRef.current = null;
+        setPokerSetup(null);
+        setPokerPrivate(null);
+        setPokerState(null);
+        pokerStateRef.current = null;
+        setLastPokerHandResult(null);
+        setPokerHandHistory([]);
+        pokerDealHandRef.current = null;
         setViewMode('active');
         resolve(res);
       });
@@ -929,6 +1187,111 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const clearTeenPattiSettlementNotice = useCallback(() => setTeenPattiSettlementNotice(null), []);
+
+  const proposePokerSetup = useCallback((config: PokerTableConfig) => {
+    return new Promise<PokerSetupAck>((resolve) => {
+      if (actionsGatedRef.current) {
+        resolve({ ok: false, error: 'Reconnect before changing Poker table settings.' });
+        return;
+      }
+      socketRef.current.emit('poker:proposeSetup', { config }, (res) => {
+        if (!res.ok) setRoomError(res.error ?? 'Could not propose Poker settings.');
+        if (res.setup) setPokerSetup(res.setup);
+        resolve(res);
+      });
+    });
+  }, []);
+
+  const acceptPokerSetup = useCallback((revision: number) => {
+    return new Promise<PokerSetupAck>((resolve) => {
+      if (actionsGatedRef.current) {
+        resolve({ ok: false, error: 'Reconnect before accepting Poker table settings.' });
+        return;
+      }
+      socketRef.current.emit('poker:acceptSetup', { revision }, (res) => {
+        if (!res.ok) setRoomError(res.error ?? 'Could not accept Poker settings.');
+        if (res.setup) setPokerSetup(res.setup);
+        resolve(res);
+      });
+    });
+  }, []);
+
+  const choosePokerVariant = useCallback((variantId: PokerVariantId) => {
+    if (actionsGatedRef.current) return;
+    const expectedSeq = pokerStateRef.current?.sequence;
+    // Dealer Choice must obey the same stale-state boundary as betting. A
+    // delayed chooser screen from an older hand must never be able to deal
+    // into a newer AWAITING_VARIANT state.
+    if (expectedSeq === undefined) return;
+    socketRef.current.emit('poker:chooseVariant', { variantId, expectedSeq });
+  }, []);
+
+  const pokerAction = useCallback((action: PokerAction) => {
+    if (actionsGatedRef.current) return;
+    const expectedSeq = pokerStateRef.current?.sequence;
+    // A Poker action without a current authoritative sequence could bypass
+    // stale-action protection after a delayed/reconnected UI event. Do not
+    // put such an action on the wire at all.
+    if (expectedSeq === undefined) return;
+    socketRef.current.emit('poker:action', { action, expectedSeq });
+  }, []);
+
+  const topUpPoker = useCallback((amount: number) => {
+    if (actionsGatedRef.current) return;
+    const expectedSeq = pokerStateRef.current?.sequence;
+    // A between-hand top-up is additive, so a double tap must not be able to
+    // fund the stack twice before the first server update comes back.
+    if (expectedSeq === undefined) return;
+    socketRef.current.emit('poker:topUp', { amount, expectedSeq });
+  }, []);
+
+  const startNextPokerHand = useCallback(() => {
+    if (actionsGatedRef.current) return;
+    const expectedSeq = pokerStateRef.current?.sequence;
+    if (expectedSeq === undefined) return;
+    // Same stale-result protection as Teen Patti: the server will only deal
+    // from the exact completed-hand sequence this button was rendered for.
+    socketRef.current.emit('poker:startNextHand', { expectedSeq });
+  }, []);
+
+  const leavePokerTable = useCallback(() => {
+    if (actionsGatedRef.current) {
+      return Promise.resolve({ ok: false, error: 'Reconnect before leaving the table.' } as PokerLeaveAck);
+    }
+    return new Promise<PokerLeaveAck>((resolve) => {
+      socketRef.current.emit('poker:leaveTable', (res) => {
+        if (!res.ok) {
+          setGameError(res.error ?? 'Could not leave the Poker table.');
+          resolve(res);
+          return;
+        }
+        if (res.settlement) setPokerSettlementNotice(res.settlement);
+        voiceManagerRef.current?.leave(false);
+        voiceManagerRef.current = null;
+        rejoinVoiceAfterReconnectRef.current = false;
+        rejoinVoiceMutedRef.current = false;
+        setInVoiceCall(false);
+        setVoiceMuted(false);
+        setVoiceParticipants([]);
+        setSpeakingPlayerIds([]);
+        requestReturnToCardRoom();
+        clearSession();
+        setRoom(null);
+        setMyPlayerId(null);
+        setPokerSetup(null);
+        setPokerPrivate(null);
+        setPokerState(null);
+        pokerStateRef.current = null;
+        setLastPokerHandResult(null);
+        setPokerHandHistory([]);
+        pokerDealHandRef.current = null;
+        setViewMode('active');
+        resolve(res);
+      });
+    });
+  }, []);
+
+  const clearPokerSettlementNotice = useCallback(() => setPokerSettlementNotice(null), []);
 
   const leaveTable = useCallback(() => {
     // The room lifecycle event itself removes call membership server-side.
@@ -965,9 +1328,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setTeenPattiSetup(null);
     setTeenPattiPrivate(null);
     setTeenPattiState(null);
+    teenPattiStateRef.current = null;
     setLastTeenPattiRoundResult(null);
     setTeenPattiRoundHistory([]);
     teenPattiDealRoundRef.current = null;
+    setPokerSetup(null);
+    setPokerPrivate(null);
+    setPokerState(null);
+    pokerStateRef.current = null;
+    setLastPokerHandResult(null);
+    setPokerHandHistory([]);
+    pokerDealHandRef.current = null;
     setViewMode('active');
   }, []);
 
@@ -1012,11 +1383,27 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setTeenPattiSetup(null);
     setTeenPattiPrivate(null);
     setTeenPattiState(null);
+    teenPattiStateRef.current = null;
     setLastTeenPattiRoundResult(null);
     setTeenPattiRoundHistory([]);
     teenPattiDealRoundRef.current = null;
+    setPokerSetup(null);
+    setPokerPrivate(null);
+    setPokerState(null);
+    pokerStateRef.current = null;
+    setLastPokerHandResult(null);
+    setPokerHandHistory([]);
+    pokerDealHandRef.current = null;
     setViewMode('active');
   }, []);
+
+  // Public and private game packets are emitted separately. React may paint
+  // after the first packet, so expose private cards/legal actions only when
+  // their authoritative round/hand + sequence identity matches the public
+  // snapshot. This closes the one-frame stale-action/stale-hand window at
+  // new deals, betting updates, top-ups and reconnect restoration.
+  const coherentTeenPattiPrivate = coherentTeenPattiPrivateState(teenPattiState, teenPattiPrivate);
+  const coherentPokerPrivate = coherentPokerPrivateState(pokerState, pokerPrivate);
 
   const value: GameContextValue = {
     connectionStatus,
@@ -1038,11 +1425,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     kittiRoundHistory,
     kittiWinnerInfo,
     teenPattiSetup,
-    teenPattiPrivate,
+    teenPattiPrivate: coherentTeenPattiPrivate,
     teenPattiState,
     lastTeenPattiRoundResult,
     teenPattiRoundHistory,
     teenPattiSettlementNotice,
+    pokerSetup,
+    pokerPrivate: coherentPokerPrivate,
+    pokerState,
+    lastPokerHandResult,
+    pokerHandHistory,
+    pokerSettlementNotice,
     roomError,
     gameError,
     chatMessages,
@@ -1087,11 +1480,27 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     startNextKittiRound,
     proposeTeenPattiSetup,
     acceptTeenPattiSetup,
+    chooseTeenPattiRoundVariant,
+    chooseTeenPattiSurpriseRound,
+    assignTeenPattiTwoReference,
+    chooseTeenPattiDiscards,
+    requestTeenPattiFriendlyAssist,
+    respondTeenPattiFriendlyAssist,
+    revokeTeenPattiFriendlyAssist,
+    suggestTeenPattiFriendlyAssist,
     teenPattiAction,
     topUpTeenPatti,
     startNextTeenPattiRound,
     leaveTeenPattiTable,
     clearTeenPattiSettlementNotice,
+    proposePokerSetup,
+    acceptPokerSetup,
+    choosePokerVariant,
+    pokerAction,
+    topUpPoker,
+    startNextPokerHand,
+    leavePokerTable,
+    clearPokerSettlementNotice,
     leaveTable,
     sendChat,
     getStats,

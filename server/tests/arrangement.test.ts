@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { validatePlayerArrangement, suggestArrangement, greedyMaxFirstArrangement, suggestArrangementOptions } from '../src/games/hazari/arrangement.js';
 import { createDeck } from '../src/games/hazari/deck.js';
-import { classifyThreeCardHand } from '../src/games/hazari/hands.js';
+import { classifyThreeCardHand, compareThreeCardHands } from '../src/games/hazari/hands.js';
 import { classifyFourCardHand } from '../src/games/hazari/fourCardRanking.js';
 import { GAME_RULES } from '../src/games/hazari/rules.js';
 import type { Card } from '../src/games/hazari/types.js';
@@ -12,7 +12,7 @@ function c(rank: Card['rank'], suit: Card['suit']): Card {
 
 // Set1: Trail (strongest) | Set2: Pair | Set3: High Card (Q,9,4)
 // Set4: 4 cards, all distinct suits/no run, best 3-of-4 subset is High Card
-// (8,6,3 + kicker 2) which is deliberately weaker than Set3's (Q,9,4) so the
+// (8,6,3) which is deliberately weaker than Set3's (Q,9,4) so the
 // unified strongest->weakest ordering (Set4 must rank below Set3) holds.
 const fullHand: Card[] = [
   c('A', 'SPADES'), c('A', 'HEARTS'), c('A', 'DIAMONDS'), // set1 trail
@@ -31,6 +31,43 @@ describe('validatePlayerArrangement', () => {
     ];
     const result = validatePlayerArrangement(fullHand, sets);
     expect(result.valid).toBe(true);
+  });
+
+
+  it('allows Set 1 and Set 2 to be exactly equal', () => {
+    const sets: [Card[], Card[], Card[], Card[]] = [
+      [c('A', 'SPADES'), c('A', 'HEARTS'), c('K', 'CLUBS')],
+      [c('A', 'DIAMONDS'), c('A', 'CLUBS'), c('K', 'DIAMONDS')],
+      [c('Q', 'SPADES'), c('Q', 'HEARTS'), c('5', 'CLUBS')],
+      [c('J', 'SPADES'), c('9', 'HEARTS'), c('6', 'DIAMONDS'), c('2', 'CLUBS')],
+    ];
+    expect(validatePlayerArrangement(sets.flat(), sets).valid).toBe(true);
+  });
+
+  it('allows Set 2 and Set 3 to be exactly equal', () => {
+    const sets: [Card[], Card[], Card[], Card[]] = [
+      [c('A', 'SPADES'), c('A', 'HEARTS'), c('A', 'DIAMONDS')],
+      [c('K', 'SPADES'), c('K', 'HEARTS'), c('Q', 'CLUBS')],
+      [c('K', 'DIAMONDS'), c('K', 'CLUBS'), c('Q', 'DIAMONDS')],
+      [c('J', 'SPADES'), c('9', 'HEARTS'), c('6', 'DIAMONDS'), c('2', 'CLUBS')],
+    ];
+    expect(validatePlayerArrangement(sets.flat(), sets).valid).toBe(true);
+  });
+
+  it('allows Set 3 to equal Set 4 by Set 4 best-three strength', () => {
+    // Real-device regression: Set 3 is 2-3-4 Sequence; Set 4 contains the
+    // same 2-3-4 Sequence plus a King. The King is unused and must NOT make
+    // Set 4 stronger.
+    const sets: [Card[], Card[], Card[], Card[]] = [
+      [c('A', 'SPADES'), c('A', 'HEARTS'), c('A', 'DIAMONDS')],
+      [c('K', 'SPADES'), c('K', 'HEARTS'), c('K', 'CLUBS')],
+      [c('2', 'SPADES'), c('4', 'HEARTS'), c('3', 'CLUBS')],
+      [c('K', 'DIAMONDS'), c('4', 'DIAMONDS'), c('2', 'HEARTS'), c('3', 'SPADES')],
+    ];
+    const result = validatePlayerArrangement(sets.flat(), sets);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(compareThreeCardHands(classifyThreeCardHand(sets[2]), classifyFourCardHand(sets[3]))).toBe(0);
   });
 
   it('rejects when a later set is stronger than an earlier set', () => {

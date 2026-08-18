@@ -353,15 +353,21 @@ export function ArrangementTable({
                 </div>
 
                 <div className="tray__slots">
-                  {setCards.map((c) => (
+                  {setCards.map((c, cardIndex) => (
                     <button
                       key={c.id}
                       type="button"
                       className="tray__card"
+                      style={{ top: `${Math.abs(cardIndex - (setCards.length - 1) / 2) * 3}px` }}
                       onClick={() => handleCardTap(idx, c)}
                       aria-pressed={selected?.cardId === c.id}
                     >
-                      <PlayingCard card={c} size="sm" selected={selected?.cardId === c.id} />
+                      <PlayingCard
+                        card={c}
+                        size="sm"
+                        selected={selected?.cardId === c.id}
+                        tilt={(cardIndex - (setCards.length - 1) / 2) * 2.5}
+                      />
                     </button>
                   ))}
 
@@ -429,7 +435,10 @@ export function ArrangementTable({
                   key={c.id}
                   type="button"
                   className={`arr__fan-card${justDealt ? ' is-dealing' : ''}`}
-                  style={justDealt ? { animationDelay: `${i * 45}ms` } : undefined}
+                  style={{
+                    top: `${Math.abs(i - (displayedPool.length - 1) / 2) * 0.7}px`,
+                    ...(justDealt ? { animationDelay: `${i * 45}ms` } : {}),
+                  }}
                   onClick={() => handleCardTap('pool', c)}
                   aria-pressed={selected?.cardId === c.id}
                 >
@@ -437,7 +446,7 @@ export function ArrangementTable({
                     card={c}
                     size="sm"
                     selected={selected?.cardId === c.id}
-                    tilt={(i - (displayedPool.length - 1) / 2) * 0.16}
+                    tilt={(i - (displayedPool.length - 1) / 2) * 1.25}
                   />
                 </button>
               ))}

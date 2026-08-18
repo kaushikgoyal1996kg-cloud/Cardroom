@@ -8,19 +8,38 @@ conversation context resets and the repository must be the source of truth.
 ## What this project is
 
 A private card room for roughly ten friends and family. No real money
-anywhere, by design. Hazari and Kitti are the current playable games; Teen
-Patti is in development and Poker is a presentation-only Coming Soon title.
+anywhere, by design. Hazari and Kitti are the current live/playable games.
+Teen Patti and Poker have substantial hidden engine/session/socket/client
+implementations in the current WIP, but both remain deliberately gated as
+Coming Soon until the combined release suite and device QA are green.
 
 | Game | Status |
 |---|---|
 | **Hazari** | Playable core with premium shell, optional virtual board, bots and table-scoped voice. Release 1.5 still needs full suite/device QA. |
 | **Kitti** | Playable online with optional computer seats, bot-only arrangement suggestions, virtual board and reconnect. Release 1.5 still needs full suite/device QA. |
-| **Teen Patti** | Core rewrite/lobby groundwork in progress. **Coming Soon** in the first Android test release. |
-| **Poker** | Presentation-only **Coming Soon** card. Not a server `GameId`; no engine/spec exists. |
+| **Teen Patti** | Hidden combined-update implementation: 22 runtime-ready variants, Variant/Surprise tables, Mutual Show, retained 5-card discards, reconnect-safe history/stats and Friendly Assist. Still `networkPlayable: false`. |
+| **Poker** | Hidden Texas/PLO4/PLO5/PLO6/Short Deck engine + session/socket/client runtime, private setup, Dealer Choice/rotation, history/stats and reconnect/privacy hardening. Still `networkPlayable: false`. |
 
 **Production deployment is BLOCKED.** The old, previously-deployed Hazari app
 remains the working version for the family and is untouched and unaffected by
 any of this.
+
+### Current development WIP — 2026-08-18
+
+The active development line is **ahead of Release 1.5.1**. It includes the
+premium Card Room identity/doorway-table logo, physical Hazari/Kitti hand
+arrangements, radial table utilities, Hazari dismissal/equality corrections,
+authoritative live history across all games, the hidden Teen Patti/Poker
+runtimes above, and a whole-app reconnect/leave/privacy audit. Recent audit
+fixes include the client `main.tsx` startup wiring, stale Dealer Choice
+sequence protection, historical participant-name retention and Poker settle
+leave during reconnect rehydration.
+
+The complete normal npm/Vitest/Vite/Android gate has **not** been rerun on
+this WIP because this environment currently cannot resolve `registry.npmjs.org`
+(`EAI_AGAIN`). Dependency-light whole client/server source+test graph compiles
+and focused runtime harnesses are used as interim checks only; they do not
+replace the release gate.
 
 **Staging now exists**, deployed after this document was first written:
 
@@ -57,7 +76,7 @@ commands were actually green (see the 2026-08-16 Bug 5 correction entry). It
 
 ### Current Release 1.5.1 working-copy checkpoint — 2026-08-17
 
-The historical table above is **not** a verification of the current Release 1.5.1 working copy. The current environment cannot restore the project's complete npm dependency tree, so full Vitest/typecheck/Vite/Android builds have not been rerun here. Release 1.5 adds optional Hazari/Kitti virtual boards, backend-issued Metered TURN, Kitti computer seats with bot-only server-authoritative suggestions, mixed-game/voice isolation coverage, expanded avatar medallions and lobby lifecycle hardening on top of the Release 1.4 premium shell. The current 1.5.1 working copy also hardens both bot controllers at the shared scheduler boundary: one pending bot timer per table/session, deterministic human-like pacing, active-bot `Thinking…` feedback, and unique premium computer identities after remove/re-add; Hazari's card-choice/arrangement rules remain unchanged. Dependency-light Kitti solver/max-table harnesses have passed during this line; the newest source/import/CSS sweep is recorded in `SESSION_CHANGELOG.md`. Teen Patti remains server-gated `networkPlayable: false`; Poker remains client-only Coming Soon.
+The historical table above is **not** a verification of the current Release 1.5.1 working copy. The current environment cannot restore the project's complete npm dependency tree, so full Vitest/typecheck/Vite/Android builds have not been rerun here. Release 1.5 adds optional Hazari/Kitti virtual boards, backend-issued Metered TURN, Kitti computer seats with bot-only server-authoritative suggestions, mixed-game/voice isolation coverage, expanded avatar medallions and lobby lifecycle hardening on top of the Release 1.4 premium shell. The current 1.5.1 working copy also hardens both bot controllers at the shared scheduler boundary: one pending bot timer per table/session, deterministic human-like pacing, active-bot `Thinking…` feedback, and unique premium computer identities after remove/re-add; Hazari's card-choice/arrangement rules remain unchanged. Dependency-light Kitti solver/max-table harnesses have passed during this line; the newest source/import/CSS sweep is recorded in `SESSION_CHANGELOG.md`. Teen Patti and Poker both remain server-gated `networkPlayable: false`. Unlike the historical checkpoint, the current WIP contains real hidden server engines/session adapters/socket contracts and client routes for both; neither may be exposed until the complete release gate passes.
 
 **Verify these yourself. Do not trust them blindly.**
 

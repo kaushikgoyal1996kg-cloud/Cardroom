@@ -11,7 +11,7 @@ export function LoadingSpinner({ message, size = 56 }: Props) {
   return (
     <div className="loading-spinner" role="status" aria-live="polite">
       <div className="loading-spinner__seal" style={{ '--loader-size': `${size}px` } as React.CSSProperties} aria-hidden="true">
-        <span>CR</span>
+        <img src="/brand/card-room-emblem.png" alt="" />
       </div>
       {message && <p className="loading-spinner__message text-muted">{message}</p>}
     </div>

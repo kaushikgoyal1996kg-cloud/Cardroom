@@ -10,8 +10,8 @@ no real-money mechanics anywhere.
 
 - **Hazari** — 4 players, 13 cards · playable
 - **Kitti** — 2–5 players, 9 cards · playable core
-- **Teen Patti** — up to 9 players · Coming Soon in the first Android test track
-- **Poker** — presentation-only Coming Soon preview; no engine/spec yet
+- **Teen Patti** — up to 9 players · substantial hidden variant-table runtime, still Coming Soon
+- **Poker** — Texas / PLO4 / PLO5 / PLO6 / Short Deck hidden runtime, still Coming Soon
 
 ## Running it locally
 
@@ -58,8 +58,9 @@ server/src/
 │   └── cards/       shared deck and 3-card hand evaluation
 └── games/
     ├── hazari/      the original engine, unchanged
-    ├── kitti/       new
-    └── teenpatti/   new
+    ├── kitti/       playable
+    ├── teenpatti/   hidden combined-update runtime
+    └── poker/       hidden combined-update runtime
 
 client/src/
 ├── platform/
@@ -90,14 +91,19 @@ Kitti's rules are now fully agreed and its online playable core is implemented.
 `RULES_KITTI.md` is authoritative; do not re-open the old placeholder questions.
 Optional Kitti computer seats are implemented: the host can add/remove them before Start, bots play only from their own cards, and arrangement Suggest is available only when every opponent is a bot. The consensual room-session virtual board/pot is implemented for both Hazari and Kitti.
 
-Teen Patti's rules are also agreed, but the game remains **Coming Soon** for the
-first Android test release. Its core engine/session groundwork is under active
-development and the registry deliberately keeps it non-playable until the
-classic table, variants, reconnect and mobile QA are release-ready.
+Teen Patti remains **Coming Soon** in the live selector, but the current WIP is
+well beyond initial groundwork: the hidden server/session/socket/client path
+contains the locked betting model, 22 runtime-ready variants, Dealer Choice /
+Fixed Rotation / Surprise Me tables, Mutual Show, retained 5-card discards,
+Friendly Assist, reconnect-safe history/stats and authoritative privacy/state
+sequences. It stays `networkPlayable: false` until the combined release gate.
 
-Poker is presentation-only **Coming Soon** in the client catalogue. It is not a
-server `GameId` and must not be added to room/session logic until a real Poker
-spec exists.
+Poker is also a real server `GameId` in the current WIP, still deliberately
+**Coming Soon**. Hidden implementations cover Texas Hold'em, PLO4/PLO5/PLO6
+and Short Deck with private-table setup, engine/evaluator, session/socket
+contracts, Dealer Choice/rotation, betting/pots/showdown, leave settlement,
+reconnect/privacy and client table/history/stats surfaces. It likewise stays
+`networkPlayable: false` until full tests/builds/device QA pass.
 
 ### Current Release 1 test-track shell
 

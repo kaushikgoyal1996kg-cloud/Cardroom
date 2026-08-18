@@ -4,6 +4,7 @@ import {
   playAreaFor,
   dealDelay,
   dealingOrderFromDealer,
+  dealingOrderLeftOfDealer,
   type SeatPosition,
 } from '../table/seatLayout';
 import { Seat, type SeatPlayer } from './Seat';
@@ -41,8 +42,18 @@ export interface CardTableProps {
    *  Cards dealt here are ALWAYS face down - this component is never given
    *  card data, so it cannot reveal a hand. */
   dealCardsEach?: number;
+  /**
+   * Where the cosmetic deal begins. Hazari/Kitti/Teen Patti remain dealer
+   * first; Poker starts with the seat clockwise after the dealer/button.
+   */
+  dealStart?: 'DEALER' | 'LEFT_OF_DEALER';
+  /** Optional subset of seats that actually receive cards this deal. */
+  dealPlayerIds?: string[];
   /** Shown in the middle of the table when nothing is played yet. */
   centreLabel?: string;
+  /** Optional game-specific content inside the physical centre of the felt
+   *  (e.g. Poker community cards + pot). */
+  centreContent?: React.ReactNode;
   /**
    * True when centreLabel specifically announces the local player's own
    * turn (as opposed to a passive "Waiting for X" notice). Confirmed on
@@ -72,7 +83,10 @@ export const CardTable = memo(function CardTable({
   playedSets = [],
   dealing = false,
   dealCardsEach = 0,
+  dealStart = 'DEALER',
+  dealPlayerIds,
   centreLabel,
+  centreContent,
   centreLabelEmphasis = false,
   children,
 }: CardTableProps) {
@@ -83,12 +97,17 @@ export const CardTable = memo(function CardTable({
 
   const dealerSeat: SeatPosition | undefined = dealerId ? layout[dealerId] : undefined;
 
-  // Temporal dealing order: starts at the dealer and proceeds clockwise,
-  // matching the server. Seat POSITIONS are untouched by this.
-  const dealingOrder = useMemo(
-    () => dealingOrderFromDealer(players.map((p) => p.playerId), dealerId),
-    [players, dealerId]
-  );
+  // Temporal dealing order mirrors the authoritative game engine. Seat
+  // POSITIONS are untouched by this; only the cosmetic flight timing changes.
+  const dealingOrder = useMemo(() => {
+    const ids = players.map((p) => p.playerId);
+    const fullOrder = dealStart === 'LEFT_OF_DEALER'
+      ? dealingOrderLeftOfDealer(ids, dealerId)
+      : dealingOrderFromDealer(ids, dealerId);
+    if (!dealPlayerIds) return fullOrder;
+    const recipients = new Set(dealPlayerIds);
+    return fullOrder.filter((id) => recipients.has(id));
+  }, [players, dealerId, dealStart, dealPlayerIds]);
 
   return (
     <div className="table">
@@ -109,7 +128,8 @@ export const CardTable = memo(function CardTable({
               <span className="table__deck-card" />
             </div>
           )}
-          {!dealing && playedSets.length === 0 && centreLabel && (
+          {!dealing && centreContent}
+          {!dealing && !centreContent && playedSets.length === 0 && centreLabel && (
             <p
               className={`table__centre-label${centreLabelEmphasis ? ' is-emphasis' : ''}`}
             >
@@ -136,9 +156,9 @@ export const CardTable = memo(function CardTable({
                     top: `${target.y}%`,
                     '--deal-from-x': `${50 - target.x}%`,
                     '--deal-from-y': `${50 - target.y}%`,
-                    // Timing follows the DEALING order (dealer first,
-                    // then clockwise) - not the seat array order - so the
-                    // animation matches the order the server actually dealt.
+                    // Timing follows the authoritative DEALING order - not
+                    // the seat array order - so the animation matches the
+                    // game that actually dealt the cards.
                     '--deal-delay': `${dealDelay(cardIndex, dealIndex, dealingOrder.length, false)}ms`,
                     '--deal-tilt': `${((cardIndex * 13 + dealIndex * 7) % 9) - 4}deg`,
                   } as React.CSSProperties

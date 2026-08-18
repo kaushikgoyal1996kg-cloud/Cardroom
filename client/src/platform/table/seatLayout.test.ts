@@ -4,6 +4,8 @@ import {
   playAreaFor,
   dealDelay,
   totalDealDuration,
+  dealingOrderFromDealer,
+  dealingOrderLeftOfDealer,
   MIN_SEATS,
   MAX_SEATS,
 } from './seatLayout.js';
@@ -148,6 +150,26 @@ describe('playAreaFor', () => {
       const area = playAreaFor(seat);
       expect(Math.hypot(area.x - 50, area.y - 50)).toBeGreaterThan(0);
     }
+  });
+});
+
+
+describe('game-specific dealing order', () => {
+  const players = ['p1', 'p2', 'p3', 'p4'];
+
+  it('preserves locked dealer-first order for Hazari/Kitti/Teen Patti', () => {
+    expect(dealingOrderFromDealer(players, 'p3')).toEqual(['p3', 'p4', 'p1', 'p2']);
+  });
+
+  it('starts Poker left of the dealer/button', () => {
+    expect(dealingOrderLeftOfDealer(players, 'p1')).toEqual(['p2', 'p3', 'p4', 'p1']);
+    expect(dealingOrderLeftOfDealer(players, 'p3')).toEqual(['p4', 'p1', 'p2', 'p3']);
+    expect(dealingOrderLeftOfDealer(players, 'p4')).toEqual(['p1', 'p2', 'p3', 'p4']);
+  });
+
+  it('falls back safely when the Poker dealer is unavailable', () => {
+    expect(dealingOrderLeftOfDealer(players, null)).toEqual(players);
+    expect(dealingOrderLeftOfDealer(players, 'ghost')).toEqual(players);
   });
 });
 

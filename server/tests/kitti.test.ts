@@ -237,6 +237,10 @@ describe('Kitti round flow', () => {
     expect(game.state).toBe('ROUND_COMPLETE');
     expect(game.roundHistory[0].hands).toHaveLength(2);
     expect(game.roundHistory[0].winnerId).toBe('p1');
+    // Same reconnect-safe authority contract as Hazari: completed Kitti rounds
+    // travel in public state so Settings -> Round History works mid-match.
+    expect(game.getPublicState().roundHistory).toHaveLength(1);
+    expect(game.getPublicState().roundHistory[0]).toMatchObject({ roundNumber: 1, winnerId: 'p1' });
     expect(game.roundsWon.p1).toBe(1);
     expect(game.roundsWon.p2).toBe(0);
   });

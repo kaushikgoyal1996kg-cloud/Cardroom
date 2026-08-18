@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import type { Card, ChatMessage, DismissalReason, GameId, HaazariPublicStatePayload, KittiPublicStatePayload, KittiRoundResult, PlayerId, PublicRoomInfo, RoundResult, TableSummary, TeenPattiAction, TeenPattiLobbySetup, TeenPattiPlayerSettlement, TeenPattiPrivateStatePayload, TeenPattiPublicStatePayload, TeenPattiRoundOutcome, TeenPattiRoundVariantConfig, TeenPattiTableConfig } from '../game/types';
+import type { Card, ChatMessage, DismissalReason, GameId, HaazariPublicStatePayload, KittiPublicStatePayload, KittiRoundResult, PlayerId, PokerAction, PokerHandOutcomePayload, PokerLobbySetup, PokerPlayerSettlement, PokerPrivateStatePayload, PokerPublicStatePayload, PokerTableConfig, PokerVariantId, PublicRoomInfo, RoundResult, TableSummary, TeenPattiAction, TeenPattiFriendlySuggestion, TeenPattiLobbySetup, TeenPattiPlayerSettlement, TeenPattiPrivateStatePayload, TeenPattiPublicStatePayload, TeenPattiRoundOutcome, TeenPattiRoundVariantConfig, TeenPattiTableConfig, TeenPattiVariantTablePolicy } from '../game/types';
 
 export interface VoiceIceServersAck {
   ok: boolean;
@@ -49,12 +49,27 @@ interface ClientToServerEvents {
   'kitti:playHand': () => void;
   'kitti:playDecider': () => void;
   'kitti:startNextRound': () => void;
-  'teenpatti:proposeSetup': (payload: { tableConfig: TeenPattiTableConfig; roundVariant: TeenPattiRoundVariantConfig }, ack: (res: TeenPattiSetupAck) => void) => void;
+  'teenpatti:proposeSetup': (payload: { tableConfig: TeenPattiTableConfig; roundVariant: TeenPattiRoundVariantConfig; variantPolicy: TeenPattiVariantTablePolicy }, ack: (res: TeenPattiSetupAck) => void) => void;
   'teenpatti:acceptSetup': (payload: { revision: number }, ack: (res: TeenPattiSetupAck) => void) => void;
-  'teenpatti:action': (payload: { action: TeenPattiAction; expectedSeq?: number }) => void;
-  'teenpatti:topUp': (payload: { amount: number }) => void;
-  'teenpatti:startNextRound': () => void;
+  'teenpatti:chooseRoundVariant': (payload: { roundVariant: TeenPattiRoundVariantConfig; expectedSeq: number }) => void;
+  'teenpatti:chooseSurpriseRound': (payload: { expectedSeq: number }) => void;
+  'teenpatti:assignTwoReference': (payload: { upDownReferenceIndex: 0 | 1; expectedSeq: number }) => void;
+  'teenpatti:chooseDiscards': (payload: { discardedSlots: number[]; expectedSeq: number }) => void;
+  'teenpatti:friendlyAssistRequest': (payload: { targetPlayerId: PlayerId; expectedRoundNumber: number }) => void;
+  'teenpatti:friendlyAssistRespond': (payload: { requestId: string; accept: boolean }) => void;
+  'teenpatti:friendlyAssistRevoke': (payload: { requestId: string }) => void;
+  'teenpatti:friendlyAssistSuggest': (payload: { requestId: string; suggestion: TeenPattiFriendlySuggestion }) => void;
+  'teenpatti:action': (payload: { action: TeenPattiAction; expectedSeq: number }) => void;
+  'teenpatti:topUp': (payload: { amount: number; expectedSeq: number }) => void;
+  'teenpatti:startNextRound': (payload: { expectedSeq: number }) => void;
   'teenpatti:leaveTable': (ack: (res: TeenPattiLeaveAck) => void) => void;
+  'poker:proposeSetup': (payload: { config: PokerTableConfig }, ack: (res: PokerSetupAck) => void) => void;
+  'poker:acceptSetup': (payload: { revision: number }, ack: (res: PokerSetupAck) => void) => void;
+  'poker:chooseVariant': (payload: { variantId: PokerVariantId; expectedSeq: number }) => void;
+  'poker:action': (payload: { action: PokerAction; expectedSeq: number }) => void;
+  'poker:topUp': (payload: { amount: number; expectedSeq: number }) => void;
+  'poker:startNextHand': (payload: { expectedSeq: number }) => void;
+  'poker:leaveTable': (ack: (res: PokerLeaveAck) => void) => void;
 
   'voice:getIceServers': (ack: (res: VoiceIceServersAck) => void) => void;
   'voice:join': () => void;
@@ -108,6 +123,19 @@ export interface TeenPattiLeaveAck {
   tableEnded?: boolean;
 }
 
+export interface PokerSetupAck {
+  ok: boolean;
+  error?: string;
+  setup?: PokerLobbySetup;
+}
+
+export interface PokerLeaveAck {
+  ok: boolean;
+  error?: string;
+  settlement?: PokerPlayerSettlement;
+  tableEnded?: boolean;
+}
+
 interface ServerToClientEvents {
   'room:update': (room: PublicRoomInfo) => void;
   'room:error': (payload: { message: string }) => void;
@@ -129,6 +157,11 @@ interface ServerToClientEvents {
   'teenpatti:state': (publicState: TeenPattiPublicStatePayload) => void;
   'teenpatti:roundComplete': (payload: { result: TeenPattiRoundOutcome }) => void;
   'teenpatti:tableEnded': (payload: { reason: 'NOT_ENOUGH_PLAYERS'; settlements: TeenPattiPlayerSettlement[] }) => void;
+  'poker:setup': (payload: { setup: PokerLobbySetup | null }) => void;
+  'poker:private': (payload: PokerPrivateStatePayload) => void;
+  'poker:state': (publicState: PokerPublicStatePayload) => void;
+  'poker:handComplete': (payload: { result: PokerHandOutcomePayload }) => void;
+  'poker:tableEnded': (payload: { reason: 'NOT_ENOUGH_PLAYERS'; settlements: PokerPlayerSettlement[] }) => void;
 
   'voice:participants': (payload: { playerIds: PlayerId[] }) => void;
   'voice:peerJoined': (payload: { playerId: PlayerId }) => void;

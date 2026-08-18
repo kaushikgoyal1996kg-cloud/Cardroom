@@ -181,3 +181,16 @@ input {
   opacity: 0.6;
   margin-bottom: 6px;
 }
+
+/* Player-selected motion reduction complements the OS accessibility setting.
+   State changes (selected lift, winning frame, etc.) remain visible; only the
+   animated journey is collapsed. */
+html[data-card-motion='reduced'] *,
+html[data-card-motion='reduced'] *::before,
+html[data-card-motion='reduced'] *::after {
+  animation-duration: 1ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 1ms !important;
+  scroll-behavior: auto !important;
+}

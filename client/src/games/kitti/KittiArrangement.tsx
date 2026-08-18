@@ -136,15 +136,20 @@ export function KittiArrangement({
                   <span className="karr-tray__kind">{value ? labelFor(value) : `${group.length}/3 cards`}</span>
                 </div>
                 <div className="karr-tray__slots">
-                  {group.map((card) => (
+                  {group.map((card, cardIndex) => (
                     <button
                       key={card.id}
                       type="button"
                       className="karr-tray__card"
+                      style={{ top: `${Math.abs(cardIndex - (group.length - 1) / 2) * 3}px` }}
                       onClick={() => returnToHand(groupIndex, card.id)}
                       aria-label={`Move ${card.rank} back to your hand`}
                     >
-                      <PlayingCard card={card} size="sm" />
+                      <PlayingCard
+                        card={card}
+                        size="sm"
+                        tilt={(cardIndex - (group.length - 1) / 2) * 2.6}
+                      />
                     </button>
                   ))}
                   {Array.from({ length: 3 - group.length }, (_, i) => (
@@ -191,7 +196,11 @@ export function KittiArrangement({
                   size="md"
                   selected={selectedId === card.id}
                   onClick={() => setSelectedId((current) => current === card.id ? null : card.id)}
-                  tilt={(index - (remaining.length - 1) / 2) * 1.1}
+                  tilt={(index - (remaining.length - 1) / 2) * 1.55}
+                  style={{
+                    top: `${Math.abs(index - (remaining.length - 1) / 2) * 0.8}px`,
+                    zIndex: index + 1,
+                  }}
                 />
               ))}
             </div>

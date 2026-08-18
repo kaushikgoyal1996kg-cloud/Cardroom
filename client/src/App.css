@@ -251,3 +251,66 @@
   box-shadow: 0 6px 20px rgba(0,0,0,.28);
   letter-spacing: .02em;
 }
+
+/* ========================================================================== 
+   Premium reconnect pass — returning and permanently leaving are two explicit
+   physical choices. This prevents the old trap where an active seat could be
+   resumed but not deliberately released from the Card Room return screen.
+   ========================================================================== */
+.home-return__choices {
+  display: grid;
+  gap: .6rem;
+  margin-top: .15rem;
+}
+.home-return__choice {
+  width: 100%;
+  min-height: 4.35rem;
+  display: grid;
+  grid-template-columns: 2.45rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .75rem;
+  padding: .7rem .75rem;
+  border: 1px solid rgba(200,164,92,.18);
+  border-radius: 14px;
+  color: var(--ink-200);
+  background: linear-gradient(180deg, rgba(8,8,7,.42), rgba(9,7,6,.68));
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.home-return__choice:active { transform: translateY(1px); }
+.home-return__choice-mark {
+  width: 2.35rem;
+  height: 2.35rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(200,164,92,.28);
+  border-radius: 50%;
+  color: var(--brass-300);
+  background: rgba(200,164,92,.055);
+}
+.home-return__choice-mark svg { width: 1rem; height: 1rem; }
+.home-return__choice > span:nth-child(2) { min-width: 0; display: grid; gap: .14rem; }
+.home-return__choice strong { color: var(--ink-100); font: 550 .92rem/1.2 var(--font-body); }
+.home-return__choice small { color: var(--ink-500); font-size: .67rem; line-height: 1.25; }
+.home-return__choice em {
+  color: var(--brass-500);
+  font-size: .54rem;
+  font-style: normal;
+  font-weight: 650;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.home-return__choice--return {
+  border-color: rgba(220,192,134,.42);
+  background: linear-gradient(180deg, rgba(200,164,92,.1), rgba(14,28,22,.24));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.018);
+}
+.home-return__choice--leave { border-color: rgba(188,109,92,.2); }
+.home-return__choice--leave .home-return__choice-mark { border-color: rgba(188,109,92,.28); color: #d9a291; }
+.home-return__choice--leave em { color: #bd8d7d; }
+
+@media (max-width: 23rem) {
+  .home-return__choice { grid-template-columns: 2.2rem minmax(0, 1fr); }
+  .home-return__choice em { display: none; }
+}

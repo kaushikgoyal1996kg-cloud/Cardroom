@@ -10,10 +10,10 @@
 // can be changed in one place without touching engine/UI code.
 //
 // 1. "No sequence" dismissal (NO_SEQUENCE_DISMISSAL):
-//    Assumption used: a hand is ELIGIBLE to be dismissed if NONE of its four
-//    sets contains a Sequence, Pure Sequence, or Trail (i.e. every set is
-//    Pair/Color/High Card or worse) AND the 4-card set also has no run-based
-//    combination. See isNoSequenceHand() in hands.ts.
+//    Confirmed house rule: a hand is ELIGIBLE to be dismissed when the raw
+//    13-card deal contains no possible Sequence or Pure Sequence anywhere.
+//    A Trial/Trail is NOT a sequence and does NOT block dismissal. The check
+//    scans all 3-card subsets of the dealt hand. See handHasNoPossibleSequence().
 //
 // 2. "Six pairs" dismissal (SIX_PAIRS_DISMISSAL):
 //    Assumption used: a hand is ELIGIBLE to be dismissed if the raw 13-card
@@ -28,12 +28,11 @@
 //    choose to play the round normally instead. See dismissal.ts.
 //
 // 3. Four-card set ranking methodology (fourCardRanking.ts):
-//    Assumption used: a Teen-Patti-inspired extension -
-//      Four of a Kind > Straight Flush (4-run, one suit) > Flush (4 same
-//      suit) > Straight (4-run, mixed suits) > Three of a Kind + kicker >
-//      Two Pair > One Pair > High Card, with rank-based tiebreaks within
-//      category. Fully isolated in fourCardRanking.ts so the methodology
-//      can be swapped without touching anything else.
+//    Confirmed house rule: Set 4 is ranked by the BEST 3-card Teen Patti
+//    combination available from its four cards. The unused fourth card is
+//    ignored completely for strength and tiebreaks. Therefore a Set 4 whose
+//    best three exactly match Set 3 is equal to Set 3 and is valid in the
+//    strongest-to-weakest arrangement.
 //
 // 4. Starting player / leader for the very first sub-round of a round
 //    (STARTING_PLAYER_RULE):

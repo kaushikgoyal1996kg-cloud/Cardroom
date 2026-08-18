@@ -5,7 +5,9 @@
 import { HaazariGame } from '../../games/hazari/gameEngine.js';
 import { KittiGame } from '../../games/kitti/engine.js';
 import { TeenPattiGame } from '../../games/teenpatti/engine.js';
-import type { TeenPattiRoundVariantConfig, TeenPattiTableConfig } from '../../games/teenpatti/rules.js';
+import { PokerGame } from '../../games/poker/engine.js';
+import type { PokerTableConfig } from '../../games/poker/rules.js';
+import type { TeenPattiRoundVariantConfig, TeenPattiTableConfig, TeenPattiVariantTablePolicy } from '../../games/teenpatti/rules.js';
 import type { GameSession } from './session.js';
 import { getGame, type GameId } from './registry.js';
 
@@ -71,9 +73,10 @@ export class TeenPattiSession implements GameSession {
     roomCode: string,
     playersClockwise: string[],
     tableConfig: TeenPattiTableConfig,
-    roundVariant: TeenPattiRoundVariantConfig
+    roundVariant: TeenPattiRoundVariantConfig,
+    variantPolicy: TeenPattiVariantTablePolicy
   ) {
-    this.engine = new TeenPattiGame(roomCode, playersClockwise, { tableConfig, roundVariant });
+    this.engine = new TeenPattiGame(roomCode, playersClockwise, { tableConfig, roundVariant, variantPolicy });
   }
 
   get state(): string {
@@ -95,10 +98,40 @@ export class TeenPattiSession implements GameSession {
   }
 }
 
+export class PokerSession implements GameSession {
+  readonly gameId = 'POKER' as const;
+  readonly engine: PokerGame;
+
+  constructor(roomCode: string, playersClockwise: string[], tableConfig: PokerTableConfig) {
+    this.engine = new PokerGame(roomCode, playersClockwise, tableConfig);
+  }
+
+  get state(): string {
+    return this.engine.state;
+  }
+
+  // Poker is an open-ended private table; a hand ending does not end the room.
+  isComplete(): boolean {
+    return false;
+  }
+
+  getPublicState() {
+    return this.engine.getPublicState();
+  }
+
+  getPrivateState(playerId: string) {
+    return this.engine.getPrivateState(playerId);
+  }
+}
+
 export interface GameSessionOptions {
   teenPatti?: {
     tableConfig: TeenPattiTableConfig;
     roundVariant: TeenPattiRoundVariantConfig;
+    variantPolicy: TeenPattiVariantTablePolicy;
+  };
+  poker?: {
+    tableConfig: PokerTableConfig;
   };
 }
 
@@ -128,7 +161,12 @@ export function createGameSession(
     case 'TEEN_PATTI': {
       const setup = options.teenPatti;
       if (!setup) throw new GameNotAvailableError(gameId, `${def.name} needs an approved table setup.`);
-      return new TeenPattiSession(roomCode, playersClockwise, setup.tableConfig, setup.roundVariant);
+      return new TeenPattiSession(roomCode, playersClockwise, setup.tableConfig, setup.roundVariant, setup.variantPolicy);
+    }
+    case 'POKER': {
+      const setup = options.poker;
+      if (!setup) throw new GameNotAvailableError(gameId, `${def.name} needs an approved table setup.`);
+      return new PokerSession(roomCode, playersClockwise, setup.tableConfig);
     }
   }
 }
@@ -147,4 +185,9 @@ export function asKitti(session: GameSession | undefined): KittiGame | null {
 export function asTeenPatti(session: GameSession | undefined): TeenPattiGame | null {
   if (!session || session.gameId !== 'TEEN_PATTI') return null;
   return (session as TeenPattiSession).engine;
+}
+
+export function asPoker(session: GameSession | undefined): PokerGame | null {
+  if (!session || session.gameId !== 'POKER') return null;
+  return (session as PokerSession).engine;
 }

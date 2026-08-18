@@ -169,14 +169,12 @@
      no rail leave this at zero and the toggle sits in the corner. */
   --action-reserve: 0px;
 
-  /* Horizontal clearance a screen's top-right content (a title, a room
-     code, a status figure) needs to stay clear of the fixed settings gear
-     (`.settings-fab`, top-right on every screen while a room is active).
-     Same idea as --action-reserve, applied to the opposite corner: one
-     value derived from the fab's own size/gap, used by every screen's
-     header instead of each guessing a right-padding number. Confirmed
-     collisions this fixes: the settings gear over "HAAZARI ROOM" (Lobby,
-     portrait) and over "13 left" (Arrangement, portrait). */
+  /* Horizontal clearance a screen's top-right content (a title, room
+     code, status figure or dealer-choice rail) needs to stay clear of the
+     shared circular TableControls hub. Same idea as --action-reserve,
+     applied to the opposite corner: one value derived from the hub's own
+     size/gap, used by every screen instead of each guessing a right-padding
+     number. This also preserves the older fixes for Lobby and Arrangement. */
   --top-fab-reserve: calc(var(--fab-size) + var(--fab-gap) + var(--space-2));
 }
 

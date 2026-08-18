@@ -14,7 +14,7 @@
 //
 // Bump this with a release that changes the cached shell/branding below; it
 // gives the waiting worker a new identity and lets activation clean old caches.
-const CACHE_VERSION = 'cardroom-v2';
+const CACHE_VERSION = 'cardroom-v3';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 
 const SHELL_URLS = [
@@ -23,6 +23,7 @@ const SHELL_URLS = [
   '/manifest.webmanifest',
   '/icon-192.png',
   '/icon-512.png',
+  '/brand/card-room-emblem.png',
 ];
 
 self.addEventListener('install', (event) => {

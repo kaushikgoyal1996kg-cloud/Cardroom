@@ -147,15 +147,10 @@ export class HaazariGame {
    *
    * `proposedSets`, if given, lets a player claim NO_SEQUENCE dismissal
    * BEFORE formally confirming their arrangement (e.g. tapping "Dismiss
-   * Hand" straight from the arrangement screen) - eligibility is evaluated
-   * against this draft directly in the same call, rather than requiring a
-   * separate prior confirmArrangement() first. That two-step approach has
-   * a real race: if this player happens to be the last to confirm,
-   * confirming alone could move the whole table into play before the
-   * dismiss request arrives, making a legitimate dismissal fail. An
-   * already-CONFIRMED arrangement (if one exists) always takes priority
-   * over a freshly-proposed one, since it's the authoritative record once
-   * it exists.
+   * Hand" straight from the arrangement screen). NO_SEQUENCE eligibility is
+   * derived from the authoritative raw 13-card deal, so it does not depend on
+   * arrangement state. proposedSets remains accepted for protocol compatibility
+   * and is integrity-checked when supplied.
    */
   requestDismissal(
     playerId: PlayerId,
@@ -329,6 +324,16 @@ export class HaazariGame {
       dealerId: this.dealerId,
       roundNumber: this.roundNumber,
       cumulativeScores: { ...this.cumulativeScores },
+      roundHistory: this.roundHistory.map((round) => ({
+        ...round,
+        subRounds: round.subRounds.map((subRound) => ({
+          ...subRound,
+          playedSets: subRound.playedSets.map((play) => ({ ...play, cards: play.cards.map((card) => ({ ...card })) })),
+          tiedPlayerIds: [...subRound.tiedPlayerIds],
+        })),
+        pointsThisRound: { ...round.pointsThisRound },
+        cumulativeScores: { ...round.cumulativeScores },
+      })),
       currentSetIndex: this.currentSetIndex,
       currentLeader: this.currentLeader,
       currentPlayOrder,

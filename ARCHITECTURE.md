@@ -16,8 +16,9 @@ server/src/
 ├── games/
 │   ├── hazari/               engine, rules, deck, hands, arrangement,
 │   │                         dismissal, scoring, botController, assist rule
-│   ├── kitti/                rules, engine        (no controller)
-│   └── teenpatti/            rules, engine        (no controller)
+│   ├── kitti/                rules, arrangement, engine, bot controller
+│   ├── teenpatti/            rules, evaluation, variant/setup, engine
+│   └── poker/                rules, evaluator, setup, engine
 └── server.ts
 
 client/src/
@@ -30,6 +31,9 @@ client/src/
 │   └── lib/                  config, useVisualViewport
 ├── games/hazari/             HazariTable, ArrangementTable, DealingTable,
 │                             RoundSummary, WinnerScreen, arrangementAssist
+├── games/kitti/              arrangement, dealing, table, summary/winner
+├── games/teenpatti/          setup, variant choice, table, rules, summary
+├── games/poker/              setup/consensus, variant choice, runtime/table, rules
 ├── lib/                      GameStore, socket, sound, haptics, identity
 ├── components/               legacy screens still in use (Lobby, Chat, Voice,
 │                             modals) + unrouted rollback screens
@@ -101,8 +105,9 @@ exist and what each needs: min/max/required players, cards per player, and
 `networkPlayable`.
 
 A game with `networkPlayable: false` cannot have a room created for it —
-`createRoom` throws and the factory throws. That is why Kitti and Teen Patti
-appear on the Home screen but cannot be entered.
+`createRoom` throws and the factory throws. In the current WIP Hazari and Kitti
+are playable; Teen Patti and Poker are registered real game identities with
+hidden engines/routes but remain gated by this flag.
 
 A drift test asserts the registry still matches each engine's own rules module,
 so the two cannot silently diverge.
@@ -129,8 +134,11 @@ so the two cannot silently diverge.
 
 | Namespace | Purpose |
 |---|---|
-| `room:*` | create, join, quick match, reconnect, ready, start, leave, list tables, add bot, chat, voice signalling |
-| `hazari:*` | Hazari only — arrangement, play set, dismissal, suggestions, its state payload |
+| `room:*` | create, join, quick match, reconnect, ready, start, leave, list tables, bots, chat, voice signalling |
+| `hazari:*` | Hazari arrangement, play-set, dismissal, suggestions and state |
+| `kitti:*` | Kitti arrangement/play/next-round and state |
+| `teenpatti:*` | hidden setup, dealer/config choices, discards/reference assignment, Friendly Assist, betting/top-up/next-round/settle-leave and state |
+| `poker:*` | hidden setup, Dealer Choice, betting/top-up/next-hand/settle-leave and state |
 | `game:error` | shared per-game error channel |
 
 `gameId` travels through create, quick-match and list-tables. Quick match will

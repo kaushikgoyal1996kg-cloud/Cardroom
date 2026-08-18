@@ -91,11 +91,7 @@ export function compareHand(a: HandValue, b: HandValue): number {
 
 /** Best 3-of-4 Teen Patti sub-combo methodology for the 4-card set. */
 export function classifyFour(cards: Card[]): HandValue {
-  const candidates: HandValue[] = cards.map((excluded, i) => {
-    const subset = cards.filter((_, j) => j !== i);
-    const base = classifyThree(subset);
-    return { category: base.category, tiebreakRanks: [...base.tiebreakRanks, RANK_VALUE[excluded.rank]] };
-  });
+  const candidates: HandValue[] = cards.map((_, i) => classifyThree(cards.filter((_, j) => j !== i)));
   let best = candidates[0];
   for (const c of candidates.slice(1)) {
     if (compareHand(c, best) > 0) best = c;
@@ -123,20 +119,16 @@ export function hasSixPairs(hand: Card[]): boolean {
 
 /**
  * True if NO possible 3-card grouping anywhere among these cards could ever
- * form a Sequence, Pure Sequence, or Trail - checked directly on the RAW
- * dealt hand (all C(13,3) = 286 combinations), independent of how the
- * player has arranged (or not yet arranged) their cards. This is what
- * actually determines NO_SEQUENCE dismissal eligibility: if no 3-card
- * subset anywhere in the 13 cards can form one, no arrangement ever could
- * either (any 4-card run also contains a 3-card run within it, so 3-card
- * subsets alone cover every case).
+ * form a Sequence or Pure Sequence - checked directly on the RAW dealt hand
+ * (all C(13,3) = 286 combinations), independent of arrangement. A Trial/Trail
+ * is NOT a sequence and therefore does not block dismissal.
  */
 export function handHasNoPossibleSequence(hand: Card[]): boolean {
-  const strong = new Set([Category.SEQUENCE, Category.PURE_SEQUENCE, Category.TRAIL]);
+  const sequences = new Set([Category.SEQUENCE, Category.PURE_SEQUENCE]);
   for (let i = 0; i < hand.length; i++) {
     for (let j = i + 1; j < hand.length; j++) {
       for (let k = j + 1; k < hand.length; k++) {
-        if (strong.has(classifyThree([hand[i], hand[j], hand[k]]).category)) return false;
+        if (sequences.has(classifyThree([hand[i], hand[j], hand[k]]).category)) return false;
       }
     }
   }
@@ -148,8 +140,14 @@ export function isNoSequenceHand(sets: [Card[], Card[], Card[], Card[]]): boolea
   if (sets[0].length !== 3 || sets[1].length !== 3 || sets[2].length !== 3 || sets[3].length !== 4) {
     return false;
   }
-  const strong = new Set([Category.SEQUENCE, Category.PURE_SEQUENCE, Category.TRAIL]);
-  const anyThreeCardRunOrTrail = [sets[0], sets[1], sets[2]].some((s) => strong.has(classifyThree(s).category));
-  const fourHasRun = strong.has(classifyFour(sets[3]).category);
-  return !anyThreeCardRunOrTrail && !fourHasRun;
+  const sequences = new Set([Category.SEQUENCE, Category.PURE_SEQUENCE]);
+  const anyThreeCardRun = [sets[0], sets[1], sets[2]].some((s) => sequences.has(classifyThree(s).category));
+  // classifyFour returns the strongest subset, so enumerate all subsets here
+  // to avoid a Trial masking a weaker Sequence contained in the same 4 cards.
+  let fourHasRun = false;
+  for (let i = 0; i < sets[3].length; i++) {
+    const subset = sets[3].filter((_, index) => index !== i);
+    if (sequences.has(classifyThree(subset).category)) { fourHasRun = true; break; }
+  }
+  return !anyThreeCardRun && !fourHasRun;
 }

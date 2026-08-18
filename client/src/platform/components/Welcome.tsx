@@ -27,8 +27,8 @@ export function Welcome({ identity, onEnter, onContinueAs, onChangeProfile }: We
       <div className="welcome__door-frame" aria-hidden="true" />
 
       <div className="welcome__content">
-        <div className="welcome__seal" aria-hidden="true">
-          <span className="welcome__seal-mark">CR</span>
+        <div className="welcome__brand-emblem" aria-hidden="true">
+          <img src="/brand/card-room-emblem.png" alt="" draggable={false} />
         </div>
         <p className="welcome__eyebrow">Private tables. Classic games.</p>
         <h1 className="welcome__brand">

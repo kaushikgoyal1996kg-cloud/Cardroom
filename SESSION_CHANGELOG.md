@@ -1,4 +1,131 @@
+## 2026-08-18 — release audit continuation: Teen Patti/Poker lifecycle departure + reconnect
+
+- Added a focused hidden-game release-audit test for the lifecycle edges most likely to corrupt a private family table immediately before/after a deal.
+- **Teen Patti Dealer Choice:** if the upcoming dealer leaves/settles while the table is waiting for that dealer to choose a variant, authority transfers to a remaining player and the round can still start normally.
+- **Teen Patti Friendly Assist:** accepted consent is restored from authoritative private state after reconnect, remains invisible to unrelated players, and is cleared when the next round begins.
+- **Poker Dealer Choice:** if the chooser settles before selecting the hand variant, chooser authority transfers and the hand remains playable.
+- **Poker dealer settlement:** a dealer who leaves after a completed hand is purged exactly once and the button advances to the correct next seated player rather than skipping/duplicating rotation.
+- Direct release harness: **4/4 lifecycle scenarios pass**. Hidden-engine stress harness also completes **484 Teen Patti rounds + 250 Poker hands** without a failure on the current compiled audit tree.
+- The normal full package gate is still pending: this runtime has only a partial server dependency tree, so a repository-wide `tsc`/Vitest/Vite/Capacitor/Gradle pass cannot yet be claimed. Teen Patti and Poker therefore remain intentionally `networkPlayable: false`.
+
+## 2026-08-18 — K Little / Q Little / J Little split into direct options
+
+- Replaced the generic **Named Rank + Little** choice with three explicit Teen Patti variants: **K Little**, **Q Little**, and **J Little**.
+- The dealer/host now chooses the exact Little variant directly from the normal variant list. There is **no second K/Q/J rank-picker screen**.
+- The server treats the selected face rank as fixed by the variant ID, so K Little cannot become Q/J Little through a stale or forged round configuration.
+- Little semantics are unchanged: the fixed named rank is wild, and the player's lowest remaining non-matching rank is also wild; duplicated Little ranks are all wild.
+- The runtime-ready Teen Patti catalogue is now **22 variants** because the former single configurable mode is represented by three direct game options.
+
+## 2026-08-18 — release audit continuation: Named Rank + Little completion
+
+- **Named Rank + Little promoted to runtime-ready:** dealer chooses the named wild rank before boot/deal; the named rank is fully wild, and “Little” is the lowest remaining non-named rank in each player’s hand. If that little rank is duplicated, every card of that rank is wild. If all dealt cards are already the named rank, there is no additional little rank.
+- **Rule-edge correction during audit:** the first implementation selected the absolute lowest rank, which failed when the dealer-named rank itself was the lowest printed rank. The evaluator now excludes the named rank when determining Little, with focused regression cases for duplicated Little, named-rank-is-lowest and all-named-rank hands.
+- **Dealer configuration/UI:** Named Rank + Little participates in the authoritative pre-deal dealer configuration gate, validates the rank server-side, resets between rounds, and exposes a mobile/short-landscape-safe A–2 rank picker.
+- **Variant release set:** Teen Patti now has **20/20 approved runtime variants/modes implemented behind the release gate**. The registry remains `networkPlayable: false`; this implementation milestone does not bypass the full npm/Vitest/Vite/Capacitor/Gradle and real-device release gates.
+
+## 2026-08-18 — release audit continuation: private-state coherence + hidden-game mobile/result hardening
+
+- **Public/private snapshot coherence:** Teen Patti private snapshots now carry `roundNumber + sequence`; Poker private snapshots carry `handNumber + sequence`. The client exposes cards/legal actions only when those identifiers exactly match the current authoritative public snapshot. This closes the brief stale-hand/stale-action window possible between separately delivered Socket.IO public/private packets during betting, new deals, reconnect and top-up.
+- **Sequence-wide private refresh after top-up:** Teen Patti and Poker top-ups advance the table sequence, so the server now refreshes every seated player's private snapshot after the new public state rather than leaving other players' legal/private models tagged to the old sequence.
+- **Reconnect-safe setup controls:** Teen Patti/Poker lobby proposal and acceptance controls now fail locally while reconnect action-gating is active instead of buffering setup mutations through restoration.
+- **Teen Patti no-flash coherence UX:** the physical table remains mounted if the matching private packet is momentarily between updates; private-dependent controls are replaced by `Syncing your private hand…` until the coherent packet arrives.
+- **Android/PWA viewport hardening:** Teen Patti live table, dealer-variant choice and round-result shells now consume the shared `VisualViewport` height contract. Poker runtime now supplies its existing `--app-height` contract from `VisualViewport`, reducing short-landscape/browser-bar clipping risk.
+- **Poker result-layer cleanup:** on `HAND_COMPLETE`, the live local hole-card/action rail is retired while the felt remains visible, leaving a smaller result/bankroll reserve so between-hand furniture cannot stack over live-action chrome.
+- **Focused verification in this constrained runtime:** current hidden-game engines compile strictly; current max-seat runtime harness passes all 19 Teen Patti variants at 9 seats and Poker Texas/PLO4/PLO5/PLO6/Short Deck at their configured caps; private/public coherence harness passes; 207 TS/TSX/MTS/CTS source/test files parse with zero syntax diagnostics and 51 CSS files pass brace-structure scan.
+- **Normal release gate still pending:** `node_modules` are absent and npm registry access still does not complete in this runtime, so full Vitest/Vite/Capacitor/Gradle and real-device QA are not claimed. Teen Patti/Poker remain deliberately `networkPlayable: false` until those gates are green.
+
+## 2026-08-18 — release audit continuation: hidden-game max-seat/privacy + Poker top-up retry hardening
+
+- **Teen Patti max-seat/runtime sweep:** added release-audit coverage that drives every one of the 19 runtime-ready Teen Patti variants at the 9-seat release ceiling, including discard and Two-Reference gates, and asserts that live public state never contains any player's private card ids.
+- **Poker max-seat/runtime sweep:** added release-audit coverage for Texas Hold'em, PLO4, PLO5, PLO6 and Short Deck at each variant's configured maximum seat cap, verifying public state never carries hole cards during live play and fold-down outcomes/history do not reveal them.
+- **Direct dependency-light audit passed:** privacy/reconnect harness passed; all 19 Teen Patti variants completed at normal and 9-seat audit loads; Poker completed Texas/PLO4 at 9 seats, PLO5 at 8, PLO6 at 7 and Short Deck at 6.
+- **Poker top-up retry hardening:** removed a client-only `Adding…` sequence latch that could remain stuck forever if a top-up request was rejected without state advancement. Duplicate protection remains server-authoritative through `expectedSeq`, so rapid duplicate submissions still stale-reject safely without permanently disabling the bankroll control.
+- **Poker selector copy:** updated the hidden Poker card copy to reflect the actual release target: Texas, Omaha 4/5/6 and 6+ Short Deck in one private table.
+- **Normal release gate still blocked in this runtime:** `vitest` is not installed and `npm ping` to the registry times out, so the full npm/Vitest/Vite/Capacitor/Gradle gate is still not claimed. Teen Patti/Poker remain `networkPlayable: false` until that gate and device QA are green.
+
+## 2026-08-18 — release audit: result restoration, accurate Poker deal ceremony and screen hygiene
+
+- **Reconnect result restoration:** Hazari/Kitti round summaries and winner screens, Teen Patti round summaries and Poker hand results can now rebuild directly from authoritative public snapshots/history after reconnect. One-time completion events remain responsible for celebration effects/device stats, but are no longer required to avoid a Loading screen.
+- **Visible result exit path:** all four result surfaces expose a restrained Card Room path that keeps the seat connected first, then reuses the existing Resume / permanent Leave-or-Settle screen instead of duplicating destructive logic.
+- **Poker deal fidelity:** shared `CardTable` now supports a separate left-of-dealer cosmetic deal order. Hazari/Kitti/Teen Patti stay locked to dealer-first; Poker mirrors its authoritative engine by starting clockwise after the button and can skip sitting-out zero-stack seats without moving their physical seats. Hole cards/actions stay visually private/inactive until the ceremony completes.
+- **Five-card ceremony timing:** Teen Patti `AWAITING_DISCARD` now counts as a genuinely dealt state, so 5-card hands animate immediately after the deal rather than only after discard choices transition the round to betting. Two-Reference assignment retains the same post-deal treatment.
+- **Shared utility hygiene:** entering a dealing ceremony closes any open Chat/Voice panel and hides the radial hub for the brief deal, preventing a dealer-choice chat/settings surface from carrying over the physical deal animation. Teen Patti's in-round `How to play` button now routes through the same App-owned exclusive Rules surface instead of opening a second component-local modal.
+- **No duplicate hand cards during dealing:** Poker and Teen Patti reserve the final local-hand footprint with invisible layout slots during the ceremony; the only visible cards are the ones physically flying from the deck. The actual private/facedown hand appears only when the ceremony completes.
+- **Cross-room cleanup:** successful create/join/quick-match clears stale room/game errors and old Teen Patti/Poker settlement notices; room/view transitions clear shared modal surfaces.
+- **Toolchain gate rechecked:** client/server/App dependency-light graph compiles pass. npm registry access still times out in this runtime and Vitest is not installed, so the normal full npm/Vitest/Vite/Capacitor release gate remains pending and is not claimed.
+
+## 2026-08-18 — release-audit checkpoint: result-command sequences, reconnect leave and repository truth
+
+- Continued the whole-app audit without changing live Release 1.5.1 or exposing Teen Patti/Poker.
+- **Next-round/next-hand stale protection:** `teenpatti:startNextRound` and `poker:startNextHand` now require the exact authoritative `expectedSeq` from the completed result state. A delayed/double-tapped old result command is rejected before any new boot/blind/card mutation. The client no longer optimistically blanks Teen Patti's result before server advancement.
+- **Reconnect leave regression:** added client coverage proving a Poker room that is authoritatively `IN_GAME` uses Poker settle/release from the “Your seat is still connected” screen even while `pokerState` is temporarily null during rehydration.
+- **History identity regression:** added client coverage proving a departed Teen Patti/Poker participant name resolves from the public-safe room-lifetime directory instead of degrading to “Former player.”
+- **Repository truth:** refreshed `HANDOFF.md`, `README.md` and `ARCHITECTURE.md`; they no longer claim Poker has no server GameId/engine or describe the current Teen Patti work as early Classic-only groundwork.
+- **Broader compile surface:** complete client/server source+test graph compiles still pass with dependency stubs, and the previously-uncovered `vite.config.ts`, `capacitor.config.ts`, `avatars-tables-test.mts` and `full-flow-test.mts` also pass a strict stubbed compile.
+- Full npm/Vitest/Vite/Capacitor/Gradle/device verification remains mandatory and is not claimed in this environment.
+
+## 2026-08-18 — whole-app release audit: startup, shared chrome, Poker authority and history identity
+
+- Continued from the 19-variant + Friendly Assist working tree; live Release 1.5.1, Render/Netlify staging and the old Haazari deployment were not modified.
+- **Production-startup fix:** a stronger complete-client compile caught `main.tsx` calling imported `initializeTablePreferences` as `ReactDOM.initializeTablePreferences()` while calling an unimported `createRoot`. Corrected to import/use `createRoot` and call `initializeTablePreferences()` directly.
+- **Shared radial hub/lifecycle:** one utility surface at a time; hub hides on result/loading screens; dealer-choice screens reserve the hub footprint; room/view changes clear stale Rules/Stats/History/Chat/Settings/error surfaces; Back on Teen Patti/Poker dealer-choice uses the deliberate settle/leave confirmation. Friendly Assist and contextual Teen Patti errors use a derived safe region instead of overlapping the hand/action rail.
+- **Poker Dealer Choice stale protection:** `poker:chooseVariant` now carries `expectedSeq`; missing/old sequences are rejected before blinds/antes/hole cards are touched. A direct compiled harness confirms stale choice leaves state at `AWAITING_VARIANT`, pot 0 and no private cards.
+- **Reconnect leave hardening:** the active-seat return screen now treats a Poker room marked `IN_GAME` as authoritative even before detailed Poker state finishes rehydrating, so Leave always uses Poker settle/release rather than generic room exit.
+- **History identity:** room public state now includes a public-safe room-lifetime name/avatar directory. Teen Patti/Poker history can still name a dealer/winner/showdown participant after that live seat is permanently released. Tokens/cards/balances are never placed in this directory.
+- **Registry drift fix:** Teen Patti is now `cardsPerPlayer: 'VARIES'` at the shared server registry and the Coming Soon card says `2–5 cards by variant`; the Classic constant remains 3 but shared platform metadata no longer hard-codes Classic assumptions.
+- **Poker history drift fix:** completed Poker outcomes capture server-authored `variantName`; Hand History no longer re-translates historical IDs through the promotional client catalogue.
+- **Stronger compile audit:** complete client source+test graph and complete server source+test graph compile with lightweight external-library stubs; focused App/server/runtime configs also pass. This audit additionally repaired stale Poker test fixtures introduced by cumulative `handsWon` / reconnect-safe `handHistory` fields.
+- **Normal release gate still pending:** `npm ping` still fails with `getaddrinfo EAI_AGAIN registry.npmjs.org`, so no claim is made for full Vitest/Vite/Capacitor/Gradle verification.
+
+## 2026-08-18 — all-game history/stats audit + Assume the Third
+
+- Audited the Hazari/Kitti Round History bug class across hidden Teen Patti and Poker.
+- Teen Patti now publishes bounded reconnect-safe round history plus cumulative per-player `roundsWon`.
+- Poker now publishes bounded reconnect-safe hand history plus cumulative per-player `handsWon`; fold-down history never exposes private cards.
+- Shared Settings now exposes correct Teen Patti/Poker **Table Stats** and Poker **Hand History** rather than disabling or falling through to another game.
+- Client GameStore continuously rehydrates Teen Patti/Poker history from authoritative state, with event-only completion updates retained as immediate fallback.
+- Made `2 Cards · Assume the Third` runtime-ready behind Coming Soon and synchronized the server/client runtime-ready catalogue at 16 variants.
+- Focused strict server/client checks and direct history/privacy/counter harnesses pass. Normal npm dependency restoration remains blocked in this runtime by registry DNS `EAI_AGAIN`; no live deployment was changed.
+
+## 2026-08-18 — WIP continuation: Two-Reference Joker + live Round History rehydration
+
+- **Two-Reference Joker runtime:** two public board references are dealt; each player privately assigns one as the Up/Down reference and the other becomes Same-rank. Betting is gated until every remaining seated player has locked an assignment. Public state exposes only assignment completion, never another player's private role choice. Leaving during this gate keeps already committed boot in the hand and safely refreshes the remaining assignment gate.
+- **Hazari Round History fix:** completed rounds are now carried in authoritative Hazari public state and rehydrated continuously on the client, so history remains available during later live rounds, after Return to Table and after reconnect.
+- **Kitti Round History audited/fixed the same way:** Kitti public state now carries completed match rounds; the history sheet no longer depends on transient events received only by the current browser session.
+- **Settings transition hardening:** Rules, Stats and Round History now open through one parent-owned surface transition rather than child `close + open` chaining.
+- **Regression coverage:** Hazari/Kitti engine tests now assert completed rounds are present in public state; a client hydration regression verifies that an authoritative live-state snapshot replaces stale same-round browser history (including wrong IDs/zero scores), and direct runtime harnesses verify both games retain completed history after the next round is dealt.
+- No Hazari/Kitti rule changes. Full npm/Vitest/Vite/device release verification is still pending.
+
+## 2026-08-18 — WIP continuation: unanimous Mutual Show + host-approved Surprise Me
+
+- **Mutual Show generalized:** any active Teen Patti player may propose a free show even with 3+ players remaining. The requester auto-accepts, every other active player must accept, and betting is frozen on the exact current turn until the vote resolves. Any decline cancels the vote and resumes that unchanged turn. Unanimous acceptance reveals every active hand; exact best-hand ties split the virtual pot equally. The existing final-two free mutual show remains the same flow.
+- **Concurrent-vote safety:** intermediate Mutual Show acceptances keep the proposal sequence stable, so multiple phones accepting the same visible proposal do not invalidate one another through the global stale-action guard. Duplicate votes are rejected by player id; completion/decline advances authoritative state.
+- **Host-approved Surprise pool:** Surprise Me no longer forces the complete runtime catalogue. At lobby setup the host chooses at least two runtime-ready variants that the server is allowed to randomize.
+- **Dedicated Surprise Me Table:** server randomly chooses one complete approved variant before every hand. The result is server-owned and reconnect-safe.
+- **Dealer Choice Surprise Me:** a round dealer on a normal Dealer Choice Variant Table can choose Surprise Me instead of naming a variant. The dealer triggers randomness but cannot choose or reroll the server result. If the selected variant requires dealer parameters (for example Closest to N), the same pre-deal configuration gate is used before any boot/card deal.
+- **Hidden premium UI:** lobby now presents Single Variant / Variant Table / Surprise Me Table, the host-approved pool remains editable only in setup, Dealer Choice has a Surprise Me tile, the live table shows unanimous vote progress, and Surprise-selected hands are identified without changing the actual variant rules.
+
 # SESSION CHANGELOG
+
+## 2026-08-18 — 5-card retained-discard completion + Friendly Assist hardening
+
+- Promoted all three locked 5-card retained-discard families to runtime-ready behind the Teen Patti Coming Soon gate: discard low+high, two lowest, or two highest.
+- The round dealer chooses the compatible joker rule before boot/deal. All five physical cards stay with the player; only the active three are ranked. Card Room jokers remain fully wild in both rank and suit.
+- Equal-ranked discard boundaries are a **physical player choice** rather than an automatic suit tiebreak. Blind players choose only among eligible facedown positions; seeing the five cards remains optional and changes them to seen betting as normal.
+- Five-card sideshow and paid/mutual showdown reveal all five original cards and mark the two retained discards; discarded cards never contribute to ranking or break an exact tie. Added regression coverage using the `2♣ 2♠ 3♠ 4♠ 8♥` example without a joker modifier.
+- Added optional host-configured **Friendly Assist / Watch & Suggest**. After packing, a player may ask one active friend for consent to privately view that player's hand and send advisory Play/Pack/Sideshow/Show suggestions. One coached target per hand; access is revocable and never auto-acts.
+- Friendly Assist exposes 5-card discard marks and private Two-Reference role assignment only to the accepted coach. Accepting while blind changes the active target to seen betting status while allowing their own cards to remain visually closed until See.
+- Hardened Friendly Assist requests with the authoritative round number so a delayed request from a previous hand cannot create a fresh session after reconnect/network delay.
+- Hidden server/client Teen Patti runtime catalogue is now synchronized at **19** ready variants; Named Rank + Little remains intentionally gated.
+
+
+## 2026-08-18 — Hazari dismissal correction: Trial does not block no-sequence dismiss
+
+- Real-device play exposed a locked-rule regression: a 13-card deal with no possible Sequence/Pure Sequence but containing a Trial/Trail was not offered **Dismiss hand**.
+- Corrected both client and server dismissal eligibility: Trial/Trail is not a sequence and does not block `NO_SEQUENCE` dismissal.
+- `NO_SEQUENCE` is now derived authoritatively from the raw 13-card deal by scanning every 3-card subset for Sequence/Pure Sequence, so arrangement cannot create/hide eligibility and the dismiss option can appear immediately after the deal.
+- Server still re-verifies the raw dealt cards; dismissal remains optional and still voids the whole round for all four players with 0 points and normal dealer rotation.
+- Added regressions for Trial-with-no-sequence eligibility and for a real raw Sequence correctly blocking dismissal. No Hazari ranking/scoring/dealing rule changed.
 
 Append-only. **Add new entries at the top.** Never rewrite history — if an
 earlier entry was wrong, add a correction entry saying so.
@@ -7,6 +134,92 @@ Purpose: a fresh session can see what changed recently, what was decided and
 why, without any conversation context.
 
 ---
+
+## 2026-08-18 — WIP continuation: Closest to N dealer configuration + stale round-decision authority
+
+- **Closest to N runtime path:** enabled the locked numerical-target variant behind the Teen Patti release gate. Dealer chooses an exact 3-digit target (100–999) and explicitly declares whether the three dealt cards may be reordered; 2–9 keep face value, 10/J/Q/K = 0 and each Ace may be 0 or 1 whichever is advantageous. Equal numerical distance is an exact tie and falls through to the existing Teen Patti tie rule for that comparison context.
+- **Pre-deal configuration gate:** generalized `AWAITING_VARIANT` into an authoritative `CHOOSE_VARIANT` / `CONFIGURE_VARIANT` decision. A fixed table, fixed rotation or Surprise Me may select Closest to N first, but no boot is charged and no card is dealt until the actual round dealer commits target + reorder settings. Reconnect-safe public state identifies that pending decision.
+- **Surprise Me integration:** the server-owned random pool now contains 14 runtime-ready variants including Closest to N. If Surprise Me lands on a variant requiring dealer parameters, it pauses at the same configuration gate rather than silently inventing settings.
+- **Stale decision protection:** `teenpatti:chooseRoundVariant` now carries the exact authoritative `expectedSeq` at the client/server socket boundary. Missing/invalid sequences are rejected before engine dispatch; an old dealer choice/configuration is rejected by the engine without charging boot or dealing cards.
+- **Verification in constrained runtime:** strict dependency-light Teen Patti core TypeScript compile and direct runtime harnesses cover Revolving Joker manual/sideshow/leave replacement, Closest Ace 0/1 + reorder behavior + equal-distance tie, fixed Closest pre-deal configuration, and Surprise→Closest pending configuration. Full normal npm/Vitest/Vite production verification remains a release gate.
+- **Release safety:** Teen Patti/Poker remain `networkPlayable: false`; Hazari/Kitti rules, live Release 1.5.1 and the old Haazari deployment remain untouched.
+
+## 2026-08-18 — WIP continuation: locked Revolving Joker + server-authoritative Surprise Me
+
+- **Rule recovery completed:** the user reconfirmed the exact Card Room Revolving Joker rule. Three undealt board references begin the round. Whenever any player packs/folds, that player's complete three-card hand replaces the current references; all matching ranks become wild and the old joker ranks stop immediately. The same replacement occurs for an automatic sideshow pack and an in-hand leave treated as a pack.
+- **Runtime implementation:** added `REVOLVING_JOKER` to the shared server/client variant identities and runtime catalogue. The server deals three initial board references, broadcasts them publicly, replaces them atomically on pack, and the evaluator treats every current reference rank as wild.
+- **Surprise Me locked:** added `SURPRISE_ME` Variant Table rotation. It is a server-owned random whole-variant selector, not a joker rule. At the network validation boundary the pool must equal the complete runtime-ready Teen Patti catalogue, so a client cannot narrow the pool. Surprise Me deals immediately and never waits for dealer choice.
+- **Premium hidden setup UI:** added a third Variant Table mode control for Surprise Me; while selected, every runtime-ready variant is visibly included and cannot be cherry-picked. Revolving Joker appears as a ready joker variant and the live/rules surfaces label its three cards as the current jokers.
+- **Authority regression coverage:** added source tests plus a dependency-light runtime harness covering manual pack, leave-as-pack, sideshow pack, old-reference replacement, new-rank wild evaluation, full-pool enforcement and Surprise selection bounds/lifecycle.
+- **Release safety:** Teen Patti remains `networkPlayable: false`; Hazari/Kitti rule code and all live deployments remain untouched.
+
+## 2026-08-18 — WIP continuation: approved Card Room identity, hand-bay refinement and Teen Patti sequence gate
+
+- **Baseline before:** `cardroom-current-work-WIP-2026-08-18-poker-network-foundation.zip`. Live Release 1.5.1, GitHub, Render/Netlify and the old Haazari deployment were not modified.
+- **Approved brand identity:** replaced the bullseye-like primary seal with the user's approved third logo direction: an open private-room doorway, warm lamp and card table in dark green/black with antique gold. Added master/emblem/safe-icon assets; Welcome, Home, Player Profile, invitation arrival, offline page, loading mark, legacy shared motif and exit sheet use the new emblem. PWA launcher, Apple touch and native Android source icons are derived from the emblem so tiny icons do not rely on unreadable wordmark text.
+- **PWA cache:** bumped `sw.js` shell cache to `cardroom-v3`, cached `/brand/card-room-emblem.png`, and added a source regression assertion so a future branding edit cannot silently drop the offline emblem. Live/socket traffic bypass rules are unchanged.
+- **Card back identity:** removed the old concentric/eye-style legacy card-back motif and replaced it with restrained dark-green crosshatch, brass framing and a central spade. Shared secondary `CR` monograms may remain as decorative initials; they are not the primary logo.
+- **Hazari/Kitti arrangement architecture:** without changing any locked ranking/validation/deal rule, grouped cards now sit in shallow physical hand bays with a slight arc/fan and selected-card lift. The remaining hand uses stronger natural overlap/perspective. Short-landscape preserves card size and fits through spacing/overlap instead of shrinking the cards.
+- **Teen Patti stale-action authority:** `teenpatti:action` now requires `expectedSeq` at both client and server socket contracts. The client emits nothing without a current sequence; the server rejects missing/invalid or old sequence values before applying a bet/action. This closes the same delayed-double-tap/reconnect race already hardened in Poker.
+- **Documentation correction:** current state/roadmap now reflect that Teen Patti permanent settle-on-leave and many non-Classic runtime variants are already implemented behind the gate; older historical changelog claims remain append-only history. Revolving Joker and Surprise/Random are still specification-recovery items and were not guessed.
+- **Verification limitation:** source/CSS/import/static checks are rerun for this WIP below; full normal npm/Vitest/typecheck/Vite builds and real-device QA remain mandatory before deployment.
+- **Baseline status:** WIP only; Teen Patti/Poker remain `networkPlayable: false`.
+
+## 2026-08-18 — WIP continuation: authoritative Poker network/leave path and hidden premium runtime
+
+- **Baseline before:** `cardroom-current-work-WIP-2026-08-18-variant-table.zip`. Live Release 1.5.1, GitHub deployment branches, Render/Netlify and the old Haazari deployment were not modified.
+- **Poker remains hidden:** server registry now recognizes `POKER` as its own game identity/session family but deliberately keeps `networkPlayable: false`; the client high-level game route still excludes Poker and the Home catalog remains Coming Soon.
+- **Dealer Choice authority:** Variant Poker Table Dealer Choice now prepares the upcoming dealer and enters `AWAITING_VARIANT` before any blind, ante or private card exists. Only that dealer can choose from the host-approved pool; the choice and deal are server-authoritative/atomic. Fixed Rotation remains available.
+- **Stale action protection:** Poker public state carries an authoritative sequence number. Hidden client actions always send the exact current sequence; the socket contract now requires it and rejects missing/old sequences, preventing delayed double taps or reconnect-buffered Fold/Call/Raise actions from applying to a newer turn.
+- **Poker private-table setup:** server owns config validation, strictest selected-variant seat cap, revisioning and unanimous acceptance. New joins that make an already-proposed variant pool impossible invalidate that proposal. Hidden premium UI now supports Single Game / Variant Table, Dealer Choice / Fixed Rotation, stack/blinds/ante and player-by-player consent.
+- **Action clock safety:** the setup previously displayed 15–60 second clocks even though no authoritative timeout engine existed. Those controls are now disabled and the server rejects any non-zero action clock, so the product cannot silently accept a setting it does not enforce. A duplicated “Variant table” setup control was also removed.
+- **Poker leave/settlement:** leaving during a live hand is an authoritative fold; already committed chips stay in the pot, the public seat disappears, settlement/P&L is returned, the room seat/socket is permanently released, and remaining players continue. If the Dealer Choice dealer leaves before the deal, dealer/chooser authority transfers to the next funded seat without charging or exposing cards. Regression tests cover both cases.
+- **Hidden runtime UI:** added a server-state-to-shared-seat adapter plus `PokerRuntimeView` that renders `PokerVariantChoice` while awaiting Dealer Choice and otherwise drives the physical `PokerTable` only from authoritative public + self-private state. Fold/all-in/stack/turn status is never inferred from local action history. Hand-complete result chrome and host next-hand intent are isolated from the felt.
+- **Private consensus UI:** added `PokerLobbyConsensus` so the eventual lobby can present current server proposal revision, approved variants, stacks/blinds/ante/seat cap, and per-player acceptance without trusting local draft state.
+- **Type hardening:** normalized Poker fractional-bet preset typing and runtime identity mapping after a strict custom UI compile exposed readonly-union inference hazards that syntax-only checks would not catch.
+- **Verification in this runtime:** strict dependency-light server Poker/platform/network compiles pass; strict hidden client GameStore/socket compile passes; strict hidden Poker UI compile passes with temporary type stubs; direct Poker leave/Dealer-Choice authority harness passed. Current `client/src` + `server/src` parser scan reports zero syntax diagnostics; CSS brace scan reports zero structural failures; all relative import edges resolve after Vite `?raw` imports are normalized.
+- **Verification limitation:** full package Vitest suites, normal package typechecks and Vite production build are still pending because the complete npm dependency tree is unavailable here. Poker therefore remains unreachable/Coming Soon.
+
+## 2026-08-18 — WIP continuation: no-shrink Kitti landscape, hub-safe utility sheets, variant-aware Teen Patti help
+
+- **Model:** GPT-5.6 Sol.
+- **Baseline before:** `cardroom-current-work-WIP-2026-08-18.zip`, continuing on top of the prior radial-control / Poker-rule WIP. Deployed Release 1.5.1, `main`, Render/Netlify staging and the old Haazari deployment remain untouched.
+- **Kitti arrangement:** removed the short-landscape card-dimension override. Medium cards now keep the authoritative shared `PlayingCard` dimensions and fit the nine-card arrangement hand through controlled overlap/grid-track spacing instead of physically shrinking the cards. This protects readable ranks/suits and the requested held-hand feel.
+- **Kitti live landscape:** reduced the side-rail claim and restored more usable felt/table area in short landscape. Mini played groups remain intentionally secondary-size cards, now with a slight physical fan; gameplay and strict Hand 1 > Hand 2 > Hand 3 validation are unchanged.
+- **Shared table utilities:** Chat and Voice surfaces launched from the circular top-right table hub now use a dedicated top-edge utility-sheet position below the hub, instead of inheriting the legacy bottom-FAB/action-rail geometry. Standalone-launcher fallback positioning remains for non-table screens.
+- **Teen Patti variant groundwork:** public state now carries the server-authoritative variant name and deal count alongside exact configuration-aware `variantHelp`. The table header, dealing ceremony, hidden-card count, card fan centring and dealing status are data-driven rather than hard-coded to Classic/three cards. A reusable `TeenPattiRulesSheet` now powers both the in-table “How to play” control and Settings → Rules, so the explanation follows the actual server round configuration.
+- **Teen Patti rule-copy safety:** `describeTeenPattiRoundVariant()` includes dealer-provided configuration such as Closest-to-N target/reordering and Named Rank. Unsupported variants remain disabled rather than silently falling back to Classic. Previously discussed Revolving Joker and Surprise/Random remain specification-recovery items; their unrecovered mechanics were not guessed.
+- **Poker client groundwork:** retained the pot/half-pot target helper and adaptive premium action rail from the previous WIP; no unfinished Poker route was enabled. Server GameId/release reachability remains unchanged.
+- **Regression contracts:** source-level mobile tests now protect Kitti no-shrink short-landscape spacing, recovered live-table landscape width, 44px Teen Patti controls, and hub-launched Chat/Voice panel geometry.
+- **Verification here:** all 193 TS/TSX/MTS/CTS files parse with zero syntax diagnostics; all 45 CSS files have balanced braces; 613 relative import edges resolve; zero direct `--pcard-w/--pcard-h` overrides remain outside `PlayingCard.css`; zero active backdrop-blur declarations remain. Dependency-light strict compiles pass for Hazari arrangement, Teen Patti core and Poker core. Harnesses pass Hazari Set 3 = Set 4 best-three equality, Teen Patti configuration-aware variant help, Poker half-pot/pot/clamped bet sizing, Texas/PLO/Short-Deck basics, Short Deck flush-over-full-house, single short all-in no-reopen + automatic board runout, and cumulative short all-ins reopening at a full-raise threshold.
+- **Verification limitation:** the full client/server Vitest suites, package typechecks and Vite production build still cannot be run in this runtime because npm dependencies are not present and the registry is unavailable; an offline `npm ci` confirms the packages are not cached. Real-device portrait/landscape QA is also still required before deployment.
+- **Baseline status:** continued WIP only. **No Git push or deployment performed.**
+
+## 2026-08-18 — WIP follow-on: poker betting rights, automatic all-in runout, no-glass regression guard
+
+- **Baseline before:** the current 2026-08-18 WIP continuation above; deployed Release 1.5.1 and the old Haazari deployment remain untouched.
+- **Poker betting correctness:** added private per-player betting-right bookkeeping so an insufficient all-in raise increases the call amount without incorrectly reopening a re-raise for a player who already acted. Multiple short all-ins reopen the prior bettor only when their cumulative increase reaches a full raise; the last full raise size still determines the next legal minimum. Server-side `RAISE_TO` rejects a forged re-raise even if a client bypasses its disabled control.
+- **Poker all-in flow:** when all opponents are all-in and the only remaining actionable player has nothing left to call, the engine now runs the remaining community cards automatically instead of requiring meaningless CHECK taps on flop/turn/river.
+- **Poker regression coverage:** added tests for a single short all-in not reopening action, cumulative short all-ins reopening action, the legal minimum after reopening, and automatic board runout. A dependency-light compiled harness passes these scenarios in addition to Texas blinds/turn order and Short Deck forced bets/ranking.
+- **Premium material cleanup:** removed remaining active `backdrop-filter: blur(...)` usage from Hazari/Kitti reveal overlays, Teen Patti rules/top-up overlays, the shared Rules modal legacy declaration and legacy shared play surfaces. Opaque room/felt/wood overlays now provide separation without glassmorphism.
+- **UI regression contracts:** mobile-safety tests now explicitly protect the radial Chat/Voice/Settings/Exit structure, 44px shared touch minimum, and the no-backdrop-blur table-chrome rule.
+- **Hazari dependency-light regression:** compiled the authoritative arrangement/evaluator modules and confirmed that Set 3 equal to Set 4's best-three strength is valid and produces no arrangement errors.
+- **Verification limitation:** full package Vitest/typecheck/Vite production builds remain pending because this runtime still cannot restore the npm dependency tree. No deployment or Git push was performed.
+
+## 2026-08-18 — WIP continuation: radial table utilities, physical arrangement hands, Poker rule hardening
+
+- **Model:** GPT-5.6 Sol.
+- **Baseline before:** `cardroom-current-work-WIP-2026-08-18.zip`, itself based on deployed Release 1.5.1. Live Netlify/Render staging and the old Haazari deployment were not modified.
+- **Shared table controls:** replaced the rectangular secondary-control rail with the requested compact **circular/radial utility wheel**. Chat, Voice, Settings and Exit/Card Room fan out from one top-right launcher; unread-chat and mute/live voice status remain visible; Escape and outside-tap close the wheel. The existing deliberate Step away vs permanent Leave sheet is preserved. Utility scrims/sheets no longer use backdrop-filter glass styling.
+- **Hazari/Kitti arrangement presentation:** kept all locked rules and arrangement validation unchanged, but made grouped cards read as small physical hands: shallow fan rotation/arc, centred trays, stronger natural fan in the unplaced hand, and 44px minimum Hazari tray targets. No gameplay assistance was added and the existing human-opponent fairness gate remains untouched.
+- **Hazari rule-copy correction:** preserved the incoming WIP's authoritative Set 4 rule: strength is its best three-of-four and the unused fourth card never breaks an exact tie. A stale player-guide bullet that still said only “dedicated four-card ranking” was made explicit. Older changelog entries claiming Set 4 was *not* best-three-of-four are historical and superseded by the later locked rule/fix; they remain in the append-only log rather than being rewritten.
+- **Poker UI:** repainted the new poker action/hand rail from translucent glass into opaque wood/felt/brass table materials, removed references to nonexistent `--wood-950` / `--felt-950` tokens, retained adaptive Hold'em/Omaha hole-card fanning, and kept all action targets at the shared touch minimum.
+- **Poker rules:** corrected the Short Deck groundwork to the documented 6+ button-blind structure: every funded player posts the ante, the dealer/button alone posts the live button blind, and pre-flop action starts left of the button. The configured `bigBlind` amount is used as the Short Deck button blind; `smallBlind` is unused in that variant. Added a regression test for the forced-bet/action order.
+- **Teen Patti continuity:** `RULES_TEEN_PATTI.md` now explicitly retains the previously discussed **Revolving Joker** and **Surprise / Random Variant** as specification-recovery items. They are intentionally not exposed at runtime until the exact final mechanics are recovered/reconfirmed; the code must not invent them or drop them.
+- **Player-facing variant preview:** removed developer-facing “Engine ready / Building” badges from the Coming Soon variant gallery, upgraded its tab targets to 44px and kept the preview as a polished rules/format showcase rather than exposing implementation status. Short Deck preview copy now states the ante + button-blind structure.
+- **Touch-target audit:** repaired remaining actionable 30–38px overrides in Hazari/Kitti short-landscape arrangement controls, Rules close, Chat send/mic, legacy browser-row actions and Teen Patti setup inputs. Non-interactive 38px voice participant rows were intentionally left unchanged.
+- **Verification in this environment:** 190 TS/TSX/MTS/CTS files parse with zero syntax diagnostics; 45 CSS files have balanced brace structure. A dependency-light compiled Poker harness passes Texas blinds/turn order, PLO pot-limit maximum raise, Short Deck ante + button blind + first actor, and Short Deck flush-over-full-house ranking. Full Vitest/typecheck/Vite production builds remain pending because the npm dependency tree cannot be restored from the registry in this runtime.
+- **Baseline status:** WIP continuation only; **not deployment-ready** until complete server/client suites and production builds run clean plus real-device portrait/landscape QA.
 
 ## Entry format
 
@@ -1263,3 +1476,32 @@ reintroducing the bug and confirming failure.
 - Corrected a stale comment in `hazari/arrangement.ts`: Set 4 uses Hazari's dedicated four-card classifier, not a best-3-of-4 rule. No executable arrangement logic changed in that edit.
 - Dependency-light audit: 1,000 random Hazari 13-card hands all produced valid suggestions; 0 invalid arrangements. With a score of 900, all 1,000 samples used the intended concentrated endgame strategy. A 250-hand timing sample measured ~20ms average suggestion time (p95 ~33ms) in this environment, comfortably below the visible bot pacing delay.
 - Full Vitest/Vite/Android verification is still pending because the current environment does not contain the complete npm dependency tree.
+
+## 2026-08-18 — continued WIP: Teen Patti Variant Table authority
+
+- Continued from `cardroom-current-work-WIP-2026-08-18-continued.zip`; deployed
+  Release 1.5.1 and the old live Haazari deployment were not touched.
+- Added server-validated Teen Patti table policy (fixed or Variant Table).
+- Added reconnect-safe `AWAITING_VARIANT` round state for Dealer Choice tables.
+- Host approves the allowed runtime-ready pool; the actual round dealer is the only
+  player who can select from it. No boot/card deal occurs before that selection.
+- Added fixed rotation support against the same approved pool.
+- Added client lobby mode/pool/rotation controls plus a dedicated dealer-choice
+  waiting/selection screen with safe-area and short-landscape layout.
+- Fixed Teen Patti deal-animation bookkeeping so merely entering
+  `AWAITING_VARIANT` cannot consume the next round's deal animation marker.
+- Added lifecycle regression tests for early-boot prevention, non-dealer rejection,
+  next-winner dealer authority and fixed rotation.
+- Verification in this runtime: 192 TS/TSX/MTS/CTS files parse with zero syntax
+  diagnostics; 46 CSS files have balanced brace structure; strict dependency-light
+  Teen Patti server TypeScript compile passes; direct dealer-choice and lobby-policy
+  runtime harnesses pass. Full npm client install timed out, so complete Vitest/Vite
+  verification remains pending before any push/deploy.
+## 2026-08-18 — Named Rank + Little restricted to K/Q/J
+
+- Locked the Teen Patti **Named Rank + Little** house rule to the user-approved named ranks **K, Q or J only**.
+- Dealer configuration now shows only K, Q and J; Ace, 10–2 and all other choices are unavailable.
+- Server validation independently rejects any non-K/Q/J named rank, so a forged/stale client cannot bypass the rule.
+- Updated variant help/catalog copy and regression expectations to match the authoritative K/Q/J-only rule.
+- No ranking semantics changed: Little remains the player's lowest remaining non-named rank, and duplicated Little ranks are all wild.
+

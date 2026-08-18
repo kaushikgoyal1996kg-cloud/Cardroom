@@ -2,16 +2,18 @@ import { useState } from 'react';
 import { useGame } from '../../lib/GameStore';
 import { PlayingCard } from '../../platform/components/PlayingCard';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { useVisualViewport } from '../../platform/lib/useVisualViewport';
 import './TeenPattiResult.css';
 
 const REASON_LABEL = {
   LAST_STANDING: 'Last player standing',
   PAID_SHOWDOWN: 'Showdown',
-  MUTUAL_OPEN_SHOW: 'Mutual open show',
+  MUTUAL_OPEN_SHOW: 'Mutual Show',
 } as const;
 
 export function TeenPattiRoundSummary() {
-  const { room, myPlayerId, teenPattiState, lastTeenPattiRoundResult, startNextTeenPattiRound, topUpTeenPatti, gameError, clearGameError } = useGame();
+  const { room, myPlayerId, teenPattiState, lastTeenPattiRoundResult, startNextTeenPattiRound, topUpTeenPatti, gameError, clearGameError, goToHomeScreen } = useGame();
+  const { viewportHeight } = useVisualViewport();
   const [topUpAmount, setTopUpAmount] = useState('');
   if (!room || !teenPattiState || !lastTeenPattiRoundResult) {
     return <div className="waiting-screen"><LoadingSpinner message="Preparing Teen Patti result…" /></div>;
@@ -19,7 +21,9 @@ export function TeenPattiRoundSummary() {
 
   const result = lastTeenPattiRoundResult;
   const isHost = room.players.find((player) => player.playerId === myPlayerId)?.isHost ?? false;
-  const nameOf = (id: string) => room.players.find((player) => player.playerId === id)?.name ?? 'Player';
+  const nameOf = (id: string) => room.players.find((player) => player.playerId === id)?.name
+    ?? room.playerDirectory?.[id]?.name
+    ?? 'Player';
   const me = teenPattiState.players.find((player) => player.playerId === myPlayerId);
   const underfunded = teenPattiState.players.filter((player) => player.chips < teenPattiState.tableConfig.bootAmount);
   const winnerText = result.winnerIds.length > 1
@@ -27,7 +31,7 @@ export function TeenPattiRoundSummary() {
     : `${nameOf(result.winnerIds[0])} wins`;
 
   return (
-    <main className="tp-result">
+    <main className="tp-result" style={viewportHeight ? ({ '--js-vh': `${viewportHeight}px` } as React.CSSProperties) : undefined}>
       <section className="tp-result__hero">
         <p className="tp-result__eyebrow">Round {result.roundNumber} · {REASON_LABEL[result.reason]}</p>
         <h1>{winnerText}</h1>
@@ -103,6 +107,7 @@ export function TeenPattiRoundSummary() {
         ) : (
           <p>Waiting for the host to deal the next round…</p>
         )}
+        <button className="btn btn-ghost" type="button" onClick={goToHomeScreen}>Card Room</button>
         <small>Next dealer: {result.winnerIds.length === 1 ? nameOf(result.winnerIds[0]) : nameOf(teenPattiState.dealerId)}</small>
       </footer>
 

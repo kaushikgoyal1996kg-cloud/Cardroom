@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   build:
-    name: Verify and build Hazari + Kitti APK
+    name: Verify and build four-game APK
     runs-on: ubuntu-latest
     timeout-minutes: 35
 
@@ -59,14 +59,14 @@ jobs:
         run: npm run android:debug
 
       - name: Create checksum
-        run: sha256sum client/android/app/build/outputs/apk/debug/app-debug.apk > cardroom-hazari-kitti-debug.apk.sha256
+        run: sha256sum client/android/app/build/outputs/apk/debug/app-debug.apk > cardroom-four-games-debug.apk.sha256
 
       - name: Upload APK
         uses: actions/upload-artifact@v7
         with:
-          name: cardroom-hazari-kitti-debug-apk
+          name: cardroom-four-games-debug-apk
           path: |
             client/android/app/build/outputs/apk/debug/app-debug.apk
-            cardroom-hazari-kitti-debug.apk.sha256
+            cardroom-four-games-debug.apk.sha256
           if-no-files-found: error
           retention-days: 14

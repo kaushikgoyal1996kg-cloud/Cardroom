@@ -61,10 +61,13 @@ describe('Teen Patti authoritative rules', () => {
     })).toThrow(/first boot/i);
   });
 
-  it('refuses an unimplemented variant instead of silently playing Classic', () => {
-    expect(TEEN_PATTI_VARIANTS.MUFLIS.runtimeImplemented).toBe(false);
-    expect(() => new TeenPattiGame('T', ids(3), { roundVariant: { variantId: 'MUFLIS' } }))
-      .toThrow(/not runtime-implemented/i);
+  it('keeps K Little, Q Little and J Little as separate runtime-enabled variants', () => {
+    expect(TEEN_PATTI_VARIANTS.K_LITTLE.runtimeImplemented).toBe(true);
+    expect(TEEN_PATTI_VARIANTS.Q_LITTLE.runtimeImplemented).toBe(true);
+    expect(TEEN_PATTI_VARIANTS.J_LITTLE.runtimeImplemented).toBe(true);
+    expect(() => new TeenPattiGame('T', ids(3), { roundVariant: { variantId: 'K_LITTLE' } })).not.toThrow();
+    expect(() => new TeenPattiGame('T', ids(3), { roundVariant: { variantId: 'Q_LITTLE' } })).not.toThrow();
+    expect(() => new TeenPattiGame('T', ids(3), { roundVariant: { variantId: 'J_LITTLE' } })).not.toThrow();
   });
 });
 
@@ -111,6 +114,16 @@ describe('Teen Patti privacy and betting', () => {
     for (const id of ids(4)) {
       for (const card of game.getPlayerHand(id)) expect(publicJson).not.toContain(card.id);
     }
+  });
+
+
+  it('publishes the active variant identity and deal count without exposing private cards', () => {
+    const game = new TeenPattiGame('T', ids(3), { initialDealerId: 'p1', tableConfig: config });
+    game.dealNewRound(createDeck());
+    const state = game.getPublicState();
+    expect(state.variantName).toBe('Classic');
+    expect(state.variantDealCount).toBe(3);
+    expect(state.variantHelp).toMatch(/Three cards each/);
   });
 
   it('keeps own cards hidden until explicit See', () => {
@@ -198,6 +211,56 @@ describe('Teen Patti compulsory sideshow', () => {
     for (const id of ids(3)) game.getPlayer(id)!.seen = true;
     expect(game.act('p2', { type: 'SIDESHOW' }).ok).toBe(true);
     expect(game.lastSideshow).toMatchObject({ packedPlayerId: 'p2', tied: true });
+  });
+});
+
+describe('Teen Patti Mutual Show', () => {
+  it('allows any active player to propose a unanimous show with three or more players', () => {
+    const order = ['p2', 'p3', 'p1'];
+    const deck = deckForHands(order, {
+      p2: [c('K', 'SPADES'), c('K', 'HEARTS'), c('5', 'CLUBS')],
+      p3: [c('K', 'CLUBS'), c('K', 'DIAMONDS'), c('5', 'HEARTS')],
+      p1: [c('Q', 'SPADES'), c('Q', 'HEARTS'), c('A', 'CLUBS')],
+    });
+    const game = new TeenPattiGame('T', ids(3), { initialDealerId: 'p1', tableConfig: config });
+    game.dealNewRound(deck);
+
+    // p3 is not the current betting player, but Mutual Show is table-wide.
+    expect(game.currentTurn).toBe('p2');
+    expect(game.act('p3', { type: 'REQUEST_OPEN_SHOW' }).ok).toBe(true);
+    const voteSeq = game.getPublicState().sequence;
+    expect(game.getPublicState().openShowAcceptedBy).toEqual(['p3']);
+
+    // Intermediate accepts intentionally keep the same proposal sequence so
+    // two clients accepting the same visible proposal do not race each other.
+    expect(game.act('p2', { type: 'ACCEPT_OPEN_SHOW' }, voteSeq).ok).toBe(true);
+    expect(game.getPublicState().sequence).toBe(voteSeq);
+    expect(game.act('p1', { type: 'ACCEPT_OPEN_SHOW' }, voteSeq).ok).toBe(true);
+
+    expect(game.state).toBe('ROUND_COMPLETE');
+    expect(game.lastOutcome?.reason).toBe('MUTUAL_OPEN_SHOW');
+    expect(game.lastOutcome?.split).toBe(true);
+    expect(game.lastOutcome?.winnerIds.sort()).toEqual(['p2', 'p3']);
+    expect(game.lastOutcome?.showdown).toHaveLength(3);
+    expect(game.getPlayer('p2')!.chips).toBe(1005);
+    expect(game.getPlayer('p3')!.chips).toBe(1005);
+    expect(game.getPlayer('p1')!.chips).toBe(990);
+  });
+
+  it('cancels the vote on any decline and resumes the exact betting turn', () => {
+    const game = new TeenPattiGame('T', ids(3), { initialDealerId: 'p1', tableConfig: config });
+    game.dealNewRound(createDeck());
+    expect(game.currentTurn).toBe('p2');
+
+    expect(game.act('p3', { type: 'REQUEST_OPEN_SHOW' }).ok).toBe(true);
+    const voteSeq = game.getPublicState().sequence;
+    expect(game.act('p1', { type: 'DECLINE_OPEN_SHOW' }, voteSeq).ok).toBe(true);
+    expect(game.getPublicState().openShowRequestFrom).toBeNull();
+    expect(game.currentTurn).toBe('p2');
+
+    const resumedSeq = game.getPublicState().sequence;
+    expect(game.act('p2', { type: 'BLIND' }, resumedSeq).ok).toBe(true);
+    expect(game.currentTurn).toBe('p3');
   });
 });
 
@@ -294,7 +357,9 @@ describe('Teen Patti rounds, top-ups and P&L', () => {
   it('supports unlimited positive top-ups without changing P&L at funding time', () => {
     const game = new TeenPattiGame('T', ids(2), { initialDealerId: 'p1', tableConfig: config });
     expect(game.getSettlement('p2')!.profitLoss).toBe(0);
+    const seqBeforeTopUp = game.sequence;
     expect(game.topUp('p2', 500_000).ok).toBe(true);
+    expect(game.sequence).toBe(seqBeforeTopUp + 1);
     expect(game.getPlayer('p2')!.chips).toBe(501_000);
     expect(game.getSettlement('p2')).toMatchObject({
       totalFunding: 501_000,

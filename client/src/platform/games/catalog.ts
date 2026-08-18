@@ -10,7 +10,7 @@
 
 import type { GameId } from '../../game/types';
 
-export type CatalogGameId = GameId | 'POKER';
+export type CatalogGameId = GameId;
 
 export interface GameCatalogEntry {
   id: CatalogGameId;
@@ -56,8 +56,8 @@ export const GAME_CATALOG: GameCatalogEntry[] = [
     players: 'Up to 9 players',
     minPlayers: 2,
     maxPlayers: 9,
-    cards: '3 cards',
-    blurb: 'Three cards each. Play blind, play seen, or fold and wait.',
+    cards: '2–5 cards by variant',
+    blurb: 'Classic three-card play plus dealer-built and server-surprise variants for a private table.',
     networkPlayable: false,
     unavailableReason: 'Coming Soon',
   },
@@ -68,16 +68,11 @@ export const GAME_CATALOG: GameCatalogEntry[] = [
     minPlayers: 2,
     maxPlayers: 9,
     cards: 'Community cards',
-    blurb: 'A future table for classic poker nights in the same private card room.',
+    blurb: 'Texas, Omaha 4/5/6 and 6+ Short Deck together at one private table.',
     networkPlayable: false,
     unavailableReason: 'Coming Soon',
   },
 ];
-
-
-export function isRuntimeGameId(id: CatalogGameId): id is GameId {
-  return id !== 'POKER';
-}
 
 export function catalogEntry(id: CatalogGameId): GameCatalogEntry {
   const entry = GAME_CATALOG.find((g) => g.id === id);

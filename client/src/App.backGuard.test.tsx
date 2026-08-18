@@ -18,6 +18,8 @@ import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
 const useGameMock = vi.fn();
 const leaveSessionMock = vi.fn();
 const leaveTableMock = vi.fn();
+const leaveTeenPattiTableMock = vi.fn();
+const leavePokerTableMock = vi.fn();
 const returnToGameMock = vi.fn();
 
 vi.mock('./lib/GameStore', () => ({ useGame: () => useGameMock() }));
@@ -34,6 +36,10 @@ vi.mock('./games/hazari/RoundSummary', () => ({ RoundSummary: () => <div>MOCK_RO
 vi.mock('./games/hazari/WinnerScreen', () => ({ WinnerScreen: () => <div>MOCK_WINNER</div> }));
 vi.mock('./components/ChatPanel', () => ({ ChatPanel: () => null }));
 vi.mock('./components/VoiceCallPanel', () => ({ VoiceCallPanel: () => null }));
+// Back-guard tests intentionally supply a minimal GameStore. The radial table
+// hub has its own contracts; rendering it here would make these navigation
+// tests depend on unrelated chat/voice state fields.
+vi.mock('./components/TableControls', () => ({ TableControls: () => null }));
 vi.mock('./components/UpdateBanner', () => ({ UpdateBanner: () => null }));
 
 function baseGameValue(overrides: Record<string, unknown> = {}) {
@@ -52,6 +58,8 @@ function baseGameValue(overrides: Record<string, unknown> = {}) {
     requestSuggestionOptions: vi.fn(),
     viewMode: 'active',
     leaveTable: leaveTableMock,
+    leaveTeenPattiTable: leaveTeenPattiTableMock,
+    leavePokerTable: leavePokerTableMock,
     leaveSession: leaveSessionMock,
     returnToGame: returnToGameMock,
     ...overrides,
@@ -74,6 +82,8 @@ beforeEach(() => {
   useGameMock.mockReset();
   leaveSessionMock.mockReset();
   leaveTableMock.mockReset();
+  leaveTeenPattiTableMock.mockReset();
+  leavePokerTableMock.mockReset();
   returnToGameMock.mockReset();
   window.history.replaceState({}, '', '/');
 });
@@ -283,5 +293,87 @@ describe('home-return: Back returns to the active game, matching "Return to Room
 
     expect(returnToGameMock).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(/leave this room/i)).toBeNull();
+  });
+});
+
+
+describe('home-return: Poker leave remains authoritative during reconnect rehydration', () => {
+  it('uses Poker settle/release when room is IN_GAME even before pokerState arrives', async () => {
+    useGameMock.mockReturnValue(
+      baseGameValue({
+        room: { gameId: 'POKER', status: 'IN_GAME', roomCode: 'PKR482', players: [] },
+        pokerState: null,
+        viewMode: 'home',
+      })
+    );
+    const App = await loadApp();
+    render(<App />);
+
+    expect(screen.getByText('Your seat is still connected')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /leave & settle/i }));
+    expect(screen.getByText(/leaving folds your live hand if needed/i)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /^leave & settle$/i }));
+
+    expect(leavePokerTableMock).toHaveBeenCalledTimes(1);
+    expect(leaveSessionMock).not.toHaveBeenCalled();
+    expect(leaveTableMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('Open-ended table loading fallback: Back can still settle/release the seat', () => {
+  it('offers Teen Patti leave & settle when room state is IN_GAME but detailed state has not rehydrated yet', async () => {
+    useGameMock.mockReturnValue(
+      baseGameValue({
+        room: { gameId: 'TEEN_PATTI', status: 'IN_GAME', roomCode: 'TPR482', players: [] },
+        teenPattiState: null,
+        viewMode: 'active',
+      })
+    );
+    const App = await loadApp();
+    render(<App />);
+
+    expect(screen.getByText(/loading teen patti/i)).toBeTruthy();
+    fireBack();
+
+    expect(screen.getByText(/leaving packs your live hand if needed/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /^leave & settle$/i }));
+    expect(leaveTeenPattiTableMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers Poker leave & settle when room state is IN_GAME but detailed state has not rehydrated yet', async () => {
+    useGameMock.mockReturnValue(
+      baseGameValue({
+        room: { gameId: 'POKER', status: 'IN_GAME', roomCode: 'PKR482', players: [] },
+        pokerState: null,
+        viewMode: 'active',
+      })
+    );
+    const App = await loadApp();
+    render(<App />);
+
+    expect(screen.getByText(/loading poker/i)).toBeTruthy();
+    fireBack();
+
+    expect(screen.getByText(/leaving folds your live hand if needed/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /^leave & settle$/i }));
+    expect(leavePokerTableMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Teen Patti non-table errors remain visible outside contextual table screens', () => {
+  it('shows the shared error toast on the connected-seat return screen', async () => {
+    useGameMock.mockReturnValue(
+      baseGameValue({
+        room: { gameId: 'TEEN_PATTI', status: 'IN_GAME', roomCode: 'TPR482', players: [] },
+        teenPattiState: null,
+        viewMode: 'home',
+        gameError: 'Reconnect before leaving the table.',
+      })
+    );
+    const App = await loadApp();
+    render(<App />);
+
+    expect(screen.getByText('Reconnect before leaving the table.')).toBeTruthy();
   });
 });

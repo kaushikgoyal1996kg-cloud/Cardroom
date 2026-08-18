@@ -5,7 +5,7 @@ import { RECONNECT_WINDOW_MS } from './sessionConfig.js';
 import { canStartWith, getGame, maxPlayersFor, type GameId } from '../games/registry.js';
 
 // Room codes carry the game identity so an invite is self-explanatory:
-// HZR = Hazari, KIT = Kitti, TPT = Teen Patti. The three-character suffix
+// HZR = Hazari, KIT = Kitti, TPT = Teen Patti, PKR = Poker. The three-character suffix
 // excludes ambiguous chars (0/O, 1/I). Existing Hazari codes keep HZR.
 const codeSuffix = customAlphabet('23456789ABCDEFGHJKLMNPQRSTUVWXYZ', 3);
 const playerIdGen = customAlphabet('23456789abcdefghjkmnpqrstuvwxyz', 12);
@@ -47,7 +47,7 @@ export class RoomManager {
   private tokenIndex = new Map<string, { roomCode: string; playerId: PlayerId }>();
 
   private generateRoomCode(gameId: GameId): string {
-    const prefix: Record<GameId, string> = { HAZARI: 'HZR', KITTI: 'KIT', TEEN_PATTI: 'TPT' };
+    const prefix: Record<GameId, string> = { HAZARI: 'HZR', KITTI: 'KIT', TEEN_PATTI: 'TPT', POKER: 'PKR' };
     let code: string;
     do {
       code = `${prefix[gameId]}${codeSuffix()}`;
@@ -89,6 +89,7 @@ export class RoomManager {
       gameId,
       hostId: playerId,
       players: new Map([[playerId, hostSlot]]),
+      playerDirectory: { [playerId]: { name: hostSlot.name, avatar: hostSlot.avatar } },
       status: 'LOBBY',
       createdAt: Date.now(),
       voiceCallParticipants: new Set(),
@@ -119,6 +120,8 @@ export class RoomManager {
       isBot: false,
     };
     room.players.set(playerId, slot);
+    room.playerDirectory ??= {};
+    room.playerDirectory[playerId] = { name: slot.name, avatar: slot.avatar };
     room.playMoney.tableProfitLoss[playerId] = 0;
     // A player joining after a proposal must explicitly accept it.
     this.tokenIndex.set(token, { roomCode, playerId });
@@ -157,6 +160,8 @@ export class RoomManager {
       isBot: true,
     };
     room.players.set(playerId, slot);
+    room.playerDirectory ??= {};
+    room.playerDirectory[playerId] = { name: slot.name, avatar: slot.avatar };
     room.playMoney.tableProfitLoss[playerId] = 0;
     room.playMoney.proposal?.acceptedBy.add(playerId); // bots auto-accept the optional board
     return slot;
@@ -177,6 +182,7 @@ export class RoomManager {
     }
 
     room.players.delete(botPlayerId);
+    if (room.playerDirectory) delete room.playerDirectory[botPlayerId];
     room.playMoney.proposal?.acceptedBy.delete(botPlayerId);
     delete room.playMoney.tableProfitLoss[botPlayerId];
     return room;
@@ -522,6 +528,9 @@ export class RoomManager {
       gameId: room.gameId,
       status: room.status,
       players,
+      playerDirectory: room.playerDirectory ? Object.fromEntries(
+        Object.entries(room.playerDirectory).map(([id, identity]) => [id, { ...identity }])
+      ) : undefined,
       maxPlayers: maxPlayersFor(room.gameId),
       hostId: room.hostId,
       gameState: room.game?.state,

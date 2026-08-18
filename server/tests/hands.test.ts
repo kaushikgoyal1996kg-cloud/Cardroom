@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyThreeCardHand, compareThreeCardHands, hasSixPairs, isNoSequenceHand } from '../src/games/hazari/hands.js';
+import { classifyThreeCardHand, compareThreeCardHands, hasSixPairs, handHasNoPossibleSequence, isNoSequenceHand } from '../src/games/hazari/hands.js';
 import { ThreeCardCategory } from '../src/games/hazari/types.js';
 import type { Card } from '../src/games/hazari/types.js';
 
@@ -121,7 +121,7 @@ describe('hasSixPairs', () => {
 });
 
 describe('isNoSequenceHand', () => {
-  it('is true when no set has a sequence/pure-sequence/trail and 4-set has no run', () => {
+  it('is true when no set has a sequence/pure-sequence and 4-set has no run', () => {
     const sets: [Card[], Card[], Card[]] = [
       [c('K', 'SPADES'), c('K', 'HEARTS'), c('5', 'DIAMONDS')], // pair
       [c('9', 'CLUBS'), c('9', 'SPADES'), c('2', 'HEARTS')], // pair
@@ -130,7 +130,7 @@ describe('isNoSequenceHand', () => {
     expect(isNoSequenceHand(sets, false)).toBe(true);
   });
 
-  it('is false if any 3-card set is a Sequence/Pure Sequence/Trail', () => {
+  it('is false if any 3-card set is a Sequence/Pure Sequence', () => {
     const sets: [Card[], Card[], Card[]] = [
       [c('A', 'SPADES'), c('K', 'SPADES'), c('Q', 'SPADES')], // pure sequence
       [c('9', 'CLUBS'), c('9', 'SPADES'), c('2', 'HEARTS')],
@@ -146,6 +146,30 @@ describe('isNoSequenceHand', () => {
       [c('A', 'SPADES'), c('8', 'SPADES'), c('3', 'SPADES')],
     ];
     expect(isNoSequenceHand(sets, true)).toBe(false);
+  });
+});
+
+
+describe('handHasNoPossibleSequence dismissal rule', () => {
+  it('allows dismissal when the deal has a Trial but no Sequence/Pure Sequence', () => {
+    const hand: Card[] = [
+      c('A', 'SPADES'), c('A', 'HEARTS'), c('A', 'DIAMONDS'), // Trial is allowed
+      c('5', 'SPADES'), c('5', 'HEARTS'),
+      c('8', 'SPADES'), c('8', 'HEARTS'),
+      c('J', 'SPADES'), c('J', 'HEARTS'),
+      c('3', 'CLUBS'), c('6', 'CLUBS'), c('10', 'DIAMONDS'), c('K', 'CLUBS'),
+    ];
+    expect(handHasNoPossibleSequence(hand)).toBe(true);
+  });
+
+  it('refuses dismissal when any raw 3-card subset can make a Sequence', () => {
+    const hand: Card[] = [
+      c('A', 'SPADES'), c('A', 'HEARTS'), c('A', 'DIAMONDS'),
+      c('5', 'SPADES'), c('6', 'HEARTS'), c('7', 'CLUBS'), // real sequence
+      c('9', 'SPADES'), c('9', 'HEARTS'), c('J', 'SPADES'), c('J', 'HEARTS'),
+      c('3', 'CLUBS'), c('10', 'DIAMONDS'), c('K', 'CLUBS'),
+    ];
+    expect(handHasNoPossibleSequence(hand)).toBe(false);
   });
 });
 
