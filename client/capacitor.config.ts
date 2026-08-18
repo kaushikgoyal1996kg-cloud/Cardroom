@@ -3,7 +3,7 @@
 // which requires a secure context. The backend CORS allow-list must include
 // https://localhost for installed Android builds.
 export default {
-  appId: 'com.thecardroom.private',
+  appId: 'com.thecardroom.app',
   appName: 'The Card Room',
   webDir: 'dist',
   backgroundColor: '#0a0908',
