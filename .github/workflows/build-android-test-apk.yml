@@ -61,6 +61,56 @@ jobs:
             (cd client && npm test)
           done
 
+      - name: Strict all-tests accounting
+        run: |
+          set -euo pipefail
+
+          echo "=== SERVER STRICT TEST ACCOUNTING ==="
+          (cd server && npx vitest run --reporter=json --outputFile=vitest-strict.json)
+
+          echo "=== CLIENT STRICT TEST ACCOUNTING ==="
+          (cd client && npx vitest run --reporter=json --outputFile=vitest-strict.json)
+
+          node <<'CHECK'
+          const fs = require('fs');
+
+          let failed = false;
+
+          for (const [name, path] of [
+            ['SERVER', 'server/vitest-strict.json'],
+            ['CLIENT', 'client/vitest-strict.json'],
+          ]) {
+            const r = JSON.parse(fs.readFileSync(path, 'utf8'));
+
+            const total = Number(r.numTotalTests ?? 0);
+            const passed = Number(r.numPassedTests ?? 0);
+            const failedTests = Number(r.numFailedTests ?? 0);
+            const pending = Number(r.numPendingTests ?? 0);
+            const todo = Number(r.numTodoTests ?? 0);
+
+            console.log(
+              `${name}: total=${total} passed=${passed} failed=${failedTests} skipped/pending=${pending} todo=${todo}`
+            );
+
+            if (
+              r.success !== true ||
+              passed !== total ||
+              failedTests !== 0 ||
+              pending !== 0 ||
+              todo !== 0
+            ) {
+              failed = true;
+            }
+          }
+
+          if (failed) {
+            console.error('STRICT TEST ACCOUNTING FAILED');
+            process.exit(1);
+          }
+
+          console.log('STRICT TEST ACCOUNTING PASSED — every discovered test passed');
+          CHECK
+
       - name: Generate Android project
         working-directory: client
         env:
