@@ -58,8 +58,7 @@ export const GAME_CATALOG: GameCatalogEntry[] = [
     maxPlayers: 9,
     cards: '2–5 cards by variant',
     blurb: 'Classic three-card play plus dealer-built and server-surprise variants for a private table.',
-    networkPlayable: false,
-    unavailableReason: 'Coming Soon',
+    networkPlayable: true,
   },
   {
     id: 'POKER',
@@ -69,8 +68,7 @@ export const GAME_CATALOG: GameCatalogEntry[] = [
     maxPlayers: 9,
     cards: 'Community cards',
     blurb: 'Texas, Omaha 4/5/6 and 6+ Short Deck together at one private table.',
-    networkPlayable: false,
-    unavailableReason: 'Coming Soon',
+    networkPlayable: true,
   },
 ];
 

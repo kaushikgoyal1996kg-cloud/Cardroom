@@ -70,8 +70,7 @@ export const GAMES: Record<GameId, GameDefinition> = {
     minPlayers: 2,
     maxPlayers: 9,
     cardsPerPlayer: 'VARIES',
-    networkPlayable: false,
-    unavailableReason: 'Not yet available online',
+    networkPlayable: true,
   },
   POKER: {
     id: 'POKER',
@@ -79,8 +78,7 @@ export const GAMES: Record<GameId, GameDefinition> = {
     minPlayers: 2,
     maxPlayers: 9,
     cardsPerPlayer: 'VARIES',
-    networkPlayable: false,
-    unavailableReason: 'Poker network tables are still being completed',
+    networkPlayable: true,
   },
 };
 
