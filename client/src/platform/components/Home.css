@@ -411,6 +411,12 @@
   padding-top: var(--space-4);
   border-top: 1px solid rgba(168,132,63,.14);
 }
+
+.home__live { margin-top: 1.25rem; }
+.home__live-list { display: grid; gap: 0.65rem; }
+.home__live-table { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.85rem; }
+.home__live-table span { display: block; margin-top: 0.2rem; font-size: 0.78rem; opacity: 0.72; }
+.home__live-actions { display: flex; gap: 0.45rem; flex-wrap: wrap; justify-content: flex-end; }
 .home__join-label {
   display: block;
   margin-bottom: var(--space-2);

@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { getSocket, type PokerLeaveAck, type PokerSetupAck, type RoomAck, type TablesAck, type TeenPattiLeaveAck, type TeenPattiSetupAck } from './socket';
+import { getSocket, type PokerLeaveAck, type PokerSetupAck, type RoomAck, type TablesAck, type TeenPattiLeaveAck, type TeenPattiSetupAck, type WatchRoomAck } from './socket';
 import type {
   Card,
   ChatMessage,
@@ -40,7 +40,7 @@ import { recordGameResult, getAllStats, type PlayerStats } from './stats';
 import type { KittiSuggestionAck, SuggestionOptionsAck } from './socket';
 import { friendlyGameError } from './errorMessages';
 import { coherentPokerPrivateState, coherentTeenPattiPrivateState } from './privateStateCoherence';
-import { VoiceCallManager, isVoiceCallSupported } from './voiceCall';
+import { VoiceCallManager, isVoiceCallSupported, type VoiceDiagnosticEvent } from './voiceCall';
 import { requestReturnToCardRoom } from './navigation';
 
 const SESSION_KEY = 'haazari_session_v1';
@@ -56,6 +56,7 @@ interface GameContextValue {
   hasConnectedOnce: boolean;
   room: PublicRoomInfo | null;
   myPlayerId: string | null;
+  isSpectator: boolean;
   myName: string;
   myHand: Card[];
   myArrangedSets: FourSets | null;
@@ -92,9 +93,12 @@ interface GameContextValue {
   voiceMuted: boolean;
   voiceParticipants: string[];
   speakingPlayerIds: string[];
+  voiceDiagnostics: VoiceDiagnosticEvent[];
+  voicePlaybackBlockedPlayerIds: string[];
   joinVoiceCall: () => void;
   leaveVoiceCall: () => void;
   toggleVoiceMute: () => void;
+  retryVoicePlayback: () => void;
   viewMode: 'active' | 'home';
   goToHomeScreen: () => void;
   returnToGame: () => void;
@@ -103,6 +107,12 @@ interface GameContextValue {
   joinRoom: (roomCode: string, playerName: string, avatar?: string) => Promise<RoomAck>;
   quickMatch: (playerName: string, avatar?: string, gameId?: GameId) => Promise<RoomAck>;
   listTables: (gameId?: GameId) => Promise<TableSummary[]>;
+  watchTable: (roomCode: string, spectatorName: string, avatar?: string) => Promise<WatchRoomAck>;
+  leaveSpectator: () => void;
+  joinFromSpectator: (botPlayerId?: PlayerId) => Promise<RoomAck>;
+  setTableVisibility: (visibility: 'LIVE' | 'PRIVATE') => void;
+  setSpectatorVoicePolicy: (policy: 'DISABLED' | 'LISTEN_ONLY' | 'CONVERSATION') => void;
+  removeInactivePlayer: (playerId: PlayerId) => void;
   /**
    * Asks the SERVER for arrangement suggestions. The server re-checks room
    * composition and refuses if the player has any real human opponent, so
@@ -135,7 +145,7 @@ interface GameContextValue {
   addBot: () => void;
   removeBot: (playerId: PlayerId) => void;
   playAgain: () => void;
-  proposePlayMoney: (amount: number) => void;
+  proposePlayMoney: (amount: number, mode?: 'MATCH_POT' | 'KITTI_ROUND_BOOT') => void;
   acceptPlayMoney: () => void;
   declinePlayMoney: () => void;
   cancelPlayMoney: () => void;
@@ -186,6 +196,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [hasConnectedOnce, setHasConnectedOnce] = useState(false);
   const [room, setRoom] = useState<PublicRoomInfo | null>(null);
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
+  const [isSpectator, setIsSpectator] = useState(false);
   const [freshDealCount, setFreshDealCount] = useState(0);
   /** Reconnect restoration lifecycle. `active` is true from the moment a
    *  reconnect is attempted until the restoration burst has been applied;
@@ -264,6 +275,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [inVoiceCall, setInVoiceCall] = useState(false);
   const [voiceMuted, setVoiceMuted] = useState(false);
   const [voiceParticipants, setVoiceParticipants] = useState<string[]>([]);
+  const [voiceDiagnostics, setVoiceDiagnostics] = useState<VoiceDiagnosticEvent[]>([]);
+  const [voicePlaybackBlockedPlayerIds, setVoicePlaybackBlockedPlayerIds] = useState<string[]>([]);
   const [speakingPlayerIds, setSpeakingPlayerIds] = useState<string[]>([]);
   // Remember an intentional live call across a temporary transport drop. The
   // local peer graph is torn down immediately, then rebuilt only AFTER the
@@ -313,6 +326,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             setRoom(res.room);
             setMyPlayerId(res.playerId ?? null);
             setMyName(stored.playerName);
+            setIsSpectator(false);
           } else {
             // An authoritative "no" from the server (bad/expired token, the
             // room is gone, or the seat is gone) - not merely "still
@@ -865,8 +879,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socketRef.current.emit('room:playAgain');
   }, []);
 
-  const proposePlayMoney = useCallback((amount: number) => {
-    socketRef.current.emit('room:playMoneyPropose', { amount });
+  const proposePlayMoney = useCallback((amount: number, mode: 'MATCH_POT' | 'KITTI_ROUND_BOOT' = 'MATCH_POT') => {
+    socketRef.current.emit('room:playMoneyPropose', { amount, mode });
   }, []);
 
   const acceptPlayMoney = useCallback(() => {
@@ -903,9 +917,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         });
       },
       onError: (message) => setGameError(message),
+      onDiagnosticsChanged: setVoiceDiagnostics,
+      onPlaybackBlockedChanged: setVoicePlaybackBlockedPlayerIds,
+      onSessionEnded: () => {
+        voiceManagerRef.current = null;
+        setInVoiceCall(false);
+        setVoiceMuted(false);
+        setVoiceParticipants([]);
+        setSpeakingPlayerIds([]);
+      },
     });
     voiceManagerRef.current = manager;
-    manager.join().then(() => {
+    const mode = isSpectator && room?.spectatorVoicePolicy !== 'CONVERSATION' ? 'LISTEN_ONLY' : 'CONVERSATION';
+    manager.join(mode).then(() => {
       if (manager.isJoined && rejoinVoiceMutedRef.current) {
         manager.setMuted(true);
         setVoiceMuted(true);
@@ -915,7 +939,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       rejoinVoiceMutedRef.current = false;
       setInVoiceCall(manager.isJoined);
     });
-  }, [myPlayerId]);
+  }, [myPlayerId, isSpectator, room?.spectatorVoicePolicy]);
 
   useEffect(() => {
     if (!rejoinVoiceAfterReconnectRef.current) return;
@@ -933,6 +957,74 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setVoiceMuted(false);
     setVoiceParticipants([]);
     setSpeakingPlayerIds([]);
+    setVoiceDiagnostics([]);
+    setVoicePlaybackBlockedPlayerIds([]);
+  }, []);
+
+  const watchTable = useCallback((roomCode: string, spectatorName: string, avatar: string = DEFAULT_AVATAR) => {
+    return new Promise<WatchRoomAck>((resolve) => {
+      if (roomRef.current || readSession()) {
+        resolve({ ok: false, error: 'Leave your current table before watching another one.' });
+        return;
+      }
+      socketRef.current.emit('room:watch', { roomCode, spectatorName, avatar }, (res) => {
+        if (res.ok && res.room && res.spectatorId) {
+          setRoom(res.room);
+          setMyPlayerId(res.spectatorId);
+          setMyName(spectatorName);
+          setIsSpectator(true);
+          setViewMode('active');
+        } else setRoomError(res.error ?? 'Could not watch this table.');
+        resolve(res);
+      });
+    });
+  }, []);
+
+  const leaveSpectator = useCallback(() => {
+    socketRef.current.emit('room:leaveSpectator', () => {
+      voiceManagerRef.current?.leave(false);
+      voiceManagerRef.current = null;
+      setRoom(null);
+      setMyPlayerId(null);
+      setIsSpectator(false);
+      setInVoiceCall(false);
+      setVoiceParticipants([]);
+      setSpeakingPlayerIds([]);
+      setVoiceMuted(false);
+      setVoiceDiagnostics([]);
+      setVoicePlaybackBlockedPlayerIds([]);
+      requestReturnToCardRoom();
+    });
+  }, []);
+
+  const joinFromSpectator = useCallback((botPlayerId?: PlayerId) => {
+    return new Promise<RoomAck>((resolve) => {
+      // Voice mesh identity is keyed by the spectator id. Tear it down before
+      // the server atomically promotes this socket to a player id; otherwise
+      // an already-negotiated peer stream could survive under stale identity.
+      leaveVoiceCall();
+      socketRef.current.emit('room:spectatorJoin', { botPlayerId }, (res) => {
+        if (res.ok && res.room && res.playerId && res.token && res.roomCode) {
+          storeSession({ token: res.token, roomCode: res.roomCode, playerName: myNameRef.current });
+          setRoom(res.room);
+          setMyPlayerId(res.playerId);
+          setIsSpectator(false);
+        } else setGameError(res.error ?? 'Could not join this table.');
+        resolve(res);
+      });
+    });
+  }, [leaveVoiceCall]);
+
+  const setTableVisibility = useCallback((visibility: 'LIVE' | 'PRIVATE') => {
+    socketRef.current.emit('room:setVisibility', { visibility });
+  }, []);
+
+  const setSpectatorVoicePolicy = useCallback((policy: 'DISABLED' | 'LISTEN_ONLY' | 'CONVERSATION') => {
+    socketRef.current.emit('room:setSpectatorVoice', { policy });
+  }, []);
+
+  const removeInactivePlayer = useCallback((playerId: PlayerId) => {
+    socketRef.current.emit('room:removeInactive', { playerId });
   }, []);
 
   const toggleVoiceMute = useCallback(() => {
@@ -940,6 +1032,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const next = !voiceManagerRef.current.isMuted;
     voiceManagerRef.current.setMuted(next);
     setVoiceMuted(next);
+  }, []);
+
+  const retryVoicePlayback = useCallback(() => {
+    void voiceManagerRef.current?.retryBlockedAudio();
   }, []);
 
   const goToHomeScreen = useCallback(() => setViewMode('home'), []);
@@ -1428,6 +1524,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     hasConnectedOnce,
     room,
     myPlayerId,
+    isSpectator,
     myName,
     myHand,
     myArrangedSets,
@@ -1464,9 +1561,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     voiceMuted,
     voiceParticipants,
     speakingPlayerIds,
+    voiceDiagnostics,
+    voicePlaybackBlockedPlayerIds,
     joinVoiceCall,
     leaveVoiceCall,
     toggleVoiceMute,
+    retryVoicePlayback,
     viewMode,
     goToHomeScreen,
     returnToGame,
@@ -1474,6 +1574,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     joinRoom,
     quickMatch,
     listTables,
+    watchTable,
+    leaveSpectator,
+    joinFromSpectator,
+    setTableVisibility,
+    setSpectatorVoicePolicy,
+    removeInactivePlayer,
     requestSuggestionOptions,
     freshDealCount,
     isRestoring: restoration.active,

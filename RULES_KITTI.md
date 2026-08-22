@@ -4,7 +4,7 @@
 
 This file is the agreed rule specification and remains the authority for Kitti.
 The core engine, multiplayer controller and client flow now implement the rules
-below. Optional bots remain pending; the consensual room-session play-money board is implemented.
+below. Optional bots and both consensual room-session play-money modes are implemented.
 
 Status key: ✅ implemented · ⛔ not implemented
 
@@ -120,6 +120,24 @@ If Hands 1, 2 and 3 are won by three different players:
 - Tied leaders play full normal **9-card sudden-death rounds**.
 - Continue until one match winner remains.
 
+### Optional Round Boot table mode ✅
+
+Round Boot is a separate host-selected play-money mode; it does not replace or
+change the normal 10-round match above.
+
+- The host proposes a positive whole-number virtual boot (for example 10), and
+  every human participant must accept before Start. Bots auto-accept.
+- Every seated participant contributes one boot before each deal.
+- The first player to win two of that deal's three hands wins the accumulated
+  pot. No fixed 10-round target or overall match winner applies.
+- If three different players win Hands 1, 2 and 3 (a 1–1–1 result), there is no
+  fresh-card decider in Round Boot mode. The pot stays on the board, every seat
+  contributes the boot again, and the next deal starts automatically.
+- After a two-hand winner receives the accumulated pot, the next automatic deal
+  begins with a fresh one-boot-per-seat pot.
+- Exact ties inside an individual hand still use the locked later-thrower rule.
+- This remains room-session virtual accounting only, with no cash value.
+
 ---
 
 ## Play money ✅
@@ -131,6 +149,8 @@ If Hands 1, 2 and 3 are won by three different players:
 - Bots may auto-accept.
 - Each participant contributes the amount.
 - The **overall match winner** receives the full virtual pot.
+- In optional **Round Boot** mode, the per-deal carry/payout rules above apply
+  instead of waiting for a 10-round match winner.
 - The current implementation keeps room-session P/L only. A persistent play-money wallet across app sessions is **not implemented**.
 
 ---

@@ -18,13 +18,14 @@ interface Props {
 }
 
 export function SettingsModal({ onClose, onOpenRules, onOpenStats, onOpenRoundHistory, onLeaveTable, leaveDescription, leaveActionLabel }: Props) {
-  const { goToHomeScreen, room } = useGame();
+  const { goToHomeScreen, room, myPlayerId, setTableVisibility, setSpectatorVoicePolicy, removeInactivePlayer } = useGame();
   const [soundOn, setSoundOn] = useState(isSoundEnabled());
   const [tablePreferences, setTablePreferences] = useState<TablePreferences>(() => loadTablePreferences());
   const { canPromptInstall, installed, isIos, promptInstall } = useInstallPrompt();
   const [confirmingLeave, setConfirmingLeave] = useState(false);
   const [showIosInstallHelp, setShowIosInstallHelp] = useState(false);
   const utilityCapabilities = room ? tableUtilityCapabilities(room.gameId) : null;
+  const isHost = room?.hostId === myPlayerId;
 
   function toggleSound() {
     const next = !soundOn;
@@ -125,6 +126,29 @@ export function SettingsModal({ onClose, onOpenRules, onOpenStats, onOpenRoundHi
               <span className="settings-row__label"><ChromeIcon name="history" /><span>{utilityCapabilities.historyLabel}</span></span>
               <span className="settings-row__chevron" aria-hidden="true">›</span>
             </button>
+          )}
+
+          {room && isHost && (
+            <div className="settings-inline-help">
+              <label>Table visibility
+                <select value={room.visibility} onChange={(event) => setTableVisibility(event.target.value as 'LIVE' | 'PRIVATE')}>
+                  <option value="LIVE">Visible in Live Tables</option>
+                  <option value="PRIVATE">Private / room code only</option>
+                </select>
+              </label>
+              <label>Spectator voice
+                <select value={room.spectatorVoicePolicy} onChange={(event) => setSpectatorVoicePolicy(event.target.value as typeof room.spectatorVoicePolicy)}>
+                  <option value="DISABLED">Disabled</option>
+                  <option value="LISTEN_ONLY">Listen only</option>
+                  <option value="CONVERSATION">Join conversation</option>
+                </select>
+              </label>
+              {room.players.filter((player) => player.inactiveDisposition && !player.connected).map((player) => (
+                <button key={player.playerId} className="btn btn-ghost" onClick={() => removeInactivePlayer(player.playerId)}>
+                  Remove inactive {player.name}
+                </button>
+              ))}
+            </div>
           )}
 
           {room && (

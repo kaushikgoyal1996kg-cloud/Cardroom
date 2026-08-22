@@ -9,4 +9,7 @@
 // ============================================================================
 
 /** How long a disconnected player keeps their seat before it can be swept. */
-export const RECONNECT_WINDOW_MS = 3 * 60 * 1000;
+export const RECONNECT_WINDOW_MS = 90 * 1000;
+
+/** Maximum grace before game-specific inactivity handling and host transfer. */
+export const INACTIVITY_THRESHOLD_MS = 90 * 1000;

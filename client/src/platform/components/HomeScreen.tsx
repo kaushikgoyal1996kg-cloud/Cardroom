@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGame, getStoredSessionRoomCode } from '../../lib/GameStore';
 import { Home } from './Home';
 import { Welcome } from './Welcome';
@@ -36,12 +36,13 @@ type EntryStage = 'welcome' | 'profile' | 'cardroom';
  * ARCHITECTURE.md.
  */
 export function HomeScreen() {
-  const { createRoom, joinRoom, quickMatch, roomError } = useGame();
+  const { createRoom, joinRoom, quickMatch, listTables, watchTable, roomError } = useGame();
   const [identity, setIdentity] = useState(() => getSavedIdentity());
   const [entryStage, setEntryStage] = useState<EntryStage>(() =>
     consumeReturnToCardRoom() && getSavedIdentity() ? 'cardroom' : 'welcome'
   );
   const [busy, setBusy] = useState(false);
+  const [liveTables, setLiveTables] = useState<import('../../game/types').TableSummary[]>([]);
 
   // Where "profile" was opened FROM, so Back/Cancel returns there rather
   // than always bouncing to Welcome - reachable from both Welcome itself
@@ -65,6 +66,15 @@ export function HomeScreen() {
   // and the normal Welcome / invite flow becomes available again.
   const storedSessionRoomCode = getStoredSessionRoomCode();
   const restoringStoredSession = storedSessionRoomCode !== null;
+
+  useEffect(() => {
+    if (entryStage !== 'cardroom' || restoringStoredSession || typeof listTables !== 'function') return;
+    let active = true;
+    const refresh = () => listTables().then((tables) => { if (active) setLiveTables(tables); });
+    void refresh();
+    const timer = setInterval(refresh, 5_000);
+    return () => { active = false; clearInterval(timer); };
+  }, [entryStage, restoringStoredSession, listTables]);
 
   // One key per distinct screen this component can show, for both the
   // back-guard and (matching App.tsx's existing pattern) as a potential
@@ -166,6 +176,8 @@ export function HomeScreen() {
         onPlay={(game: GameId) => run(() => quickMatch(identity!.name, avatar, game))}
         onCreateTable={(game: GameId) => run(() => createRoom(identity!.name, avatar, game))}
         onJoinTable={(code: string) => run(() => joinRoom(code, identity!.name, avatar))}
+        liveTables={liveTables}
+        onWatchTable={(code: string) => run(() => watchTable(code, identity!.name, avatar))}
       />
     );
   }

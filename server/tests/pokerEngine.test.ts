@@ -15,6 +15,26 @@ const mixed: PokerTableConfig = {
 };
 
 describe('PokerGame', () => {
+  it('folds an inactive seat and restores it only before a later hand', () => {
+    const game = new PokerGame('INACTIVE', ['A', 'B', 'C'], texas, 'A');
+    game.dealHand(deck);
+    const inactiveId = game.currentTurn!;
+    expect(game.setInactiveSittingOut(inactiveId)).toEqual({ ok: true });
+    expect(game.getPublicState().players.find((player) => player.playerId === inactiveId)).toMatchObject({
+      sittingOut: true, folded: true,
+    });
+
+    while (game.state !== 'HAND_COMPLETE') {
+      const turn = game.currentTurn;
+      if (!turn) throw new Error('Expected Poker turn while finishing inactivity fixture');
+      expect(game.act(turn, { type: 'FOLD' }, game.sequence).ok).toBe(true);
+    }
+    expect(game.resumePlayerNextHand(inactiveId)).toEqual({ ok: true });
+    game.dealHand(deck);
+    expect(game.getPublicState().players.find((player) => player.playerId === inactiveId)?.sittingOut).toBe(false);
+    expect(game.getPrivateState(inactiveId).holeCards).toHaveLength(2);
+  });
+
   it('deals Texas hole cards privately, posts blinds and starts after the big blind', () => {
     const game = new PokerGame('P1', ['A', 'B', 'C'], texas, 'A');
     game.dealHand(deck);

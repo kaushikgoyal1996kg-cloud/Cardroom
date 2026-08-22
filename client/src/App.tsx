@@ -148,6 +148,7 @@ export function App() {
     gameState,
     kittiState,
     myPlayerId,
+    isSpectator,
     lastRoundResult,
     winnerInfo,
     myHand,
@@ -182,6 +183,8 @@ export function App() {
     leavePokerTable,
     clearPokerSettlementNotice,
     leaveSession,
+    leaveSpectator,
+    joinFromSpectator,
     returnToGame,
   } = useGame();
   const [showRules, setShowRules] = useState(false);
@@ -346,7 +349,7 @@ export function App() {
       screen = <KittiTable />;
       screenKey = 'playing';
     } else if (kittiState && KITTI_ARRANGING_STATES.has(kittiState.state)) {
-      if (kittiState.spectatorIds.includes(myPlayerId ?? '') || (kittiArrangedGroups && myPlayerId)) {
+      if (isSpectator || kittiState.spectatorIds.includes(myPlayerId ?? '') || (kittiArrangedGroups && myPlayerId)) {
         screen = <KittiWaitingTable />;
         screenKey = 'arranging-waiting';
       } else if (dealingCeremony && kittiHand.length === 9) {
@@ -455,7 +458,7 @@ export function App() {
     screen = <HazariTable />;
     screenKey = 'playing';
   } else if (gameState && ARRANGING_STATES.has(gameState.state)) {
-    screen = myArrangedSets && myPlayerId ? (
+    screen = (isSpectator || (myArrangedSets && myPlayerId)) ? (
       <ArrangingWaitScreen />
     ) : dealingCeremony && myHand.length === 13 ? (
       <DealingTable />
@@ -474,7 +477,7 @@ export function App() {
         <LoadingSpinner message="Dealing the cards…" />
       </div>
     );
-    screenKey = myArrangedSets && myPlayerId
+    screenKey = (isSpectator || (myArrangedSets && myPlayerId))
       ? 'arranging-waiting'
       : dealingCeremony && myHand.length === 13
         ? 'dealing'
@@ -531,14 +534,18 @@ export function App() {
         : room?.gameId === 'POKER'
           ? 'Poker'
           : 'Card Room';
-  const tableLeaveAction = botTakeoverLeaveAvailable
+  const tableLeaveAction = isSpectator
+    ? leaveSpectator
+    : botTakeoverLeaveAvailable
     ? leaveTable
     : teenPattiCanSettleAndLeave
       ? () => { void leaveTeenPattiTable(); }
       : pokerCanSettleAndLeave
         ? () => { void leavePokerTable(); }
         : undefined;
-  const tableLeaveDescription = teenPattiCanSettleAndLeave
+  const tableLeaveDescription = isSpectator
+    ? 'Stop watching and return to the Card Room. No player seat or game state will be changed.'
+    : teenPattiCanSettleAndLeave
     ? 'Leaving packs your live hand if needed, settles your current play-money P/L, and permanently releases your seat. You cannot reconnect to this table with the old session token.'
     : pokerCanSettleAndLeave
       ? 'Leaving folds your live hand if needed, keeps committed chips in the pot, settles your virtual Poker stack/P&L, and permanently releases your seat.'
@@ -666,6 +673,21 @@ export function App() {
     // declaratively in CSS rather than by measuring the DOM.
     <div className="app-root" data-screen={screenKey}>
       <UpdateBanner />
+      {isSpectator && room && <div className="spectator-banner">Watching {activeGameName} · public table view</div>}
+      {isSpectator && room && (
+        <div className="spectator-join panel">
+          {(room.gameId === 'TEEN_PATTI' || room.gameId === 'POKER') && room.players.length < room.maxPlayers && (
+            <button className="btn btn-primary" onClick={() => { void joinFromSpectator(); }}>
+              Join next {room.gameId === 'POKER' ? 'hand' : 'round'}
+            </button>
+          )}
+          {room.players.filter((player) => player.isBot && !player.inactiveDisposition).map((bot) => (
+            <button key={bot.playerId} className="btn btn-primary" onClick={() => { void joinFromSpectator(bot.playerId); }}>
+              Take {bot.name}'s bot seat
+            </button>
+          ))}
+        </div>
+      )}
       {showConnBanner && connectionStatus !== 'connected' && (
         <div className="conn-banner">
           {hasConnectedOnce

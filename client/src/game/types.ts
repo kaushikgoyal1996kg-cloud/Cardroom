@@ -18,6 +18,8 @@ export interface PublicPlayerInfo {
   ready: boolean;
   isHost: boolean;
   isBot: boolean;
+  inactiveDisposition?: 'BOT_SUBSTITUTE' | 'SITTING_OUT';
+  returnPending?: boolean;
 }
 
 /** Mirrors the server's platform/games/registry GameId. */
@@ -26,12 +28,15 @@ export type GameId = 'HAZARI' | 'KITTI' | 'TEEN_PATTI' | 'POKER';
 export interface PublicPlayMoneyState {
   proposal: {
     amount: number;
+    mode: 'MATCH_POT' | 'KITTI_ROUND_BOOT';
     proposedBy: PlayerId;
     acceptedBy: PlayerId[];
   } | null;
   activeMatch: {
     amount: number;
+    mode: 'MATCH_POT' | 'KITTI_ROUND_BOOT';
     pot: number;
+    contributionRounds: number;
     participantIds: PlayerId[];
     settled: boolean;
     winnerId?: PlayerId;
@@ -44,12 +49,15 @@ export interface PublicRoomInfo {
   gameId: GameId;
   status: 'LOBBY' | 'IN_GAME';
   players: PublicPlayerInfo[];
+  spectators: Array<{ spectatorId: string; name: string; avatar: string }>;
   /** Public-safe identity archive for readable history after a player leaves. */
   playerDirectory?: Record<PlayerId, { name: string; avatar: string }>;
   maxPlayers: number;
   hostId: PlayerId;
   gameState?: string;
   playMoney: PublicPlayMoneyState;
+  visibility: 'LIVE' | 'PRIVATE';
+  spectatorVoicePolicy: 'DISABLED' | 'LISTEN_ONLY' | 'CONVERSATION';
 }
 
 export interface TableSummary {
@@ -59,6 +67,9 @@ export interface TableSummary {
   playerCount: number;
   maxPlayers: number;
   status: 'LOBBY' | 'IN_GAME';
+  visibility: 'LIVE' | 'PRIVATE';
+  spectatorCount: number;
+  botCount: number;
 }
 
 export interface ChatMessage {
@@ -157,13 +168,15 @@ export interface KittiRoundResult {
   suddenDeath: boolean;
   hands: KittiHandResult[];
   decider?: KittiDeciderResult;
-  winnerId: PlayerId;
+  winnerId: PlayerId | null;
+  potCarried: boolean;
   roundsWon: Record<PlayerId, number>;
 }
 
 export interface KittiPublicStatePayload {
   roomCode: string;
   game: 'KITTI';
+  mode: 'TEN_ROUND_MATCH' | 'ROUND_BOOT';
   state: string;
   dealerId: PlayerId;
   roundDealerId: PlayerId;
@@ -464,6 +477,7 @@ export interface PokerPlayerStatePayload {
   actedThisStreet: boolean;
   topUps: number;
   handsWon: number;
+  sittingOut?: boolean;
 }
 
 export interface PokerLegalActions {

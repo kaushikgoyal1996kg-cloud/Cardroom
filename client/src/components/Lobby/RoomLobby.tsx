@@ -22,6 +22,8 @@ export function RoomLobby() {
     pokerSetup,
     proposePokerSetup,
     acceptPokerSetup,
+    setTableVisibility,
+    setSpectatorVoicePolicy,
   } = useGame();
   const [shareCopied, setShareCopied] = useState(false);
   const [pokerSetupBusy, setPokerSetupBusy] = useState(false);
@@ -48,10 +50,7 @@ export function RoomLobby() {
     (p) => p.isBot || room.playMoney.proposal!.acceptedBy.includes(p.playerId)
   );
   const canStart = allReady && teenPattiSetupReady && pokerSetupReady && playMoneyReady;
-  // Release 1 supports optional computer seats in Hazari and Kitti. Bots are
-  // auto-ready and auto-accept the optional virtual board; Teen Patti remains
-  // Coming Soon and deliberately has no bot controller.
-  const canAddBot = (room.gameId === 'HAZARI' || room.gameId === 'KITTI') && openSeats > 0;
+  const canAddBot = openSeats > 0;
   const needed = Math.max(0, game.minPlayers - room.players.length);
 
   const roomCode = room.roomCode;
@@ -88,7 +87,7 @@ export function RoomLobby() {
       <p className="room-lobby__game-meta">{game.players} · {game.cards}</p>
 
       <div className="room-lobby__code">
-        <span className="text-muted">Private table</span>
+        <span className="text-muted">{room.visibility === 'LIVE' ? 'Visible in Live Tables' : 'Private · room code only'}</span>
         <div className="room-lobby__code-value">{room.roomCode}</div>
         <span className="text-muted">
           {openSeats > 0 ? `${openSeats} seat${openSeats === 1 ? '' : 's'} open` : 'Table full'}
@@ -98,6 +97,26 @@ export function RoomLobby() {
         </button>
         {shareCopied && <span className="room-lobby__share-copied text-muted">Invite copied</span>}
       </div>
+
+      {isHost && (
+        <div className="room-lobby__visibility panel">
+          <label>
+            Table visibility
+            <select value={room.visibility} onChange={(event) => setTableVisibility(event.target.value as 'LIVE' | 'PRIVATE')}>
+              <option value="LIVE">Visible in Live Tables</option>
+              <option value="PRIVATE">Private / room code only</option>
+            </select>
+          </label>
+          <label>
+            Spectator voice
+            <select value={room.spectatorVoicePolicy} onChange={(event) => setSpectatorVoicePolicy(event.target.value as typeof room.spectatorVoicePolicy)}>
+              <option value="DISABLED">Disabled</option>
+              <option value="LISTEN_ONLY">Listen only</option>
+              <option value="CONVERSATION">Join conversation</option>
+            </select>
+          </label>
+        </div>
+      )}
 
       <div className="room-lobby__players" aria-label={`${game.name} seats`}>
         {Array.from({ length: room.maxPlayers }, (_, i) => {

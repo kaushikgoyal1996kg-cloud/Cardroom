@@ -3,10 +3,13 @@ import type { GameId } from '../games/registry.js';
 /** A seated player. Opaque to the platform - games never reinterpret it. */
 export type PlayerId = string;
 
+export type PlayMoneyMode = 'MATCH_POT' | 'KITTI_ROUND_BOOT';
+
 import type { GameSession } from '../games/session.js';
 
 export interface PlayMoneyProposal {
   amount: number;
+  mode: PlayMoneyMode;
   proposedBy: PlayerId;
   /** Host acceptance is implicit in proposing; bots are auto-accepted. */
   acceptedBy: Set<PlayerId>;
@@ -14,7 +17,10 @@ export interface PlayMoneyProposal {
 
 export interface ActivePlayMoneyMatch {
   amount: number;
+  mode: PlayMoneyMode;
   pot: number;
+  /** Number of per-seat boot contributions currently held in this pot. */
+  contributionRounds: number;
   participantIds: PlayerId[];
   settled: boolean;
   winnerId?: PlayerId;
@@ -40,6 +46,17 @@ export interface PlayerSlot {
   disconnectedAt?: number;
   /** True if this seat is (or has become, via "Leave Table") computer-controlled. */
   isBot: boolean;
+  /** Automatic inactivity handling never destroys the human token. */
+  inactiveDisposition?: 'BOT_SUBSTITUTE' | 'SITTING_OUT';
+  /** The human has returned; control resumes at the next safe game boundary. */
+  returnPending?: boolean;
+}
+
+export interface SpectatorSlot {
+  spectatorId: string;
+  name: string;
+  avatar: string;
+  socketId?: string;
 }
 
 export interface RoomState {
@@ -53,6 +70,7 @@ export interface RoomState {
   gameId: GameId;
   hostId: PlayerId;
   players: Map<PlayerId, PlayerSlot>;
+  spectators: Map<string, SpectatorSlot>;
   /** Public-safe identity archive for this room's lifetime. It keeps completed
    *  round/hand history readable after an open-ended table participant settles
    *  and permanently releases their live seat. */
@@ -64,6 +82,8 @@ export interface RoomState {
   /** Opaque, game-owned lobby setup. The room layer stores but never interprets it. */
   gameSetup?: unknown;
   createdAt: number;
+  visibility: 'LIVE' | 'PRIVATE';
+  spectatorVoicePolicy: 'DISABLED' | 'LISTEN_ONLY' | 'CONVERSATION';
   /** PlayerIds currently in the live voice call for this room (WebRTC
    *  mesh) - the server never touches audio itself, this is purely so it
    *  can tell everyone who's in the call and relay signaling messages. */
@@ -82,17 +102,22 @@ export interface PublicPlayerInfo {
   ready: boolean;
   isHost: boolean;
   isBot: boolean;
+  inactiveDisposition?: 'BOT_SUBSTITUTE' | 'SITTING_OUT';
+  returnPending?: boolean;
 }
 
 export interface PublicPlayMoneyState {
   proposal: {
     amount: number;
+    mode: PlayMoneyMode;
     proposedBy: PlayerId;
     acceptedBy: PlayerId[];
   } | null;
   activeMatch: {
     amount: number;
+    mode: PlayMoneyMode;
     pot: number;
+    contributionRounds: number;
     participantIds: PlayerId[];
     settled: boolean;
     winnerId?: PlayerId;
@@ -105,6 +130,7 @@ export interface PublicRoomInfo {
   gameId: GameId;
   status: RoomState['status'];
   players: PublicPlayerInfo[];
+  spectators: Array<{ spectatorId: string; name: string; avatar: string }>;
   /** Public-safe room-lifetime identities; no tokens, cards or balances. */
   playerDirectory?: Record<PlayerId, { name: string; avatar: string }>;
   maxPlayers: number;
@@ -115,6 +141,8 @@ export interface PublicRoomInfo {
   gameState?: string;
   /** Optional room-session virtual board/pot for Hazari and Kitti. */
   playMoney: PublicPlayMoneyState;
+  visibility: RoomState['visibility'];
+  spectatorVoicePolicy: RoomState['spectatorVoicePolicy'];
 }
 
 /** Summary shown in the "Browse Tables" list. */
@@ -125,4 +153,7 @@ export interface TableSummary {
   playerCount: number;
   maxPlayers: number;
   status: RoomState['status'];
+  visibility: RoomState['visibility'];
+  spectatorCount: number;
+  botCount: number;
 }

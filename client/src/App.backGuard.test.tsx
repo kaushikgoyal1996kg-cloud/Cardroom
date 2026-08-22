@@ -21,6 +21,7 @@ const leaveTableMock = vi.fn();
 const leaveTeenPattiTableMock = vi.fn();
 const leavePokerTableMock = vi.fn();
 const returnToGameMock = vi.fn();
+const joinFromSpectatorMock = vi.fn();
 
 vi.mock('./lib/GameStore', () => ({ useGame: () => useGameMock() }));
 vi.mock('./platform/components/HomeScreen', () => ({ HomeScreen: () => <div>MOCK_HOME</div> }));
@@ -34,6 +35,8 @@ vi.mock('./components/Play/ArrangingWaitScreen', () => ({ ArrangingWaitScreen: (
 vi.mock('./games/hazari/HazariTable', () => ({ HazariTable: () => <div>MOCK_PLAYING</div> }));
 vi.mock('./games/hazari/RoundSummary', () => ({ RoundSummary: () => <div>MOCK_ROUND_SUMMARY</div> }));
 vi.mock('./games/hazari/WinnerScreen', () => ({ WinnerScreen: () => <div>MOCK_WINNER</div> }));
+vi.mock('./games/teenpatti/TeenPattiTable', () => ({ TeenPattiTable: () => <div>MOCK_TEEN_PATTI</div> }));
+vi.mock('./games/poker/PokerRuntimeView', () => ({ PokerRuntimeView: () => <div>MOCK_POKER</div> }));
 vi.mock('./components/ChatPanel', () => ({ ChatPanel: () => null }));
 vi.mock('./components/VoiceCallPanel', () => ({ VoiceCallPanel: () => null }));
 // Back-guard tests intentionally supply a minimal GameStore. The radial table
@@ -62,6 +65,7 @@ function baseGameValue(overrides: Record<string, unknown> = {}) {
     leavePokerTable: leavePokerTableMock,
     leaveSession: leaveSessionMock,
     returnToGame: returnToGameMock,
+    joinFromSpectator: joinFromSpectatorMock,
     ...overrides,
   };
 }
@@ -85,6 +89,7 @@ beforeEach(() => {
   leaveTeenPattiTableMock.mockReset();
   leavePokerTableMock.mockReset();
   returnToGameMock.mockReset();
+  joinFromSpectatorMock.mockReset();
   window.history.replaceState({}, '', '/');
 });
 
@@ -164,6 +169,42 @@ describe('Active game (playing): Back is guarded with the bot-takeover warning',
     expect(leaveTableMock).toHaveBeenCalledTimes(1);
     expect(leaveSessionMock).not.toHaveBeenCalled();
   });
+});
+
+describe('running-table bot seat takeover', () => {
+  it.each([
+    ['TEEN_PATTI', 'Teen Patti', { teenPattiState: { state: 'BETTING' } }, /join next round/i],
+    ['POKER', 'Poker', { pokerState: { state: 'PREFLOP', variant: { holeCards: 2 }, players: [] } }, /join next hand/i],
+  ] as const)(
+    'offers both an empty seat and an ordinary bot seat in %s',
+    async (gameId, gameName, gameStateOverride, emptySeatLabel) => {
+      useGameMock.mockReturnValue(baseGameValue({
+        room: {
+          gameId,
+          status: 'IN_GAME',
+          roomCode: gameId === 'POKER' ? 'PKR482' : 'TPT482',
+          maxPlayers: 5,
+          players: [
+            { playerId: 'p1', name: 'Host', isBot: false },
+            { playerId: 'bot1', name: 'Raja', isBot: true },
+            { playerId: 'reserved', name: 'Returning Player', isBot: true, inactiveDisposition: 'BOT_SUBSTITUTE' },
+          ],
+        },
+        isSpectator: true,
+        myPlayerId: 'watch_1',
+        ...gameStateOverride,
+      }));
+      const App = await loadApp();
+      render(<App />);
+
+      expect(screen.getByText(`Watching ${gameName} · public table view`)).toBeTruthy();
+      expect(screen.getByRole('button', { name: emptySeatLabel })).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: /take Raja's bot seat/i }));
+
+      expect(joinFromSpectatorMock).toHaveBeenCalledWith('bot1');
+      expect(screen.queryByRole('button', { name: /Returning Player's bot seat/i })).toBeNull();
+    },
+  );
 });
 
 describe('Round Summary / Winner: Back never unexpectedly exits the PWA', () => {

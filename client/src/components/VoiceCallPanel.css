@@ -95,6 +95,33 @@
   padding: 4px 2px;
 }
 
+.voice-call-panel__recovery {
+  margin-top: 0.6rem;
+  padding: 0.7rem;
+  border: 1px solid var(--gold, #c9a34e);
+  border-radius: 0.7rem;
+  background: rgba(201, 163, 78, 0.12);
+}
+
+.voice-call-panel__recovery p {
+  margin: 0 0 0.5rem;
+}
+
+.voice-call-panel__diagnostics {
+  margin-top: 0.65rem;
+  font-size: 0.78rem;
+}
+
+.voice-call-panel__diagnostics ol {
+  max-height: 9rem;
+  margin: 0.45rem 0 0;
+  padding-left: 1.25rem;
+  overflow-y: auto;
+}
+
+.voice-call-panel__diagnostics li[data-level='warning'] { color: #f4c96b; }
+.voice-call-panel__diagnostics li[data-level='error'] { color: #ff8f8f; }
+
 .voice-call-panel__empty {
   font-size: 0.78rem;
   text-align: center;

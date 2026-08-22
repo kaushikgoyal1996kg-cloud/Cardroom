@@ -12,16 +12,22 @@ export function KittiRoundSummary() {
   }
 
   const result = lastKittiRoundResult;
-  const nameOf = (id: string) => room.players.find((p) => p.playerId === id)?.name ?? 'Player';
+  const nameOf = (id: string | null) => room.players.find((p) => p.playerId === id)?.name ?? 'Player';
+  const isRoundBoot = kittiState.mode === 'ROUND_BOOT';
+  const carried = result.potCarried || result.winnerId === null;
   const standings = [...room.players].sort((a, b) => (result.roundsWon[b.playerId] ?? 0) - (result.roundsWon[a.playerId] ?? 0));
 
   return (
     <main className="kres" style={viewportHeight ? ({ '--js-vh': `${viewportHeight}px` } as React.CSSProperties) : undefined}>
       <div className="kres__scroll">
         <header className="kres__head">
-          <p className="kres__eyebrow">{result.suddenDeath ? 'Sudden death' : `Round ${result.roundNumber} of 10`}</p>
-          <h1>{nameOf(result.winnerId)} wins the round</h1>
-          <p>{result.roundsWon[result.winnerId]} round win{result.roundsWon[result.winnerId] === 1 ? '' : 's'} overall</p>
+          <p className="kres__eyebrow">{isRoundBoot ? `Round Boot · Deal ${result.roundNumber}` : result.suddenDeath ? 'Sudden death' : `Round ${result.roundNumber} of 10`}</p>
+          <h1>{carried ? 'Pot carries to the next deal' : `${nameOf(result.winnerId)} wins the round`}</h1>
+          <p>{carried
+            ? 'Three different hand winners — every seat adds the boot again.'
+            : isRoundBoot
+              ? 'Two hand wins take the full accumulated pot.'
+              : `${result.roundsWon[result.winnerId!]} round win${result.roundsWon[result.winnerId!] === 1 ? '' : 's'} overall`}</p>
         </header>
 
         <section className="kres__hands" aria-label="Hand results">
@@ -59,7 +65,7 @@ export function KittiRoundSummary() {
           )}
         </section>
 
-        <section className="kres__standings">
+        {!isRoundBoot && <section className="kres__standings">
           <h2>Match standings</h2>
           {standings.map((player, index) => (
             <div key={player.playerId} className={`kres__standing${player.playerId === result.winnerId ? ' is-round-winner' : ''}`}>
@@ -68,7 +74,7 @@ export function KittiRoundSummary() {
               <b>{result.roundsWon[player.playerId] ?? 0}</b>
             </div>
           ))}
-        </section>
+        </section>}
 
         {kittiState.suddenDeath && (
           <p className="kres__sudden">The scheduled 10 rounds are tied. Only the tied leaders continue; everyone else remains at the table to watch.</p>
@@ -76,7 +82,9 @@ export function KittiRoundSummary() {
       </div>
 
       <footer className="kres__actions">
-        <p role="status">{kittiState.suddenDeath ? 'Sudden-death round dealing automatically…' : 'Next round dealing automatically…'}</p>
+        <p role="status">{isRoundBoot
+          ? carried ? 'Boot is being added and the next deal starts automatically…' : 'Fresh boot deal starts automatically…'
+          : kittiState.suddenDeath ? 'Sudden-death round dealing automatically…' : 'Next round dealing automatically…'}</p>
         <button type="button" className="btn btn-ghost" onClick={goToHomeScreen}>Card Room</button>
       </footer>
     </main>

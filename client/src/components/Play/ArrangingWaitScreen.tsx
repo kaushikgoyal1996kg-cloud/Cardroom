@@ -9,7 +9,7 @@ import './Play.css';
  * rest of the match. No separate square felt / legacy lobby language.
  */
 export function ArrangingWaitScreen() {
-  const { room, gameState, myPlayerId, voiceParticipants, speakingPlayerIds } = useGame();
+  const { room, gameState, myPlayerId, isSpectator, voiceParticipants, speakingPlayerIds } = useGame();
   if (!room || !gameState || !myPlayerId) {
     return <div className="waiting-screen"><LoadingSpinner message="Returning to your table…" /></div>;
   }
@@ -46,7 +46,7 @@ export function ArrangingWaitScreen() {
       </div>
       <footer className="arranging-wait__footer" role="status">
         <span className="arranging-wait__check" aria-hidden="true">✓</span>
-        <div><strong>Hand confirmed</strong><p>Your cards are locked. The round starts as soon as everyone is ready.</p></div>
+        <div><strong>{isSpectator ? 'Watching arrangements' : 'Hand confirmed'}</strong><p>{isSpectator ? 'The round starts as soon as every seated player is ready.' : 'Your cards are locked. The round starts as soon as everyone is ready.'}</p></div>
       </footer>
     </main>
   );

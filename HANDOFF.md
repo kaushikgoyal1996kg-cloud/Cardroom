@@ -1,5 +1,11 @@
 # HANDOFF — read this first
 
+> **Current staging authority — 2026-08-22:** continue from
+> `STAGING_BUG_CHANGE_REGISTER_2026-08-22.md`. The staging WIP now includes the
+> formerly deferred Live Tables/spectator/bot features and Kitti Round Boot.
+> Production `release-1.5.1` remains untouched. Historical “hidden/Coming Soon”
+> wording below records the older checkpoint, not the current staging state.
+
 **This file is the entry point for every new session.** It exists because
 conversation context resets and the repository must be the source of truth.
 

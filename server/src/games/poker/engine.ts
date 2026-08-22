@@ -37,6 +37,7 @@ export interface PokerPlayerState {
   topUps: number;
   /** Cumulative hands won at this open-ended table session. */
   handsWon: number;
+  sittingOut: boolean;
 }
 
 export type PokerAction =
@@ -269,6 +270,7 @@ export class PokerGame {
         actedThisStreet: false,
         topUps: 0,
         handsWon: 0,
+        sittingOut: false,
       });
       this.lastActedBet.set(playerId, null);
     }
@@ -282,6 +284,50 @@ export class PokerGame {
     return this.playersClockwise.filter((id) => !this.departedPlayerIds.has(id));
   }
 
+  addPlayerForNextHand(playerId: PokerPlayerId): PokerActionResult {
+    if (this.players.has(playerId)) return { ok: false, error: 'That player is already seated.' };
+    if (this.seatedPlayerIds.length >= maxPlayersForPokerTable(this.tableConfig)) return { ok: false, error: 'This Poker table is full.' };
+    const preDeal = this.state === 'READY' || this.state === 'HAND_COMPLETE' || this.state === 'AWAITING_VARIANT';
+    this.playersClockwise.push(playerId);
+    this.players.set(playerId, {
+      playerId,
+      stack: this.tableConfig.startingStack,
+      folded: !preDeal,
+      allIn: false,
+      streetCommitted: 0,
+      handCommitted: 0,
+      actedThisStreet: false,
+      topUps: 0,
+      handsWon: 0,
+      sittingOut: !preDeal,
+    });
+    this.lastActedBet.set(playerId, null);
+    this.holeCards[playerId] = [];
+    this.actionSeq += 1;
+    return { ok: true };
+  }
+
+  setInactiveSittingOut(playerId: PokerPlayerId): PokerActionResult {
+    const player = this.players.get(playerId);
+    if (!player || this.departedPlayerIds.has(playerId)) return { ok: false, error: 'That Poker seat does not exist.' };
+    player.sittingOut = true;
+    if (['PREFLOP', 'FLOP', 'TURN', 'RIVER'].includes(this.state) && !player.folded) {
+      player.folded = true;
+      player.actedThisStreet = true;
+      this.lastActedBet.set(playerId, this.currentBet);
+      this.afterAction(playerId);
+      this.actionSeq += 1;
+    }
+    return { ok: true };
+  }
+
+  resumePlayerNextHand(playerId: PokerPlayerId): PokerActionResult {
+    const player = this.players.get(playerId);
+    if (!player || this.departedPlayerIds.has(playerId)) return { ok: false, error: 'That Poker seat does not exist.' };
+    player.sittingOut = false;
+    return { ok: true };
+  }
+
   private initialVariant(): PokerVariantId {
     if (this.tableConfig.mode === 'FIXED') return this.tableConfig.fixedVariant!;
     return variantsForPokerTable(this.tableConfig)[0].id;
@@ -289,7 +335,7 @@ export class PokerGame {
 
   private prepareUpcomingDealer(): void {
     if (this.handNumber === 0) return;
-    const nextDealer = nextClockwise(this.playersClockwise, this.dealerId, (id) => !this.departedPlayerIds.has(id) && this.players.get(id)!.stack > 0);
+    const nextDealer = nextClockwise(this.playersClockwise, this.dealerId, (id) => !this.departedPlayerIds.has(id) && this.players.get(id)!.stack > 0 && !this.players.get(id)!.sittingOut);
     if (!nextDealer) throw new Error('No funded dealer seat available.');
     this.dealerId = nextDealer;
   }
@@ -301,7 +347,7 @@ export class PokerGame {
     if (this.departedPlayerIds.size === 0) return false;
     const dealerDeparted = this.departedPlayerIds.has(this.dealerId);
     const fallback = dealerDeparted
-      ? nextClockwise(this.playersClockwise, this.dealerId, (id) => !this.departedPlayerIds.has(id) && this.players.get(id)!.stack > 0)
+      ? nextClockwise(this.playersClockwise, this.dealerId, (id) => !this.departedPlayerIds.has(id) && this.players.get(id)!.stack > 0 && !this.players.get(id)!.sittingOut)
       : null;
 
     for (const id of [...this.departedPlayerIds]) {
@@ -372,7 +418,7 @@ export class PokerGame {
   dealHand(testDeck?: Card[]): void {
     if (this.state !== 'READY' && this.state !== 'HAND_COMPLETE') throw new Error(`Cannot deal poker from ${this.state}.`);
     const dealerAlreadyAdvanced = this.purgeDepartedBeforeDeal();
-    const funded = this.playersClockwise.filter((id) => this.players.get(id)!.stack > 0);
+    const funded = this.playersClockwise.filter((id) => this.players.get(id)!.stack > 0 && !this.players.get(id)!.sittingOut);
     if (funded.length < 2) throw new Error('At least two funded players are required to deal poker.');
 
     if (!dealerAlreadyAdvanced) this.prepareUpcomingDealer();
@@ -388,7 +434,7 @@ export class PokerGame {
       this.holeCards = {};
       for (const id of this.playersClockwise) {
         const player = this.players.get(id)!;
-        player.folded = player.stack <= 0;
+        player.folded = player.stack <= 0 || player.sittingOut;
         player.allIn = false;
         player.streetCommitted = 0;
         player.handCommitted = 0;
@@ -408,7 +454,7 @@ export class PokerGame {
     this.currentVariantId = this.resolveVariantForNextHand();
     this.nextVariantChooserId = null;
     const variant = getPokerVariant(this.currentVariantId);
-    const active = this.playersClockwise.filter((id) => !this.departedPlayerIds.has(id) && this.players.get(id)!.stack > 0);
+    const active = this.playersClockwise.filter((id) => !this.departedPlayerIds.has(id) && this.players.get(id)!.stack > 0 && !this.players.get(id)!.sittingOut);
     if (active.length > variant.maxPlayers) throw new Error(`${variant.name} allows at most ${variant.maxPlayers} funded seats.`);
 
     this.handNumber += 1;
@@ -421,7 +467,7 @@ export class PokerGame {
     this.holeCards = {};
     for (const id of this.playersClockwise) {
       const player = this.players.get(id)!;
-      player.folded = player.stack <= 0;
+      player.folded = player.stack <= 0 || player.sittingOut;
       player.allIn = false;
       player.streetCommitted = 0;
       player.handCommitted = 0;

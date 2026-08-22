@@ -19,6 +19,7 @@ import { KITTI_RULES } from './rules.js';
 export type PlayerId = string;
 export type KittiGroups = [Card[], Card[], Card[]];
 export type KittiHandIndex = 0 | 1 | 2;
+export type KittiMode = 'TEN_ROUND_MATCH' | 'ROUND_BOOT';
 
 export type KittiState =
   | 'READY'
@@ -65,7 +66,9 @@ export interface KittiRoundResult {
   suddenDeath: boolean;
   hands: KittiHandResult[];
   decider?: KittiDeciderResult;
-  winnerId: PlayerId;
+  /** Null only in Round Boot mode when three different players win one hand. */
+  winnerId: PlayerId | null;
+  potCarried: boolean;
   roundsWon: Record<PlayerId, number>;
 }
 
@@ -223,6 +226,7 @@ function resolveThrows(played: KittiThrow[]): { winnerId: PlayerId; wasTie: bool
 export class KittiGame {
   readonly roomCode: string;
   readonly playersClockwise: PlayerId[];
+  readonly mode: KittiMode;
 
   state: KittiState = 'READY';
   dealerId: PlayerId;
@@ -251,13 +255,19 @@ export class KittiGame {
   private deciderResult: KittiDeciderResult | undefined;
   private currentRoundDealerId: PlayerId;
 
-  constructor(roomCode: string, playersClockwise: PlayerId[], initialDealerId?: PlayerId) {
+  constructor(
+    roomCode: string,
+    playersClockwise: PlayerId[],
+    initialDealerId?: PlayerId,
+    mode: KittiMode = 'TEN_ROUND_MATCH'
+  ) {
     const n = playersClockwise.length;
     if (n < KITTI_RULES.MIN_PLAYERS || n > KITTI_RULES.MAX_PLAYERS) {
       throw new Error(`Kitti requires ${KITTI_RULES.MIN_PLAYERS}-${KITTI_RULES.MAX_PLAYERS} players, got ${n}`);
     }
     if (new Set(playersClockwise).size !== playersClockwise.length) throw new Error('Duplicate Kitti player id');
     this.roomCode = roomCode;
+    this.mode = mode;
     this.playersClockwise = [...playersClockwise];
     this.activePlayerIds = [...playersClockwise];
     this.roundsWon = Object.fromEntries(playersClockwise.map((p) => [p, 0]));
@@ -429,6 +439,10 @@ export class KittiGame {
 
     const threeWinners = new Set(this.handResultsThisRound.map((h) => h.winnerId));
     if (threeWinners.size === 3) {
+      if (this.mode === 'ROUND_BOOT') {
+        this.finishTiedBootRound();
+        return;
+      }
       this.startDecider(result.winnerId, [...threeWinners]);
       return;
     }
@@ -495,8 +509,15 @@ export class KittiGame {
           }
         : undefined,
       winnerId,
+      potCarried: false,
       roundsWon: { ...this.roundsWon },
     });
+
+    if (this.mode === 'ROUND_BOOT') {
+      this.scheduledRoundsComplete += 1;
+      this.state = 'ROUND_COMPLETE';
+      return;
+    }
 
     if (!wasSuddenDeath) this.scheduledRoundsComplete += 1;
 
@@ -529,6 +550,26 @@ export class KittiGame {
     this.state = 'ROUND_COMPLETE';
   }
 
+  private finishTiedBootRound(): void {
+    this.roundWinnerId = null;
+    this.roundHistory.push({
+      roundNumber: this.roundNumber,
+      dealerId: this.currentRoundDealerId,
+      participants: [...this.activePlayerIds],
+      suddenDeath: false,
+      hands: this.handResultsThisRound.map((hand) => ({
+        ...hand,
+        played: hand.played.map((play) => ({ ...play, cards: [...play.cards] })),
+        tiedPlayerIds: [...hand.tiedPlayerIds],
+      })),
+      winnerId: null,
+      potCarried: true,
+      roundsWon: { ...this.roundsWon },
+    });
+    this.scheduledRoundsComplete += 1;
+    this.state = 'ROUND_COMPLETE';
+  }
+
   /** Compatibility helper: a Kitti "score" is round wins, not points. */
   scoreRound(): Record<PlayerId, number> {
     if (this.state !== 'ROUND_COMPLETE' && this.state !== 'MATCH_COMPLETE') {
@@ -558,6 +599,7 @@ export class KittiGame {
     return {
       roomCode: this.roomCode,
       game: 'KITTI' as const,
+      mode: this.mode,
       state: this.state,
       dealerId: this.dealerId,
       roundDealerId: this.currentRoundDealerId,

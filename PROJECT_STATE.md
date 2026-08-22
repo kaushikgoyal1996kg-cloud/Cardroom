@@ -1,5 +1,13 @@
 # PROJECT STATE
 
+> **Authoritative staging update — 2026-08-22:** the current staging WIP now
+> enables all four games plus Live Tables/spectators, Teen Patti/Poker bots and
+> safe-boundary running-table joins; inactivity is capped at 90 seconds; voice
+> diagnostics/autoplay/ICE handling are hardened; and Kitti includes the new
+> optional Round Boot mode. See `STAGING_BUG_CHANGE_REGISTER_2026-08-22.md`.
+> Older “hidden/Coming Soon” descriptions lower in this long historical file
+> describe the earlier checkpoint and do not override this current status.
+
 
 ### Current WIP — whole-app release audit after 5-card + Friendly Assist
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { GAME_CATALOG, catalogEntry, type CatalogGameId } from '../games/catalog';
 import { AvatarBadge } from '../../components/Lobby/AvatarPicker';
 import { GameVariantGallery } from './GameVariantGallery';
-import type { GameId } from '../../game/types';
+import type { GameId, TableSummary } from '../../game/types';
 import './Home.css';
 
 export interface HomeProps {
@@ -19,6 +19,8 @@ export interface HomeProps {
   /** Disables the primary actions while a request is in flight. */
   busy?: boolean;
   error?: string | null;
+  liveTables?: TableSummary[];
+  onWatchTable?: (code: string) => void;
 }
 
 /**
@@ -37,6 +39,8 @@ export function Home({
   onJoinTable,
   busy = false,
   error = null,
+  liveTables = [],
+  onWatchTable,
 }: HomeProps) {
   const [selected, setSelected] = useState<CatalogGameId | null>(null);
   const [joinCode, setJoinCode] = useState('');
@@ -193,6 +197,32 @@ export function Home({
             </p>
           )}
         </div>
+
+        <section className="home__live" aria-labelledby="live-tables-title">
+          <h2 id="live-tables-title" className="home__section-title">Live Tables</h2>
+          {liveTables.length === 0 ? (
+            <p className="text-muted">No visible tables are running right now.</p>
+          ) : (
+            <div className="home__live-list">
+              {liveTables.map((table) => (
+                <article key={table.roomCode} className="panel home__live-table">
+                  <div>
+                    <strong>{catalogEntry(table.gameId)?.name ?? table.gameId}</strong>
+                    <span>{table.playerCount} players · {table.botCount} bots · {table.spectatorCount} watching</span>
+                  </div>
+                  <div className="home__live-actions">
+                    {table.playerCount < table.maxPlayers && (
+                      <button className="btn btn--secondary" disabled={busy} onClick={() => onJoinTable(table.roomCode)}>Join</button>
+                    )}
+                    {table.status === 'IN_GAME' && (
+                      <button className="btn btn--ghost" disabled={busy || !onWatchTable} onClick={() => onWatchTable?.(table.roomCode)}>Watch</button>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );

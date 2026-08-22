@@ -1,7 +1,7 @@
 import { customAlphabet } from 'nanoid';
 import type { PlayerId, PlayerSlot, PublicPlayerInfo, PublicRoomInfo, RoomState, TableSummary } from './types.js';
 import { DEFAULT_AVATAR, isValidAvatar } from './avatars.js';
-import { RECONNECT_WINDOW_MS } from './sessionConfig.js';
+import { INACTIVITY_THRESHOLD_MS, RECONNECT_WINDOW_MS } from './sessionConfig.js';
 import { canStartWith, getGame, maxPlayersFor, type GameId } from '../games/registry.js';
 
 // Room codes carry the game identity so an invite is self-explanatory:
@@ -89,9 +89,12 @@ export class RoomManager {
       gameId,
       hostId: playerId,
       players: new Map([[playerId, hostSlot]]),
+      spectators: new Map(),
       playerDirectory: { [playerId]: { name: hostSlot.name, avatar: hostSlot.avatar } },
       status: 'LOBBY',
       createdAt: Date.now(),
+      visibility: 'LIVE',
+      spectatorVoicePolicy: 'LISTEN_ONLY',
       voiceCallParticipants: new Set(),
       playMoney: { tableProfitLoss: { [playerId]: 0 } },
     };
@@ -105,11 +108,12 @@ export class RoomManager {
   joinRoom(roomCode: string, playerName: string, avatar?: string): { room: RoomState; playerId: PlayerId; token: string } {
     const room = this.rooms.get(roomCode);
     if (!room) throw new RoomManagerError('This room does not exist.');
-    // Teen Patti is an open table session: completely new players may take an
-    // empty seat while a hand is already running. The Teen Patti engine marks
-    // that seat as sitting out until the next round. Other games keep their
-    // existing lobby-only join rule.
-    if (room.status === 'IN_GAME' && room.gameId !== 'TEEN_PATTI') {
+    // Teen Patti and Poker are open table sessions: completely new players may
+    // take an empty seat while a round/hand is already running, then enter at
+    // the next safe boundary. Hazari/Kitti keep their lobby-only join rule.
+    // In every game, a spectator may instead reserve an ordinary bot seat and
+    // take control only when the current round/hand reaches a safe boundary.
+    if (room.status === 'IN_GAME' && room.gameId !== 'TEEN_PATTI' && room.gameId !== 'POKER') {
       throw new RoomManagerError('Game has already started.');
     }
     if (room.players.size >= maxPlayersFor(room.gameId)) throw new RoomManagerError('This room is full.');
@@ -306,6 +310,12 @@ export class RoomManager {
     slot.connected = true;
     slot.socketId = socketId;
     slot.disconnectedAt = undefined;
+    if (slot.inactiveDisposition) slot.returnPending = room.status === 'IN_GAME';
+    if (room.status === 'LOBBY' && slot.inactiveDisposition) {
+      slot.isBot = false;
+      slot.inactiveDisposition = undefined;
+      slot.returnPending = undefined;
+    }
     return previousSocketId;
   }
 
@@ -319,7 +329,7 @@ export class RoomManager {
     if (!slot) throw new RoomManagerError('Player no longer in this room.');
 
     const elapsedSinceDisconnect = slot.disconnectedAt ? Date.now() - slot.disconnectedAt : 0;
-    if (!slot.connected && slot.disconnectedAt && elapsedSinceDisconnect > RECONNECT_WINDOW_MS) {
+    if (!slot.connected && slot.disconnectedAt && elapsedSinceDisconnect > RECONNECT_WINDOW_MS && !slot.inactiveDisposition) {
       throw new RoomManagerError('Reconnection window has expired.');
     }
 
@@ -345,6 +355,131 @@ export class RoomManager {
     // game-owned state untouched and rely on the reconnect window instead.
     if (room?.status === 'LOBBY' && !slot.isBot) slot.ready = false;
     room?.voiceCallParticipants.delete(playerId); // a dropped connection also drops out of any voice call
+  }
+
+  /** Applies only after the exact disconnectedAt timestamp has remained stale
+   * for the full grace period. Returns whether public room state changed. */
+  transitionInactive(roomCode: string, playerId: PlayerId, disconnectedAt: number, now = Date.now()): boolean {
+    const room = this.rooms.get(roomCode);
+    const slot = room?.players.get(playerId);
+    if (!room || !slot || slot.isBot || slot.connected || slot.disconnectedAt !== disconnectedAt) return false;
+    if (now - disconnectedAt < INACTIVITY_THRESHOLD_MS) return false;
+
+    slot.inactiveDisposition = room.gameId === 'HAZARI' || room.gameId === 'KITTI' ? 'BOT_SUBSTITUTE' : 'SITTING_OUT';
+    if (slot.inactiveDisposition === 'BOT_SUBSTITUTE') {
+      slot.isBot = true;
+      slot.ready = true;
+    }
+    if (room.hostId === playerId) {
+      const nextHost = [...room.players.values()].find((candidate) =>
+        candidate.playerId !== playerId
+        && !candidate.isBot
+        && candidate.connected
+        && !candidate.inactiveDisposition
+        && !candidate.returnPending
+      );
+      if (nextHost) room.hostId = nextHost.playerId;
+    }
+    return true;
+  }
+
+  /** Activates humans who returned from inactivity at a caller-confirmed safe
+   * round/hand boundary. Engine-specific sit-out flags are handled alongside
+   * this room-level transition by the network controller. */
+  activatePendingReturns(roomCode: string): PlayerId[] {
+    const room = this.getRoomOrThrow(roomCode);
+    const activated: PlayerId[] = [];
+    for (const slot of room.players.values()) {
+      if (!slot.returnPending || !slot.connected || !slot.inactiveDisposition) continue;
+      slot.isBot = false;
+      slot.inactiveDisposition = undefined;
+      slot.returnPending = undefined;
+      slot.ready = true;
+      activated.push(slot.playerId);
+    }
+    return activated;
+  }
+
+  setVisibility(roomCode: string, requestingPlayerId: PlayerId, visibility: RoomState['visibility']): RoomState {
+    const room = this.getRoomOrThrow(roomCode);
+    if (room.hostId !== requestingPlayerId) throw new RoomManagerError('Only the host can change table visibility.');
+    room.visibility = visibility;
+    return room;
+  }
+
+  watchRoom(roomCode: string, name: string, avatar?: string): { room: RoomState; spectatorId: string } {
+    const room = this.getRoomOrThrow(roomCode);
+    if (room.visibility !== 'LIVE') throw new RoomManagerError('This table is private.');
+    if (room.status !== 'IN_GAME') throw new RoomManagerError('This table has not started yet. Join it as a player instead.');
+    const spectatorId = `watch_${playerIdGen()}`;
+    room.spectators.set(spectatorId, {
+      spectatorId,
+      name,
+      avatar: isValidAvatar(avatar) ? avatar : DEFAULT_AVATAR,
+    });
+    return { room, spectatorId };
+  }
+
+  bindSpectatorSocket(roomCode: string, spectatorId: string, socketId: string): void {
+    const spectator = this.getRoomOrThrow(roomCode).spectators.get(spectatorId);
+    if (!spectator) throw new RoomManagerError('Spectator is no longer watching this table.');
+    spectator.socketId = socketId;
+  }
+
+  leaveSpectator(roomCode: string, spectatorId: string): void {
+    const room = this.rooms.get(roomCode);
+    if (!room) return;
+    room.spectators.delete(spectatorId);
+    room.voiceCallParticipants.delete(spectatorId);
+  }
+
+  setSpectatorVoicePolicy(roomCode: string, requestingPlayerId: PlayerId, policy: RoomState['spectatorVoicePolicy']): RoomState {
+    const room = this.getRoomOrThrow(roomCode);
+    if (room.hostId !== requestingPlayerId) throw new RoomManagerError('Only the host can change spectator voice.');
+    room.spectatorVoicePolicy = policy;
+    // A connected conversation stream cannot be downgraded safely in place:
+    // its already-negotiated microphone track would keep flowing peer-to-peer.
+    // Remove current spectators whenever conversation becomes unavailable;
+    // listen-only spectators may rejoin under the new policy.
+    if (policy !== 'CONVERSATION') {
+      for (const spectatorId of room.spectators.keys()) room.voiceCallParticipants.delete(spectatorId);
+    }
+    return room;
+  }
+
+  removeInactiveBotClaim(roomCode: string, requestingPlayerId: PlayerId, targetPlayerId: PlayerId): RoomState {
+    const room = this.getRoomOrThrow(roomCode);
+    if (room.hostId !== requestingPlayerId) throw new RoomManagerError('Only the host can remove an inactive player.');
+    const slot = room.players.get(targetPlayerId);
+    if (!slot?.inactiveDisposition || slot.connected) throw new RoomManagerError('That player is not eligible for inactivity removal.');
+    if (slot.inactiveDisposition !== 'BOT_SUBSTITUTE') throw new RoomManagerError('This seat must be settled by its game controller.');
+    this.tokenIndex.delete(slot.token);
+    slot.inactiveDisposition = undefined;
+    slot.returnPending = undefined;
+    return room;
+  }
+
+  claimBotSeat(roomCode: string, spectatorId: string, botPlayerId: PlayerId): { room: RoomState; playerId: PlayerId; token: string } {
+    const room = this.getRoomOrThrow(roomCode);
+    const spectator = room.spectators.get(spectatorId);
+    const slot = room.players.get(botPlayerId);
+    if (!spectator) throw new RoomManagerError('You are not watching this table.');
+    if (!slot?.isBot || slot.inactiveDisposition) throw new RoomManagerError('That bot seat is not available to take.');
+    const token = tokenGen();
+    slot.token = token;
+    slot.name = spectator.name;
+    slot.avatar = spectator.avatar;
+    slot.connected = true;
+    slot.returnPending = room.status === 'IN_GAME';
+    slot.inactiveDisposition = room.status === 'IN_GAME' ? 'BOT_SUBSTITUTE' : undefined;
+    slot.socketId = spectator.socketId;
+    room.playerDirectory ??= {};
+    room.playerDirectory[slot.playerId] = { name: slot.name, avatar: slot.avatar };
+    room.spectators.delete(spectatorId);
+    room.voiceCallParticipants.delete(spectatorId);
+    this.tokenIndex.set(token, { roomCode, playerId: slot.playerId });
+    if (room.status !== 'IN_GAME') slot.isBot = false;
+    return { room, playerId: slot.playerId, token };
   }
 
   setReady(roomCode: string, playerId: PlayerId, ready: boolean): RoomState {
@@ -387,7 +522,12 @@ export class RoomManager {
   }
 
   /** Host proposes an optional virtual board for the next Hazari/Kitti match. */
-  proposePlayMoney(roomCode: string, requestingPlayerId: PlayerId, amount: number): RoomState {
+  proposePlayMoney(
+    roomCode: string,
+    requestingPlayerId: PlayerId,
+    amount: number,
+    mode: 'MATCH_POT' | 'KITTI_ROUND_BOOT' = 'MATCH_POT'
+  ): RoomState {
     const room = this.getRoomOrThrow(roomCode);
     if (!supportsSharedPlayMoney(room.gameId)) {
       throw new RoomManagerError('This play-money board applies only to Hazari and Kitti.');
@@ -397,9 +537,12 @@ export class RoomManager {
     if (!Number.isSafeInteger(amount) || amount <= 0 || amount > MAX_PLAY_MONEY_BOARD) {
       throw new RoomManagerError(`Board amount must be a whole number from 1 to ${MAX_PLAY_MONEY_BOARD}.`);
     }
+    if (mode === 'KITTI_ROUND_BOOT' && room.gameId !== 'KITTI') {
+      throw new RoomManagerError('Round Boot mode applies only to Kitti.');
+    }
     const acceptedBy = new Set<PlayerId>([requestingPlayerId]);
     for (const slot of room.players.values()) if (slot.isBot) acceptedBy.add(slot.playerId);
-    room.playMoney.proposal = { amount, proposedBy: requestingPlayerId, acceptedBy };
+    room.playMoney.proposal = { amount, mode, proposedBy: requestingPlayerId, acceptedBy };
     return room;
   }
 
@@ -461,7 +604,9 @@ export class RoomManager {
     }
     room.playMoney.activeMatch = {
       amount: proposal.amount,
+      mode: proposal.mode,
       pot: proposal.amount * participantIds.length,
+      contributionRounds: 1,
       participantIds,
       settled: false,
     };
@@ -480,6 +625,36 @@ export class RoomManager {
     room.playMoney.tableProfitLoss[winnerId] = (room.playMoney.tableProfitLoss[winnerId] ?? 0) + active.pot;
     active.settled = true;
     active.winnerId = winnerId;
+    return room;
+  }
+
+  /**
+   * Funds the next Kitti Round Boot deal. A tied 1-1-1 deal keeps the old
+   * pot and adds one new boot from every seat. After a winner was paid, this
+   * opens a fresh pot for the next deal at the same table.
+   */
+  fundNextKittiBootRound(roomCode: string): RoomState {
+    const room = this.getRoomOrThrow(roomCode);
+    const active = room.playMoney.activeMatch;
+    if (room.gameId !== 'KITTI' || !active || active.mode !== 'KITTI_ROUND_BOOT') return room;
+    const participantIds = [...room.players.keys()];
+    for (const id of participantIds) {
+      room.playMoney.tableProfitLoss[id] = (room.playMoney.tableProfitLoss[id] ?? 0) - active.amount;
+    }
+    if (active.settled) {
+      room.playMoney.activeMatch = {
+        amount: active.amount,
+        mode: active.mode,
+        pot: active.amount * participantIds.length,
+        contributionRounds: 1,
+        participantIds,
+        settled: false,
+      };
+    } else {
+      active.pot += active.amount * participantIds.length;
+      active.contributionRounds += 1;
+      active.participantIds = participantIds;
+    }
     return room;
   }
 
@@ -528,12 +703,15 @@ export class RoomManager {
       ready: p.ready,
       isHost: p.playerId === room.hostId,
       isBot: p.isBot,
+      inactiveDisposition: p.inactiveDisposition,
+      returnPending: p.returnPending,
     }));
     return {
       roomCode: room.roomCode,
       gameId: room.gameId,
       status: room.status,
       players,
+      spectators: [...room.spectators.values()].map(({ spectatorId, name, avatar }) => ({ spectatorId, name, avatar })),
       playerDirectory: room.playerDirectory ? Object.fromEntries(
         Object.entries(room.playerDirectory).map(([id, identity]) => [id, { ...identity }])
       ) : undefined,
@@ -544,6 +722,7 @@ export class RoomManager {
         proposal: room.playMoney.proposal
           ? {
               amount: room.playMoney.proposal.amount,
+              mode: room.playMoney.proposal.mode,
               proposedBy: room.playMoney.proposal.proposedBy,
               acceptedBy: [...room.playMoney.proposal.acceptedBy],
             }
@@ -553,6 +732,8 @@ export class RoomManager {
           : null,
         tableProfitLoss: { ...room.playMoney.tableProfitLoss },
       },
+      visibility: room.visibility,
+      spectatorVoicePolicy: room.spectatorVoicePolicy,
     };
   }
 
@@ -593,10 +774,10 @@ export class RoomManager {
   listOpenTables(gameId?: GameId): TableSummary[] {
     const tables: TableSummary[] = [];
     for (const room of this.rooms.values()) {
-      if (room.status !== 'LOBBY') continue;
+      if (room.visibility !== 'LIVE') continue;
       if (gameId && room.gameId !== gameId) continue;
       const max = maxPlayersFor(room.gameId);
-      if (room.players.size >= max) continue;
+      if (room.players.size >= max && room.status === 'LOBBY') continue;
       const host = room.players.get(room.hostId);
       tables.push({
         roomCode: room.roomCode,
@@ -605,6 +786,9 @@ export class RoomManager {
         playerCount: room.players.size,
         maxPlayers: max,
         status: room.status,
+        visibility: room.visibility,
+        spectatorCount: room.spectators.size,
+        botCount: [...room.players.values()].filter((player) => player.isBot).length,
       });
     }
     // Most recently created first, so new tables are easy to find.

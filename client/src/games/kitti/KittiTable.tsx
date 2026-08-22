@@ -29,6 +29,7 @@ export function KittiTable() {
     speakingPlayerIds,
     isRestoring,
     restorationGeneration,
+    isSpectator: watching,
   } = useGame();
   const [pending, setPending] = useState(false);
   const [dismissedRevealKey, setDismissedRevealKey] = useState<string | null>(null);
@@ -84,12 +85,14 @@ export function KittiTable() {
   }
 
   const isDecider = kittiState.state === 'PLAYING_DECIDER' || completedWithDecider;
-  const isSpectator = kittiState.spectatorIds.includes(myPlayerId);
+  const isSpectator = watching || kittiState.spectatorIds.includes(myPlayerId);
   const nameOf = (id: PlayerId | null) => room.players.find((p) => p.playerId === id)?.name ?? 'Player';
   const phaseLabel = isDecider
     ? 'Three-winner decider'
     : `${HAND_NAMES[kittiState.currentHandIndex]} of 3`;
-  const roundLabel = kittiState.suddenDeath
+  const roundLabel = kittiState.mode === 'ROUND_BOOT'
+    ? `Round Boot · Deal ${kittiState.roundNumber}`
+    : kittiState.suddenDeath
     ? `Sudden death · Round ${kittiState.roundNumber}`
     : `Round ${Math.min(kittiState.roundNumber, 10)} of 10`;
 
@@ -140,7 +143,7 @@ export function KittiTable() {
           compact
         />
         <div className="kitti-table-screen__scoreline">
-          <span>{kittiState.scheduledRoundsComplete}/10 complete</span>
+          <span>{kittiState.mode === 'ROUND_BOOT' ? `${kittiState.scheduledRoundsComplete} deals complete` : `${kittiState.scheduledRoundsComplete}/10 complete`}</span>
           {kittiState.suddenDeath && <strong>Leaders only</strong>}
           <PlayMoneyPotBadge />
         </div>

@@ -21,10 +21,16 @@ export interface ClientToServerEvents {
   'room:ready': (payload: { ready: boolean }) => void;
   'room:start': () => void;
   'room:listTables': (payload: { gameId?: GameId } | undefined, ack: (res: TablesAck) => void) => void;
+  'room:watch': (payload: { roomCode: string; spectatorName: string; avatar?: string }, ack: (res: WatchRoomAck) => void) => void;
+  'room:leaveSpectator': (ack: (res: RoomLeaveAck) => void) => void;
+  'room:spectatorJoin': (payload: { botPlayerId?: PlayerId }, ack: (res: RoomAck) => void) => void;
+  'room:setVisibility': (payload: { visibility: 'LIVE' | 'PRIVATE' }) => void;
+  'room:setSpectatorVoice': (payload: { policy: 'DISABLED' | 'LISTEN_ONLY' | 'CONVERSATION' }) => void;
+  'room:removeInactive': (payload: { playerId: PlayerId }) => void;
   'room:addBot': () => void;
   'room:removeBot': (payload: { playerId: PlayerId }) => void;
   'room:playAgain': () => void;
-  'room:playMoneyPropose': (payload: { amount: number }) => void;
+  'room:playMoneyPropose': (payload: { amount: number; mode?: 'MATCH_POT' | 'KITTI_ROUND_BOOT' }) => void;
   'room:playMoneyAccept': () => void;
   'room:playMoneyDecline': () => void;
   'room:playMoneyCancel': () => void;
@@ -77,7 +83,7 @@ export interface ClientToServerEvents {
 
   // Voice/WebRTC signaling
   'voice:getIceServers': (ack: (res: VoiceIceServersAck) => void) => void;
-  'voice:join': () => void;
+  'voice:join': (payload?: { mode: 'LISTEN_ONLY' | 'CONVERSATION' }) => void;
   'voice:leave': () => void;
   'voice:signal': (payload: { toPlayerId: PlayerId; data: unknown }) => void;
   'voice:mute': (payload: { muted: boolean }) => void;
@@ -107,6 +113,14 @@ export interface RoomAck {
   roomCode?: string;
   playerId?: PlayerId;
   token?: string;
+  room?: PublicRoomInfo;
+}
+
+export interface WatchRoomAck {
+  ok: boolean;
+  error?: string;
+  roomCode?: string;
+  spectatorId?: string;
   room?: PublicRoomInfo;
 }
 
@@ -214,6 +228,7 @@ export interface ServerToClientEvents {
   'voice:peerLeft': (payload: { playerId: PlayerId }) => void;
   'voice:signal': (payload: { fromPlayerId: PlayerId; data: unknown }) => void;
   'voice:muteChanged': (payload: { playerId: PlayerId; muted: boolean }) => void;
+  'voice:accessRevoked': (payload: { reason: string }) => void;
 }
 
 export interface ChatMessage {
@@ -252,6 +267,7 @@ export interface HaazariPublicStatePayload {
 export interface KittiPublicStatePayload {
   roomCode: string;
   game: 'KITTI';
+  mode: 'TEN_ROUND_MATCH' | 'ROUND_BOOT';
   state: string;
   dealerId: PlayerId;
   roundDealerId: PlayerId;

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useGame } from '../../lib/GameStore';
 import './PlayMoneyBoard.css';
 
-const PRESETS = [20, 50, 100, 200];
+const PRESETS = [10, 20, 50, 100];
 
 export function PlayMoneyBoard() {
   const {
@@ -14,6 +14,7 @@ export function PlayMoneyBoard() {
     cancelPlayMoney,
   } = useGame();
   const [amountText, setAmountText] = useState('100');
+  const [kittiMode, setKittiMode] = useState<'MATCH_POT' | 'KITTI_ROUND_BOOT'>('MATCH_POT');
 
   if (!room?.playMoney || !['HAZARI', 'KITTI'].includes(room.gameId)) return null;
 
@@ -28,6 +29,8 @@ export function PlayMoneyBoard() {
   const previewPot = proposal ? proposal.amount * room.players.length : 0;
   const amount = Number(amountText);
   const validAmount = Number.isSafeInteger(amount) && amount > 0 && amount <= 1_000_000;
+  const proposalMode = proposal?.mode ?? 'MATCH_POT';
+  const isRoundBoot = room.gameId === 'KITTI' && proposalMode === 'KITTI_ROUND_BOOT';
 
   const ledgerRows = room.players
     .map((player) => ({ player, value: room.playMoney.tableProfitLoss[player.playerId] ?? 0 }))
@@ -51,7 +54,18 @@ export function PlayMoneyBoard() {
       {!proposal ? (
         isHost ? (
           <div className="play-money-board__propose">
-            <p>Propose a board for this match, or start normally with no play money.</p>
+            {room.gameId === 'KITTI' && (
+              <label>
+                Kitti table mode
+                <select value={kittiMode} onChange={(event) => setKittiMode(event.target.value as typeof kittiMode)}>
+                  <option value="MATCH_POT">10-round match · one match pot</option>
+                  <option value="KITTI_ROUND_BOOT">Round Boot · pot carries on a 1–1–1 tie</option>
+                </select>
+              </label>
+            )}
+            <p>{room.gameId === 'KITTI' && kittiMode === 'KITTI_ROUND_BOOT'
+              ? 'Choose the boot each seat adds per deal. A three-way 1–1–1 result carries the pot and everyone adds the boot again.'
+              : 'Propose a board for this match, or start normally with no play money.'}</p>
             <div className="play-money-board__presets" aria-label="Board amount presets">
               {PRESETS.map((preset) => (
                 <button
@@ -80,9 +94,9 @@ export function PlayMoneyBoard() {
                 className="btn btn-primary"
                 type="button"
                 disabled={!validAmount}
-                onClick={() => validAmount && proposePlayMoney(amount)}
+                onClick={() => validAmount && proposePlayMoney(amount, room.gameId === 'KITTI' ? kittiMode : 'MATCH_POT')}
               >
-                Propose board
+                {room.gameId === 'KITTI' && kittiMode === 'KITTI_ROUND_BOOT' ? 'Propose boot' : 'Propose board'}
               </button>
             </div>
           </div>
@@ -92,7 +106,7 @@ export function PlayMoneyBoard() {
       ) : (
         <>
           <div className="play-money-board__pot-preview">
-            <span>Match pot if accepted</span>
+            <span>{isRoundBoot ? 'First-deal pot if accepted' : 'Match pot if accepted'}</span>
             <strong>{previewPot}</strong>
             <small>{room.players.length} × {proposal.amount}</small>
           </div>
@@ -114,7 +128,7 @@ export function PlayMoneyBoard() {
 
           <p className={`play-money-board__status${allHumansAccepted ? ' is-ready' : ''}`} role="status">
             {allHumansAccepted
-              ? 'Everyone has accepted. The board will lock when the match starts.'
+              ? `Everyone has accepted. The ${isRoundBoot ? 'round boot' : 'board'} will lock when the match starts.`
               : `${humanAccepted.length} of ${humans.length} human player${humans.length === 1 ? '' : 's'} accepted.`}
           </p>
 
@@ -167,6 +181,7 @@ export function PlayMoneyPotBadge() {
     <div className="play-money-pot-badge play-money-pot-badge--compact" aria-label={`Virtual play-money pot ${active.pot}`}>
       <span>Virtual pot</span>
       <strong>{active.pot}</strong>
+      {active.mode === 'KITTI_ROUND_BOOT' && active.contributionRounds > 1 && <small>{active.contributionRounds} boots</small>}
     </div>
   );
 }
@@ -181,7 +196,7 @@ export function PlayMoneySettlement() {
     <section className="play-money-settlement" aria-label="Play-money result">
       <p>Virtual board settled</p>
       <div className="play-money-settlement__pot">
-        <span>{active.amount} × {active.participantIds.length}</span>
+        <span>{active.amount} × {active.participantIds.length}{active.contributionRounds > 1 ? ` × ${active.contributionRounds} deals` : ''}</span>
         <strong>{active.pot}</strong>
         <small>pot</small>
       </div>

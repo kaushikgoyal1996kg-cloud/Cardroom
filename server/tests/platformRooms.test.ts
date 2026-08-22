@@ -168,7 +168,7 @@ describe('seat limits follow the room\'s game', () => {
     expect(() => rooms.joinRoom(room.roomCode, 'E')).toThrow(/full/i);
   });
 
-  it('allows a new seat into an already-running Teen Patti table but keeps other games lobby-only', () => {
+  it('allows join-next-round/hand seats at running Teen Patti and Poker tables', () => {
     const rooms = new RoomManager();
     const { room: teenPatti } = rooms.createRoom('Host', 'TEEN_PATTI');
     teenPatti.status = 'IN_GAME';
@@ -177,7 +177,12 @@ describe('seat limits follow the room\'s game', () => {
 
     const { room: poker } = rooms.createRoom('Poker Host', 'POKER');
     poker.status = 'IN_GAME';
-    expect(() => rooms.joinRoom(poker.roomCode, 'Late Poker')).toThrow(/already started/i);
+    const pokerJoined = rooms.joinRoom(poker.roomCode, 'Late Poker');
+    expect(pokerJoined.room.players.has(pokerJoined.playerId)).toBe(true);
+
+    const { room: kitti } = rooms.createRoom('Kitti Host', 'KITTI');
+    kitti.status = 'IN_GAME';
+    expect(() => rooms.joinRoom(kitti.roomCode, 'Late Kitti')).toThrow(/already started/i);
   });
 
   it('quick match never crosses games', () => {

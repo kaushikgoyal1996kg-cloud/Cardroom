@@ -75,7 +75,9 @@ export function RoundHistoryModal({ onClose }: Props) {
                   <span>Round {r.roundNumber}{r.suddenDeath ? <span className="round-history-row__sudden"> · sudden death</span> : null}</span>
                   <span className="text-muted">Dealer: {nameOf(r.dealerId)}</span>
                 </div>
-                <div className="round-history-row__winner">Won by <strong>{nameOf(r.winnerId)}</strong></div>
+                <div className="round-history-row__winner">
+                  {r.winnerId ? <>Won by <strong>{nameOf(r.winnerId)}</strong></> : <strong>1–1–1 · pot carried</strong>}
+                </div>
                 <div className="round-history-row__scores">
                   {room.players.map((player) => (
                     <div key={player.playerId} className="round-history-row__player">

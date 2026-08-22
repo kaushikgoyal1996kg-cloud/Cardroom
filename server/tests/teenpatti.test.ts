@@ -415,6 +415,29 @@ describe('Teen Patti rounds, top-ups and P&L', () => {
 });
 
 describe('Teen Patti live-table joining', () => {
+  it('packs an inactive player, keeps the seat out, and resumes only on the next safe round', () => {
+    const game = new TeenPattiGame('INACTIVE', ['p1', 'p2', 'p3'], {
+      initialDealerId: 'p1', tableConfig: config,
+    });
+    game.dealNewRound(createDeck());
+    const inactiveId = game.currentTurn!;
+    expect(game.setInactiveSittingOut(inactiveId)).toEqual({ ok: true });
+    expect(game.getPublicState().players.find((player) => player.playerId === inactiveId)).toMatchObject({
+      sittingOut: true, packed: true,
+    });
+
+    while (game.state === 'BETTING') {
+      expect(game.act(game.currentTurn!, { type: 'PACK' }, game.sequence).ok).toBe(true);
+    }
+    expect(game.state).toBe('ROUND_COMPLETE');
+    expect(game.resumePlayerNextRound(inactiveId)).toEqual({ ok: true });
+    game.dealNewRound(createDeck());
+    expect(game.getPublicState().players.find((player) => player.playerId === inactiveId)).toMatchObject({
+      sittingOut: false, packed: false,
+    });
+    expect(game.getPlayerHand(inactiveId)).toHaveLength(3);
+  });
+
   it('seats a new player immediately during a running hand but activates them only from the next round', () => {
     const game = new TeenPattiGame('LIVE-JOIN', ['p1', 'p2', 'p3'], {
       initialDealerId: 'p1', tableConfig: config,

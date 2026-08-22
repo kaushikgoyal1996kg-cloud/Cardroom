@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { HaazariGame } from '../../games/hazari/gameEngine.js';
-import { KittiGame } from '../../games/kitti/engine.js';
+import { KittiGame, type KittiMode } from '../../games/kitti/engine.js';
 import { TeenPattiGame } from '../../games/teenpatti/engine.js';
 import { PokerGame } from '../../games/poker/engine.js';
 import type { PokerTableConfig } from '../../games/poker/rules.js';
@@ -43,8 +43,8 @@ export class KittiSession implements GameSession {
   readonly gameId = 'KITTI' as const;
   readonly engine: KittiGame;
 
-  constructor(roomCode: string, playersClockwise: string[]) {
-    this.engine = new KittiGame(roomCode, playersClockwise);
+  constructor(roomCode: string, playersClockwise: string[], mode: KittiMode = 'TEN_ROUND_MATCH') {
+    this.engine = new KittiGame(roomCode, playersClockwise, undefined, mode);
   }
 
   get state(): string {
@@ -125,6 +125,7 @@ export class PokerSession implements GameSession {
 }
 
 export interface GameSessionOptions {
+  kitti?: { mode: KittiMode };
   teenPatti?: {
     tableConfig: TeenPattiTableConfig;
     roundVariant: TeenPattiRoundVariantConfig;
@@ -157,7 +158,7 @@ export function createGameSession(
     case 'HAZARI':
       return new HazariSession(roomCode, playersClockwise);
     case 'KITTI':
-      return new KittiSession(roomCode, playersClockwise);
+      return new KittiSession(roomCode, playersClockwise, options.kitti?.mode);
     case 'TEEN_PATTI': {
       const setup = options.teenPatti;
       if (!setup) throw new GameNotAvailableError(gameId, `${def.name} needs an approved table setup.`);

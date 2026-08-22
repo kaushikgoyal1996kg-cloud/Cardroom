@@ -18,9 +18,12 @@ export function VoiceCallPanel({ open: controlledOpen, onClose, showLauncher = t
     voiceMuted,
     voiceParticipants,
     speakingPlayerIds,
+    voiceDiagnostics,
+    voicePlaybackBlockedPlayerIds,
     joinVoiceCall,
     leaveVoiceCall,
     toggleVoiceMute,
+    retryVoicePlayback,
   } = useGame();
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
@@ -33,7 +36,9 @@ export function VoiceCallPanel({ open: controlledOpen, onClose, showLauncher = t
   if (!room || !voiceCallSupported) return null;
 
   function nameOf(playerId: string) {
-    return room!.players.find((p) => p.playerId === playerId)?.name ?? playerId;
+    return room!.players.find((p) => p.playerId === playerId)?.name
+      ?? room!.spectators.find((spectator) => spectator.spectatorId === playerId)?.name
+      ?? playerId;
   }
 
   const othersInCall = voiceParticipants.filter((id) => id !== myPlayerId);
@@ -94,6 +99,26 @@ export function VoiceCallPanel({ open: controlledOpen, onClose, showLauncher = t
                   </div>
                 ))}
               </div>
+              {voicePlaybackBlockedPlayerIds.length > 0 && (
+                <div className="voice-call-panel__recovery" role="alert">
+                  <p>Your browser paused incoming audio.</p>
+                  <button className="btn btn-primary" onClick={retryVoicePlayback}>Tap to enable audio</button>
+                </div>
+              )}
+              <details className="voice-call-panel__diagnostics">
+                <summary>Connection diagnostics</summary>
+                {voiceDiagnostics.length === 0 ? (
+                  <p className="text-muted">No connection events yet.</p>
+                ) : (
+                  <ol>
+                    {voiceDiagnostics.slice(-12).map((event, index) => (
+                      <li key={`${event.at}-${index}`} data-level={event.level}>
+                        {event.peerId ? `${nameOf(event.peerId)}: ` : ''}{event.message}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </details>
             </>
           )}
         </div>

@@ -223,6 +223,40 @@ describe('Kitti hand resolution', () => {
 });
 
 describe('Kitti round flow', () => {
+  it('carries a Round Boot pot instead of dealing a decider after a 1–1–1 result', () => {
+    const hands = threeDifferentWinnersHands();
+    const game = new KittiGame('K1', ['p1', 'p2', 'p3'], 'p1', 'ROUND_BOOT');
+    game.dealNewRound(deckForHands(['p1', 'p2', 'p3'], hands));
+    for (const playerId of ['p1', 'p2', 'p3']) {
+      expect(game.confirmArrangement(playerId, groups(hands[playerId])).ok).toBe(true);
+    }
+
+    playCurrentHandInOrder(game);
+    playCurrentHandInOrder(game);
+    playCurrentHandInOrder(game);
+
+    expect(game.state).toBe('ROUND_COMPLETE');
+    expect(game.getPublicState().mode).toBe('ROUND_BOOT');
+    expect(game.getPublicState().deciderPlayerIds).toEqual([]);
+    expect(game.roundHistory[0]).toMatchObject({ winnerId: null, potCarried: true });
+    expect(game.roundsWon).toEqual({ p1: 0, p2: 0, p3: 0 });
+  });
+
+  it('keeps Round Boot open-ended and awards a deal only for two hand wins', () => {
+    const hands = twoPlayerWinningHands();
+    const game = new KittiGame('K1', ['p1', 'p2'], 'p1', 'ROUND_BOOT');
+    game.dealNewRound(deckForHands(['p1', 'p2'], hands));
+    game.confirmArrangement('p1', groups(hands.p1));
+    game.confirmArrangement('p2', groups(hands.p2));
+    playCurrentHandInOrder(game);
+    playCurrentHandInOrder(game);
+
+    expect(game.state).toBe('ROUND_COMPLETE');
+    expect(game.matchWinnerId).toBeNull();
+    expect(game.roundHistory[0]).toMatchObject({ winnerId: 'p1', potCarried: false });
+    expect(game.isComplete()).toBe(false);
+  });
+
   it('ends the round immediately when a player wins the first two hands', () => {
     const hands = twoPlayerWinningHands();
     const game = new KittiGame('K1', ['p1', 'p2'], 'p1');

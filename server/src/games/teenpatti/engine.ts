@@ -184,6 +184,7 @@ export function drawInitialTeenPattiDealer(
 }
 
 export class TeenPattiGame {
+  private forcedSittingOut = new Set<PlayerId>();
   readonly roomCode: string;
   readonly playersClockwise: PlayerId[];
   readonly tableConfig: TeenPattiTableConfig;
@@ -384,7 +385,8 @@ export class TeenPattiGame {
       player.seen = false;
       player.cardsViewed = false;
       player.packed = false;
-      player.sittingOut = false;
+      player.sittingOut = this.forcedSittingOut.has(playerId);
+      player.packed = player.sittingOut;
       player.committed = 0;
       player.blindTurns = 0;
     }
@@ -688,6 +690,36 @@ export class TeenPattiGame {
       roundsWon: 0,
     });
     this.actionSeq += 1;
+    return { ok: true };
+  }
+
+  /** Server lifecycle hook: pack the disconnected seat now so it cannot stall
+   * this round, and keep it out of future rounds until a safe-boundary return. */
+  setInactiveSittingOut(playerId: PlayerId): ActionResult {
+    const player = this.players.get(playerId);
+    if (!player) return { ok: false, error: 'That Teen Patti seat does not exist.' };
+    this.forcedSittingOut.add(playerId);
+    player.sittingOut = true;
+    if (this.state === 'BETTING' && !player.packed) {
+      const wasTurn = this.currentTurn === playerId;
+      player.packed = true;
+      this.clearOpenShowRequest();
+      const active = this.activePlayers();
+      if (active.length === 1) this.awardPot(active, null, false, 'LAST_STANDING');
+      else if (wasTurn) {
+        this.currentTurn = this.nextActiveAfter(playerId);
+        this.applyForcedSeenIfNeeded();
+        this.actionSeq += 1;
+      } else {
+        this.actionSeq += 1;
+      }
+    }
+    return { ok: true };
+  }
+
+  resumePlayerNextRound(playerId: PlayerId): ActionResult {
+    if (!this.players.has(playerId)) return { ok: false, error: 'That Teen Patti seat does not exist.' };
+    this.forcedSittingOut.delete(playerId);
     return { ok: true };
   }
 

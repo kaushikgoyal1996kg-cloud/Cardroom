@@ -42,7 +42,7 @@ describe('service worker never touches live game traffic', () => {
     // which would otherwise false-positive a plain text match.
     const code = installHandler
       .split('\n')
-      .map((line) => line.replace(/\/\/.*$/, ''))
+      .map((line) => line.replace(/\/\/.*\r?$/, ''))
       .join('\n');
     expect(code).not.toMatch(/self\.skipWaiting\(\)/);
   });
